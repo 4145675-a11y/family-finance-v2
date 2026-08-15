@@ -22,8 +22,8 @@ Package manager: **npm**, נעול לפי `ADR-0001`. אין להחליף בלי
 | 5 | format | `npm run format` → `prettier --write .` · `format:check` → `prettier --check .` | Format | 1 | **Active** |
 | 6 | typecheck | `npm run typecheck` → `tsc --noEmit` בשורש ובכל workspace | Typecheck | 1 | **Active** |
 | 7 | lint | `npm run lint` → `eslint . --max-warnings=0` (flat config) | Lint | 1 | **Active** |
-| 8 | dev | `npm run dev` → `next dev` ב־`apps/web` | — (לא שער) | 1 | **Active** |
-| 9 | build | `npm run build` → `next build` ב־`apps/web` | Build | 1 | **Active** |
+| 8 | dev | `npm run dev` → `node tools/next.mjs dev` ב־`apps/web` | — (לא שער) | 1 | **Active** |
+| 9 | build | `npm run build` → `node tools/next.mjs build` ב־`apps/web` | Build | 1 | **Active** |
 | 10 | verify (aggregate) | `npm run verify` | כל השערים הפעילים ברצף | 1 | **Active** |
 | 11 | verify (M0 subset) | `npm run verify:m0` | שערי M0 בלבד — נשמר כדי ש־checkpoint M0 יישאר משחזר | 0 | **Active** |
 | 12 | property | `npm run property` → `vitest run --project property` (fast-check) | Property | 5 | Defined |
@@ -33,7 +33,7 @@ Package manager: **npm**, נעול לפי `ADR-0001`. אין להחליף בלי
 
 `unit` רץ על Vitest בלבד מ־Milestone 1 (`ADR-0009`). ב־Milestone 0 הוא רץ על `node --test` כי לא הותקנה שום תלות.
 
-**משתנה סביבה מקומי**: מומלץ לייצא `NEXT_TELEMETRY_DISABLED=1` לפני `dev`/`build`. ב־CI זה כבר מוגדר ברמת ה־workflow (`ADR-0010`).
+**טלמטריה**: אין מה לייצא ידנית. כל פקודת Next של הפרויקט עוברת דרך `tools/next.mjs`, שמכריח `NEXT_TELEMETRY_DISABLED=1` בכל מערכת הפעלה, ודורס גם ערך שהגיע בירושה. ב־CI המשתנה מוגדר גם ברמת ה־workflow כהגנה שנייה. script שמריץ `next` ישירות מפיל את `tools/next-telemetry.test.mjs` (`ADR-0011`).
 
 ## פירוט השערים הפעילים
 

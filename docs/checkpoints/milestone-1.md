@@ -5,6 +5,8 @@
 - **Environment**: local (Windows 10, Node v24.18.1, npm 11.16.0) · אין remote, לא בוצע push
 - **Date**: 2026-08-16
 
+> **תיקון follow-up בתוך אותו ענף**: לאחר הדוח הראשוני נסגר פער שזוהה בו — חסימת הטלמטריה המקומית הייתה המלצה מתועדת ולא אכיפה. נוסף `tools/next.mjs` ובדיקת רגרסיה, ו־`ADR-0010` הוחלף על ידי `ADR-0011`. כל השערים הורצו מחדש. הספירות בטבלה למטה הן של ההרצה האחרונה.
+
 ## Scope
 
 ### הושלם
@@ -45,7 +47,7 @@
 
 **Migrations**: אין.
 
-**ADRs**: 0006 נעילת גרסאות · 0007 מבנה workspaces · 0008 ניגודיות tokens · 0009 runner יחיד · 0010 טלמטריה.
+**ADRs**: 0006 נעילת גרסאות · 0007 מבנה workspaces · 0008 ניגודיות tokens · 0009 runner יחיד · 0010 טלמטריה (הוחלף) · 0011 launcher לחסימת טלמטריה.
 
 ## Commands & Evidence
 
@@ -57,10 +59,10 @@
 | Format | `npm run format:check` | **PASS** | exit 0 |
 | Typecheck | `npm run typecheck` | **PASS** | exit 0; שורש + 2 workspaces; TS 6.0.3 |
 | Lint | `npm run lint` | **PASS** | exit 0; `--max-warnings=0` |
-| Unit | `npm run unit` | **PASS** | 88 passed, 0 failed, **0 skipped**, 4 קבצים |
-| Build | `npm run build` | **PASS** | exit 0; Next 16.3.1; 3 עמודים static |
+| Unit | `npm run unit` | **PASS** | **113 passed**, 0 failed, **0 skipped**, 5 קבצים |
+| Build | `npm run build` | **PASS** | exit 0; Next 16.3.1 דרך `tools/next.mjs`; 3 עמודים static |
 | Built-shell | `npm run check:shell` | **PASS** | 8/8 checks על ה־HTML וה־CSS הבנויים |
-| Forbidden scan | `npm run scan:forbidden` | **PASS** | 17 קבצים, 10 כללים, 0 errors |
+| Forbidden scan | `npm run scan:forbidden` | **PASS** | 19 קבצים, 10 כללים, 0 errors |
 | Traceability | `npm run check:traceability` | **PASS** | 23/23 |
 | **Aggregate** | `npm run verify` | **PASS** | **exit 0 אמיתי** |
 | Property | — | **NOT RUN** | Milestone 5 |
@@ -73,6 +75,7 @@
 |---|---|
 | `dir="rtl"` → `dir="ltr"` ב־`layout.tsx`, ואז build מחדש | `check:shell` **exit 1**, 3 מ־8 נכשלו. המקור שוחזר ואומת |
 | `--color-primary` ב־`globals.css` שונה ב־ספרה אחת מ־`tokens.ts` | `tokens.test.ts` **exit 1** עם כשל ממוקד. שוחזר ואומת |
+| `"start": "next start"` הוחזר כ־script שעוקף את ה־launcher | `next-telemetry.test.mjs` **exit 1**. שוחזר ואומת |
 | ESLint 10 מול תוספי Next | 3 אזהרות `ERESOLVE`; ירדנו ל־9.39.5 עד ל־0 אזהרות |
 | TypeScript 7 מול typescript-eslint | peer `<6.1.0` — ננעל 6.0.3 |
 
@@ -92,6 +95,14 @@
 במהלך העבודה git סימן את `.claude/settings.json` כ־`M`. בדיקה הראתה ש־blob hash שלו **זהה ל־HEAD** (`f24f554`) — כלומר התוכן לא השתנה כלל. הסיבה: `.gitattributes` שנוסף ב־M0 יצר renormalization ממתין לקובץ שחויב לפניו.
 
 טיפול: נוסף `.claude/settings.json -text` ל־`.gitattributes` כדי שקובץ הגדרות האבטחה לא ינורמל על ידי כלים לעולם, ואז `git add --renormalize` רענן את רשומת ה־index. אומת: hash זהה, staged diff ריק. **הקובץ לא נערך.**
+
+## טלמטריה — מה נסגר ומה נשאר פתוח
+
+`ADR-0010` כיסה את CI בלבד והשאיר את ההרצה המקומית כהמלצה. הפער נסגר ב־`ADR-0011`: `tools/next.mjs` מכריח `NEXT_TELEMETRY_DISABLED=1` בכל פקודת Next של הפרויקט, בכל מערכת הפעלה, ודורס גם ערך שהגיע בירושה. `tools/next-telemetry.test.mjs` (25 בדיקות) סורק כל `package.json` ונכשל אם script מריץ `next` ישירות.
+
+נשאר פתוח ומוצהר: מפתח שמקליד `npx next dev` ידנית בטרמינל עוקף את ה־launcher. זה מחוץ לשליטת המאגר.
+
+לא הורצה `next telemetry disable` ולא נגעתי בשום קובץ ברמת המשתמש — הרישום שנוצר אולי ב־build הראשון נשאר כפי שהוא, וההסרה שלו היא פעולה שהמשתמש מבצע בעצמו אם ירצה.
 
 ## Risks & rollback
 

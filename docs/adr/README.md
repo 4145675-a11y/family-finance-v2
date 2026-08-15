@@ -22,4 +22,5 @@
 | [0007](0007-workspace-layout.md) | מבנה workspaces — רק חבילות עם תוכן אמיתי | Accepted | 1 |
 | [0008](0008-design-token-contrast.md) | שתי התאמות ב־palette לאחר אימות ניגודיות | Accepted | 1 |
 | [0009](0009-single-test-runner.md) | Vitest כ־runner יחיד; בדיקות ללא JSX | Accepted | 1 |
-| [0010](0010-framework-telemetry-disabled.md) | טלמטריית Next מושבתת ב־CI | Accepted | 1 |
+| [0010](0010-framework-telemetry-disabled.md) | טלמטריית Next מושבתת ב־CI | Superseded by 0011 | 1 |
+| [0011](0011-next-launcher-telemetry.md) | launcher שאוכף חסימת טלמטריה בכל פלטפורמה | Accepted | 1 |
