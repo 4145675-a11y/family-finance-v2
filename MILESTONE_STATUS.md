@@ -4,9 +4,10 @@
 
 - **תאריך עדכון אחרון**: 2026-08-15
 - **Milestone פעיל**: 0 — Bootstrap
-- **סטטוס**: הושלם. ממתין לאישור מפורש להתחלת Milestone 1.
-- **Commit בזמן העדכון**: `7ac6d78` (עבודת M0 טרם בוצע לה commit)
-- **Branch**: `master`
+- **סטטוס**: הושלם ונשמר. ממתין לאישור מפורש להתחלת Milestone 1.
+- **Commit של יישום M0**: `273d8a9` — `chore: complete milestone 0 bootstrap` (26 קבצים)
+- **Commit בסיס קודם**: `7ac6d78` — `chore: add planning and safety baseline`
+- **Branch**: `main` (שונה שמו מ־`master`; אין remote ולא בוצע push)
 
 ## מקרא
 
@@ -18,7 +19,7 @@
 
 | # | Milestone | סטטוס | Checkpoint | הערה |
 |---:|---|---|---|---|
-| 0 | Bootstrap | **Complete — evidenced** | [milestone-0](docs/checkpoints/milestone-0.md) | 4 שערים פעילים, 5 ADRs, 23 דרישות ממופות |
+| 0 | Bootstrap | **Complete — evidenced** | [milestone-0](docs/checkpoints/milestone-0.md) | נשמר ב־`273d8a9`; 4 שערים פעילים, 5 ADRs, 23 דרישות ממופות |
 | 1 | Repository Foundation | Not started | — | דורש אישור מפורש |
 | 2 | Identity & Isolation | Not started | — | דורש חשבון Supabase — ראה חסמים |
 | 3 | Financial Accounts & Opening Picture | Not started | — | |

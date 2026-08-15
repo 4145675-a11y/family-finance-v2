@@ -1,9 +1,11 @@
 # CHECKPOINT — Milestone 0: Bootstrap
 
 - **Result**: **PASS**
-- **Branch**: `master` · **Commit בבסיס**: `7ac6d78` · **Environment**: local (Windows 10, Node v24.18.1, npm 11.16.0)
+- **Commit של יישום M0**: `273d8a9` — `chore: complete milestone 0 bootstrap` (26 קבצים, 1415 הוספות)
+- **Commit בסיס קודם**: `7ac6d78` · **Branch**: `main` (שונה שמו מ־`master`)
+- **Environment**: local (Windows 10, Node v24.18.1, npm 11.16.0) · אין remote, לא בוצע push
 - **Date**: 2026-08-15
-- **הערה**: עבודת ה־milestone טרם בוצע לה commit. ממתין להוראת המשתמש.
+- **הערה**: עדכוני התיעוד שנוצרו לאחר `273d8a9` נשמרים ב־commit תיעוד נפרד.
 
 ## Scope
 
