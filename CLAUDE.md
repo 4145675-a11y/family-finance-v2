@@ -10,7 +10,15 @@ README, PRODUCT, FINANCIAL, UX/DESIGN, ARCHITECTURE, SECURITY, TEST, MILESTONES,
 
 ## פקודות
 
-מלא ב־Milestone 0: install, dev, format, typecheck, lint, unit, property, integration, E2E, build, forbidden scan. אין החלפת package manager ללא ADR.
+Package manager: **npm**, נעול (`ADR-0001`). אין החלפה ללא ADR. cache פנימי: `.npm-cache` — אין התקנה global.
+
+פעילות היום: `npm ci --ignore-scripts` (install) · `npm run unit` · `npm run scan:forbidden` · `npm run check:traceability` · `npm run verify:m0` (הכל ברצף).
+
+מוגדרות ויופעלו ב־milestone שלהן (`ADR-0003`): format, typecheck, lint, dev, build (1) · integration/RLS (2) · property (5) · E2E, a11y/RTL (6).
+
+החוזה המלא: `docs/COMMANDS.md`. השערים: `docs/CI-GATES.md`. פקודה נכנסת ל־`package.json` רק כשהיא רצה באמת — אין script שמדפיס "not implemented" ואין script ריק שמחזיר 0.
+
+ב־pipeline יש לשמר קוד יציאה אמיתי: `set -o pipefail`, לכידת `$?` מיד, `exit "$code"`. קוד יציאה של `tail`/`grep` אינו ראיה.
 
 ## כללי כסף
 

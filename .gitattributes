@@ -1,0 +1,36 @@
+# Line-ending policy.
+#
+# Git decides per file whether it is text; every text file is stored with LF in the
+# repository AND checked out with LF in the working tree, on every platform. This keeps
+# the repo consistent with .editorconfig (end_of_line = lf) and prevents CRLF noise in
+# diffs and in Prettier once the formatter lands in Milestone 1.
+* text=auto eol=lf
+
+# Explicitly binary: never normalized, never diffed as text.
+# Corrupting a binary through line-ending translation is silent and unrecoverable.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.zip binary
+*.gz binary
+*.7z binary
+*.xls binary
+*.xlsx binary
+*.mp3 binary
+*.m4a binary
+*.wav binary
+*.webm binary
+*.mp4 binary
+
+# Generated lockfile: keep it in the repo, keep it out of review diffs.
+package-lock.json linguist-generated=true

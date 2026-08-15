@@ -1,0 +1,42 @@
+# dependencies
+node_modules/
+.pnp/
+.pnp.js
+.npm-cache/
+
+# build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# test / coverage artifacts
+coverage/
+playwright-report/
+test-results/
+.vitest/
+
+# environment and secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+service-role*.json
+
+# local temp / uploads (import pipeline scratch space)
+tmp/
+.tmp/
+uploads/
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# logs
+*.log
+npm-debug.log*

@@ -1,0 +1,55 @@
+name: CI
+
+# Quality gates. Every step here runs a real command and fails the build on a real failure.
+# Gates that are not yet implemented are NOT represented as passing steps — see docs/CI-GATES.md
+# for the full gate table and the milestone in which each one becomes active (ADR-0003).
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: Milestone 0 gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install (reproducible, project-local)
+        run: npm ci --ignore-scripts
+
+      - name: Verify npm cache stays inside the repository
+        run: |
+          set -euo pipefail
+          cache_path="$(npm config get cache)"
+          echo "npm cache: ${cache_path}"
+          case "${cache_path}" in
+            "${GITHUB_WORKSPACE}"*) echo "cache is project-local" ;;
+            *) echo "cache escapes the project root" >&2; exit 1 ;;
+          esac
+
+      - name: Unit tests
+        run: npm run unit
+
+      - name: Forbidden-artifact scan
+        run: npm run scan:forbidden
+
+      - name: Traceability gate
+        run: npm run check:traceability
