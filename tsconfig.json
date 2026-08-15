@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  /* Root-level TypeScript that belongs to no workspace. Without this, the linter's
+     type-aware rules cannot resolve these files and refuse to check them. */
+  "include": ["vitest.config.ts"]
+}

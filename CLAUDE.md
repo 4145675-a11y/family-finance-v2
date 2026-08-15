@@ -12,9 +12,9 @@ README, PRODUCT, FINANCIAL, UX/DESIGN, ARCHITECTURE, SECURITY, TEST, MILESTONES,
 
 Package manager: **npm**, נעול (`ADR-0001`). אין החלפה ללא ADR. cache פנימי: `.npm-cache` — אין התקנה global.
 
-פעילות היום: `npm ci --ignore-scripts` (install) · `npm run unit` · `npm run scan:forbidden` · `npm run check:traceability` · `npm run verify:m0` (הכל ברצף).
+פעילות היום: `npm ci --ignore-scripts` (install) · `format` / `format:check` · `typecheck` · `lint` · `unit` (Vitest) · `dev` · `build` · `check:shell` · `scan:forbidden` · `check:traceability` · **`npm run verify`** (כל השערים ברצף).
 
-מוגדרות ויופעלו ב־milestone שלהן (`ADR-0003`): format, typecheck, lint, dev, build (1) · integration/RLS (2) · property (5) · E2E, a11y/RTL (6).
+מוגדרות ויופעלו ב־milestone שלהן (`ADR-0003`): integration/RLS (2) · property (5) · E2E, axe, RTL visual (6).
 
 החוזה המלא: `docs/COMMANDS.md`. השערים: `docs/CI-GATES.md`. פקודה נכנסת ל־`package.json` רק כשהיא רצה באמת — אין script שמדפיס "not implemented" ואין script ריק שמחזיר 0.
 

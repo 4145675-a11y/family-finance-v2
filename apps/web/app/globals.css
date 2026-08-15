@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+
+/**
+ * Theme tokens.
+ *
+ * Mirrors packages/design-system/src/tokens.ts, which is the source of truth.
+ * packages/design-system/src/tokens.test.ts fails if the two drift apart, so edit
+ * tokens.ts first and copy the value here.
+ */
+@theme {
+  --color-background: #f7f8f5;
+  --color-surface: #ffffff;
+  --color-text-primary: #18302b;
+  --color-text-secondary: #5e706c;
+  --color-primary: #285e61;
+  --color-primary-hover: #204e50;
+  --color-success: #2f7d62;
+  --color-attention: #9e6515;
+  --color-danger: #b43a3a;
+  --color-border: #dde5e1;
+  --color-border-interactive: #8b908e;
+  --color-focus: #2b6cb0;
+
+  --radius-control: 8px;
+  --radius-card: 14px;
+  --radius-hero: 18px;
+
+  --font-sans:
+    'Assistant', 'Heebo', system-ui, -apple-system, 'Segoe UI', 'Noto Sans Hebrew', sans-serif;
+
+  --text-body: 16px;
+  --text-body--line-height: 1.55;
+  --text-small: 14px;
+  --text-small--line-height: 1.5;
+}
+
+@layer base {
+  html {
+    /* Prevents a wide child from scrolling the whole document sideways.
+       03-UX-SPEC.md UX-RTL-001: no horizontal overflow at any width. */
+    overflow-x: hidden;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    /* Long Hebrew words and pasted identifiers must wrap rather than widen the page. */
+    overflow-wrap: break-word;
+  }
+
+  /* A visible focus ring is a requirement, not a preference (UX-A11Y-001). */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

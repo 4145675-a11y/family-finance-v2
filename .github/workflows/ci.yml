@@ -17,11 +17,15 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # The framework must not phone home from a financial project's build (ADR-0010).
+  NEXT_TELEMETRY_DISABLED: '1'
+
 jobs:
   gates:
-    name: Milestone 0 gates
+    name: Quality gates
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -45,8 +49,23 @@ jobs:
             *) echo "cache escapes the project root" >&2; exit 1 ;;
           esac
 
+      - name: Format check
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
       - name: Unit tests
         run: npm run unit
+
+      - name: Build
+        run: npm run build
+
+      - name: Built-shell contract (lang/dir/overflow/a11y)
+        run: npm run check:shell
 
       - name: Forbidden-artifact scan
         run: npm run scan:forbidden

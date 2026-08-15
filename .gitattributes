@@ -34,3 +34,9 @@
 
 # Generated lockfile: keep it in the repo, keep it out of review diffs.
 package-lock.json linguist-generated=true
+
+# Security settings are committed byte-for-byte and are never rewritten by tooling,
+# including by end-of-line normalization. Without this, the `* text=auto eol=lf` rule
+# above marks the file as pending renormalization and invites a tool-driven rewrite of
+# a file that only a human should change.
+.claude/settings.json -text

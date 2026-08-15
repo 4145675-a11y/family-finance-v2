@@ -18,3 +18,8 @@
 | [0003](0003-no-dependencies-in-milestone-0.md) | Milestone 0 אינו מתקין תלויות; חוזה פקודות במקום scripts מדומים | Accepted | 0 |
 | [0004](0004-requirements-registry.md) | מרשם דרישות נפרד במקום עריכת מסמכי הסמכות | Accepted | 0 |
 | [0005](0005-forbidden-scan-self-exclusion.md) | טבלת הכללים של ה־forbidden scan מוחרגת ומכוסה בבדיקות | Accepted | 0 |
+| [0006](0006-locked-dependency-versions.md) | נעילת גרסאות — שתי סטיות מהבסיס של ADR-0002 | Accepted | 1 |
+| [0007](0007-workspace-layout.md) | מבנה workspaces — רק חבילות עם תוכן אמיתי | Accepted | 1 |
+| [0008](0008-design-token-contrast.md) | שתי התאמות ב־palette לאחר אימות ניגודיות | Accepted | 1 |
+| [0009](0009-single-test-runner.md) | Vitest כ־runner יחיד; בדיקות ללא JSX | Accepted | 1 |
+| [0010](0010-framework-telemetry-disabled.md) | טלמטריית Next מושבתת ב־CI | Accepted | 1 |

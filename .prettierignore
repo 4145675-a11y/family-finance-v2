@@ -1,0 +1,29 @@
+# Generated or vendored
+node_modules/
+.npm-cache/
+.next/
+dist/
+build/
+coverage/
+package-lock.json
+apps/web/next-env.d.ts
+
+# Authority documents.
+# The constitution is not reformatted by tooling: a whitespace rewrite of a document
+# that outranks the code is an unauthorised change to it. Edit these by hand only.
+00-BOOTSTRAP-PROMPT.md
+01-PRODUCT-SPEC.md
+02-FINANCIAL-RULES.md
+03-UX-SPEC.md
+04-DESIGN-SYSTEM.md
+05-ARCHITECTURE-DATA.md
+07-SECURITY-PRIVACY.md
+08-TEST-PLAN.md
+09-MILESTONES.md
+10-TRACEABILITY-MATRIX.md
+11-OPERATIONS.md
+CHECKPOINT-TEMPLATE.md
+CLAUDE.md
+README.md
+MILESTONE_STATUS.md
+docs/

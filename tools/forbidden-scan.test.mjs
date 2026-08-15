@@ -5,11 +5,11 @@
  * containing the literals it searches for). These tests are what makes that exclusion
  * acceptable: every rule must fire on a positive fixture and stay silent on clean code.
  *
- * Runner: node:test (built into Node) — no dependencies required at Milestone 0.
+ * Runner: Vitest. Milestone 0 ran these on node:test because no dependency was installed
+ * yet; Milestone 1 consolidated on one runner (ADR-0009). The assertions are unchanged.
  */
 
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, expect, test } from 'vitest';
 
 import { RULES, findViolations, isProductionPath, camelSplit } from './forbidden-scan.mjs';
 
@@ -41,50 +41,50 @@ const CLEAN_LINES = [
 
 test('every rule has a positive fixture', () => {
   const ruleIds = RULES.map((rule) => rule.id).sort();
-  assert.deepEqual(Object.keys(POSITIVE_FIXTURES).sort(), ruleIds);
+  expect(Object.keys(POSITIVE_FIXTURES).sort()).toEqual(ruleIds);
 });
 
-for (const rule of RULES) {
-  test(`rule ${rule.id} fires on its fixture`, () => {
-    const matched = findViolations(POSITIVE_FIXTURES[rule.id], true).map((r) => r.id);
-    assert.ok(
-      matched.includes(rule.id),
-      `expected ${rule.id} to match ${JSON.stringify(POSITIVE_FIXTURES[rule.id])}, matched: ${matched.join(', ') || 'nothing'}`,
-    );
+describe('each rule fires on its fixture', () => {
+  test.each(RULES.map((rule) => [rule.id]))('%s', (id) => {
+    const matched = findViolations(POSITIVE_FIXTURES[id], true).map((rule) => rule.id);
+    expect(matched, `fixture: ${POSITIVE_FIXTURES[id]}`).toContain(id);
   });
-}
+});
 
 test('clean production code triggers no rule', () => {
   for (const line of CLEAN_LINES) {
-    const matched = findViolations(line, true).map((r) => r.id);
-    assert.deepEqual(matched, [], `unexpected match on: ${line}`);
+    expect(
+      findViolations(line, true).map((rule) => rule.id),
+      `line: ${line}`,
+    ).toEqual([]);
   }
 });
 
 test('production-only rules are suppressed in test paths', () => {
   const productionOnlyIds = RULES.filter((rule) => rule.productionOnly).map((rule) => rule.id);
-  assert.ok(productionOnlyIds.length > 0, 'expected at least one production-only rule');
+  expect(productionOnlyIds.length).toBeGreaterThan(0);
 
   for (const id of productionOnlyIds) {
-    const matched = findViolations(POSITIVE_FIXTURES[id], false).map((r) => r.id);
-    assert.ok(!matched.includes(id), `${id} must not fire outside a production path`);
+    expect(findViolations(POSITIVE_FIXTURES[id], false).map((rule) => rule.id)).not.toContain(
+      id,
+    );
   }
 });
 
 test('rules that are not production-only fire everywhere', () => {
-  const alwaysOn = RULES.filter((rule) => !rule.productionOnly);
-  for (const rule of alwaysOn) {
-    const matched = findViolations(POSITIVE_FIXTURES[rule.id], false).map((r) => r.id);
-    assert.ok(matched.includes(rule.id), `${rule.id} must fire in test paths as well`);
+  for (const rule of RULES.filter((r) => !r.productionOnly)) {
+    expect(findViolations(POSITIVE_FIXTURES[rule.id], false).map((r) => r.id)).toContain(
+      rule.id,
+    );
   }
 });
 
 test('path classification recognises test and fixture locations', () => {
-  assert.equal(isProductionPath('packages/finance-engine/src/safe-spend.ts'), true);
-  assert.equal(isProductionPath('packages/finance-engine/src/safe-spend.test.ts'), false);
-  assert.equal(isProductionPath('apps/web/tests/home.spec.ts'), false);
-  assert.equal(isProductionPath('packages/contracts/fixtures/debt.ts'), false);
-  assert.equal(isProductionPath('apps/web/e2e/onboarding.ts'), false);
+  expect(isProductionPath('packages/finance-engine/src/safe-spend.ts')).toBe(true);
+  expect(isProductionPath('packages/finance-engine/src/safe-spend.test.ts')).toBe(false);
+  expect(isProductionPath('apps/web/tests/home.spec.ts')).toBe(false);
+  expect(isProductionPath('packages/contracts/fixtures/debt.ts')).toBe(false);
+  expect(isProductionPath('apps/web/e2e/onboarding.ts')).toBe(false);
 });
 
 test('test doubles are detected inside camelCase and PascalCase identifiers', () => {
@@ -95,20 +95,23 @@ test('test doubles are detected inside camelCase and PascalCase identifiers', ()
     'import { buildDummyHousehold } from "../support";',
   ];
   for (const line of disguised) {
-    const matched = findViolations(line, true).map((rule) => rule.id);
-    assert.ok(matched.includes('mock-in-production-path'), `missed test double in: ${line}`);
+    expect(
+      findViolations(line, true).map((rule) => rule.id),
+      `line: ${line}`,
+    ).toContain('mock-in-production-path');
   }
 });
 
 test('camelSplit does not break rules that rely on the raw identifier', () => {
-  assert.equal(camelSplit('await seedProduction(db);'), 'await seed Production(db);');
-  const matched = findViolations('await seedProduction(db);', true).map((rule) => rule.id);
-  assert.ok(matched.includes('production-seed'), 'raw-form rule must still match after adding the split variant');
+  expect(camelSplit('await seedProduction(db);')).toBe('await seed Production(db);');
+  expect(findViolations('await seedProduction(db);', true).map((rule) => rule.id)).toContain(
+    'production-seed',
+  );
 });
 
 test('every rule carries a severity and a rationale', () => {
   for (const rule of RULES) {
-    assert.ok(['error', 'warn'].includes(rule.severity), `${rule.id} has an invalid severity`);
-    assert.ok(rule.why.length > 20, `${rule.id} needs a rationale a reviewer can act on`);
+    expect(['error', 'warn']).toContain(rule.severity);
+    expect(rule.why.length, `${rule.id} needs an actionable rationale`).toBeGreaterThan(20);
   }
 });

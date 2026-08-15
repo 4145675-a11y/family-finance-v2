@@ -96,7 +96,8 @@ export const RULES = [
     id: 'disabled-test',
     severity: 'error',
     productionOnly: false,
-    pattern: /\b(?:describe|it|test|context)\.(?:skip|only|todo|failing)\b|\bx(?:describe|it|test)\s*\(|\bf(?:describe|it|test)\s*\(/,
+    pattern:
+      /\b(?:describe|it|test|context)\.(?:skip|only|todo|failing)\b|\bx(?:describe|it|test)\s*\(|\bf(?:describe|it|test)\s*\(/,
     why: 'Skipped, focused or pending test. A gate that contains disabled tests is not a gate.',
   },
   {
@@ -124,7 +125,8 @@ export const RULES = [
     id: 'tautological-assertion',
     severity: 'error',
     productionOnly: false,
-    pattern: /expect\s*\(\s*(?:true|1)\s*\)\s*\.\s*to(?:Be|Equal|BeTruthy)\s*\(\s*(?:true|1)?\s*\)|assert\s*\(\s*true\s*\)/,
+    pattern:
+      /expect\s*\(\s*(?:true|1)\s*\)\s*\.\s*to(?:Be|Equal|BeTruthy)\s*\(\s*(?:true|1)?\s*\)|assert\s*\(\s*true\s*\)/,
     why: 'Assertion passes regardless of the behaviour under test.',
   },
   {
@@ -138,7 +140,8 @@ export const RULES = [
     id: 'inline-secret-assignment',
     severity: 'error',
     productionOnly: false,
-    pattern: /\b(?:SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE|ANTHROPIC_API_KEY|OPENAI_API_KEY|SECRET_KEY|ACCESS_TOKEN)\b\s*[:=]\s*['"][^'"\s$][^'"]{7,}['"]/,
+    pattern:
+      /\b(?:SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE|ANTHROPIC_API_KEY|OPENAI_API_KEY|SECRET_KEY|ACCESS_TOKEN)\b\s*[:=]\s*['"][^'"\s$][^'"]{7,}['"]/,
     why: 'Secret value assigned inline. Secrets belong in the secret manager, never in source.',
   },
   {
@@ -229,7 +232,12 @@ function main() {
       .split(/\r?\n/)
       .forEach((text, index) => {
         for (const rule of findViolations(text, production)) {
-          findings.push({ file: relPath, line: index + 1, rule, text: text.trim().slice(0, 160) });
+          findings.push({
+            file: relPath,
+            line: index + 1,
+            rule,
+            text: text.trim().slice(0, 160),
+          });
         }
       });
   }
@@ -241,10 +249,14 @@ function main() {
   console.log(`  roots:    ${SCAN_ROOTS.join(', ')}`);
   console.log(`  files:    ${scanned.length} scanned`);
   console.log(`  rules:    ${RULES.length} active`);
-  console.log(`  excluded: ${[...SELF_EXCLUDED].join(', ')} (rule table; covered by unit tests)`);
+  console.log(
+    `  excluded: ${[...SELF_EXCLUDED].join(', ')} (rule table; covered by unit tests)`,
+  );
 
   for (const finding of [...errors, ...warnings]) {
-    console.log(`\n${finding.rule.severity.toUpperCase()} ${finding.rule.id}  ${finding.file}:${finding.line}`);
+    console.log(
+      `\n${finding.rule.severity.toUpperCase()} ${finding.rule.id}  ${finding.file}:${finding.line}`,
+    );
     console.log(`  ${finding.text}`);
     console.log(`  why: ${finding.rule.why}`);
   }

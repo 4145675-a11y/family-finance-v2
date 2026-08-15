@@ -13,10 +13,10 @@
 | Unit | `npm run unit` | כן | 0 | ✅ |
 | Forbidden scan | `npm run scan:forbidden` | כן | 0 | ✅ |
 | Traceability | `npm run check:traceability` | כן | 0 | ✅ |
-| Format | `npm run format:check` | כן | 1 | — |
-| Typecheck | `npm run typecheck` | כן | 1 | — |
-| Lint | `npm run lint` | כן | 1 | — |
-| Build | `npm run build` | כן | 1 | — |
+| Format | `npm run format:check` | כן | 1 | ✅ |
+| Typecheck | `npm run typecheck` | כן | 1 | ✅ |
+| Lint | `npm run lint` | כן | 1 | ✅ |
+| Build | `npm run build` | כן | 1 | ✅ |
 | Integration + RLS negative | `npm run integration` | כן | 2 | — |
 | Property | `npm run property` | כן | 5 | — |
 | E2E smoke | `npm run e2e -- --grep @smoke` | כן | 6 | — |

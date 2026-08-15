@@ -13,22 +13,27 @@ Package manager: **npm**, נעול לפי `ADR-0001`. אין להחליף בלי
 
 | # | פקודה | מחרוזת | שער | Milestone | סטטוס |
 |---:|---|---|---|---:|---|
-| 1 | install | `npm ci` (ב־CI) / `npm install` (מקומי) | reproducible install | 0 | **Active** |
-| 2 | unit | `npm run unit` → `node --test "tools/**/*.test.mjs"` | Unit | 0 | **Active** |
+| # | פקודה | מחרוזת | שער | Milestone | סטטוס |
+|---:|---|---|---|---:|---|
+| 1 | install | `npm ci --ignore-scripts` (ב־CI) / `npm install` (מקומי) | reproducible install | 0 | **Active** |
+| 2 | unit | `npm run unit` → `vitest run` | Unit | 0 | **Active** |
 | 3 | forbidden scan | `npm run scan:forbidden` → `node tools/forbidden-scan.mjs` | No False Completion | 0 | **Active** |
 | 4 | traceability | `npm run check:traceability` → `node tools/check-traceability.mjs` | דרישה↔מיפוי | 0 | **Active** |
-| 5 | verify (aggregate) | `npm run verify:m0` | כל שערי M0 ברצף | 0 | **Active** |
-| 6 | format | `npm run format` → `prettier --write .` · `format:check` → `prettier --check .` | Format | 1 | Defined |
-| 7 | typecheck | `npm run typecheck` → `tsc --noEmit` בכל workspace | Typecheck | 1 | Defined |
-| 8 | lint | `npm run lint` → `eslint .` (flat config, `--max-warnings=0`) | Lint | 1 | Defined |
-| 9 | dev | `npm run dev` → `next dev` ב־`apps/web` | — (לא שער) | 1 | Defined |
-| 10 | build | `npm run build` → `next build` ב־`apps/web` | Build | 1 | Defined |
-| 11 | property | `npm run property` → `vitest run --project property` (fast-check) | Property | 5 | Defined |
-| 12 | integration | `npm run integration` → `vitest run --project integration` (כולל RLS negative tests) | Integration/RLS | 2 | Defined |
-| 13 | E2E | `npm run e2e` → `playwright test` | E2E | 6 | Defined |
-| 14 | a11y/visual | `npm run a11y` → axe + RTL golden snapshots ב־360/390/768/1280 | Accessibility/RTL | 6 | Defined |
+| 5 | format | `npm run format` → `prettier --write .` · `format:check` → `prettier --check .` | Format | 1 | **Active** |
+| 6 | typecheck | `npm run typecheck` → `tsc --noEmit` בשורש ובכל workspace | Typecheck | 1 | **Active** |
+| 7 | lint | `npm run lint` → `eslint . --max-warnings=0` (flat config) | Lint | 1 | **Active** |
+| 8 | dev | `npm run dev` → `next dev` ב־`apps/web` | — (לא שער) | 1 | **Active** |
+| 9 | build | `npm run build` → `next build` ב־`apps/web` | Build | 1 | **Active** |
+| 10 | verify (aggregate) | `npm run verify` | כל השערים הפעילים ברצף | 1 | **Active** |
+| 11 | verify (M0 subset) | `npm run verify:m0` | שערי M0 בלבד — נשמר כדי ש־checkpoint M0 יישאר משחזר | 0 | **Active** |
+| 12 | property | `npm run property` → `vitest run --project property` (fast-check) | Property | 5 | Defined |
+| 13 | integration | `npm run integration` → `vitest run --project integration` (כולל RLS negative tests) | Integration/RLS | 2 | Defined |
+| 14 | E2E | `npm run e2e` → `playwright test` | E2E | 6 | Defined |
+| 15 | a11y/visual | `npm run a11y` → axe + RTL golden snapshots ב־360/390/768/1280 | Accessibility/RTL | 6 | Defined |
 
-הפקודה `unit` תורחב ב־Milestone 1 כך שתריץ גם את בדיקות ה־workspaces דרך Vitest, לצד בדיקות הכלים שרצות ב־`node --test`. `node --test` נבחר ל־Milestone 0 משום שהוא מובנה ב־Node ואינו דורש התקנה.
+`unit` רץ על Vitest בלבד מ־Milestone 1 (`ADR-0009`). ב־Milestone 0 הוא רץ על `node --test` כי לא הותקנה שום תלות.
+
+**משתנה סביבה מקומי**: מומלץ לייצא `NEXT_TELEMETRY_DISABLED=1` לפני `dev`/`build`. ב־CI זה כבר מוגדר ברמת ה־workflow (`ADR-0010`).
 
 ## פירוט השערים הפעילים
 
@@ -53,7 +58,15 @@ exit 0 = נקי · exit 1 = ממצאי error · exit 2 = הסורק עצמו נ�
 
 ### `npm run unit`
 
-מריץ את בדיקות הכלים דרך `node --test`. כרגע: כיסוי מלא לכללי ה־forbidden scan (18 בדיקות).
+Vitest, runner יחיד (`ADR-0009`). כרגע 88 בדיקות בארבעה קבצים: כללי ה־forbidden scan (18), חישוב ניגודיות (15), tokens והתאמתם ל־CSS (42), ומעטפת ה־HTML העברית (13). `allowOnly: false` ו־`passWithNoTests: false` — ריצה ריקה או בדיקה ממוקדת נכשלות.
+
+### `npm run typecheck`
+
+`tsc --noEmit` בשורש (קובצי קונפיגורציה) ובכל workspace. `tsconfig.base.json` מפעיל `strict` יחד עם `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitReturns`, `noUnusedLocals` ו־`noUnusedParameters`.
+
+### `npm run lint`
+
+ESLint flat config. הכללים של Next מוגבלים ל־`apps/web/**` בלבד — ללא הגבלה הם מדווחים על תיקיית `pages/` שאינה קיימת בחבילות אחרות. type-aware linting פעיל דרך `projectService`, כולל `no-floating-promises` ו־`no-misused-promises`, שתופסים הבטחה שנזרקה בשקט בזרימת כסף.
 
 ## כללי הרצה
 

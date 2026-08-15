@@ -14,9 +14,30 @@
     "packages/*"
   ],
   "scripts": {
-    "unit": "node --test \"tools/**/*.test.mjs\"",
+    "dev": "npm run dev --workspace @family-finance/web",
+    "build": "npm run build --workspace @family-finance/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit && npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "unit": "vitest run",
     "scan:forbidden": "node tools/forbidden-scan.mjs",
     "check:traceability": "node tools/check-traceability.mjs",
-    "verify:m0": "npm run unit && npm run scan:forbidden && npm run check:traceability"
+    "check:shell": "node tools/check-built-shell.mjs",
+    "verify:m0": "npm run unit && npm run scan:forbidden && npm run check:traceability",
+    "verify": "npm run format:check && npm run typecheck && npm run lint && npm run unit && npm run build && npm run check:shell && npm run scan:forbidden && npm run check:traceability"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.1",
+    "globals": "17.11.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.10"
   }
 }

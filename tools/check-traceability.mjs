@@ -91,7 +91,9 @@ function main() {
 
   const unregistered = [...sourceIds].filter((id) => !registered.has(id));
   if (unregistered.length > 0) {
-    violations.push(`IDs used in authority documents but absent from ${REGISTRY}: ${list(unregistered)}`);
+    violations.push(
+      `IDs used in authority documents but absent from ${REGISTRY}: ${list(unregistered)}`,
+    );
   }
 
   const unmapped = [...registered].filter((id) => !mapped.has(id));
@@ -101,7 +103,9 @@ function main() {
 
   const orphanMappings = [...mapped].filter((id) => !registered.has(id));
   if (orphanMappings.length > 0) {
-    violations.push(`IDs mapped in ${MATRIX} but not registered in ${REGISTRY}: ${list(orphanMappings)}`);
+    violations.push(
+      `IDs mapped in ${MATRIX} but not registered in ${REGISTRY}: ${list(orphanMappings)}`,
+    );
   }
 
   const badSources = registryRows.filter((row) => {
@@ -109,7 +113,9 @@ function main() {
     return cited !== null && !existsSync(join(REPO_ROOT, cited[0]));
   });
   if (badSources.length > 0) {
-    violations.push(`Registry rows citing a missing document: ${list(badSources.map((r) => r.id))}`);
+    violations.push(
+      `Registry rows citing a missing document: ${list(badSources.map((r) => r.id))}`,
+    );
   }
 
   console.log('Traceability gate');
@@ -134,6 +140,9 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error('Traceability gate failed to run:', error instanceof Error ? error.message : error);
+  console.error(
+    'Traceability gate failed to run:',
+    error instanceof Error ? error.message : error,
+  );
   process.exitCode = 2;
 }

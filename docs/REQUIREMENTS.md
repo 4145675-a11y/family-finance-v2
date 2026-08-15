@@ -37,8 +37,8 @@
 | `FIN-ROLL-001` | גלגול חוב: פירעון, חוב חדש וקישור כשלוש עובדות נפרדות | 02-FINANCIAL-RULES.md § גלגול חוב והחלפת נושה | 4–6 | Registered |
 | `UX-HOME-001` | שלוש תשובות הליבה מובנות תוך 10 שניות | 03-UX-SPEC.md § קבלה | 6 | Registered |
 | `UX-TRUST-001` | כל מספר מרכזי מסביר מקור/זמן/confidence | 03-UX-SPEC.md § קבלה | 6 | Registered |
-| `UX-RTL-001` | אין horizontal overflow ב־360/390/768/1280 | 03-UX-SPEC.md § קבלה | 1/6 | Registered |
-| `UX-A11Y-001` | WCAG 2.2 AA, מקלדת, focus, labels, reduced motion, text scaling | 03-UX-SPEC.md § קבלה | 1/6/14 | Registered |
+| `UX-RTL-001` | אין horizontal overflow ב־360/390/768/1280 | 03-UX-SPEC.md § קבלה | 1/6 | Partial (M1 shell) |
+| `UX-A11Y-001` | WCAG 2.2 AA, מקלדת, focus, labels, reduced motion, text scaling | 03-UX-SPEC.md § קבלה | 1/6/14 | Partial (M1 palette + focus + motion) |
 | `UX-STATE-001` | כל המצבים המחייבים קיימים ונבדקו בכל core screen | 03-UX-SPEC.md § מצבים מחייבים | 6+ | Registered |
 | `UX-DEBT-002` | כרטיס "מה קרה באמת לחוב" וציר זמן מקושר | 03-UX-SPEC.md § מסכים | 6 | Registered |
 | `SEC-RLS-001` | RLS על כל טבלה פרטית עם בדיקות שליליות בשני households | 07-SECURITY-PRIVACY.md § Authorization | 2+ | Registered |
