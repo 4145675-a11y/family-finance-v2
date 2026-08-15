@@ -1,0 +1,30 @@
+﻿{
+  "permissions": {
+    "defaultMode": "default",
+    "deny": [
+      "Read(~/Desktop/**)",
+      "Edit(~/Desktop/**)",
+      "Read(~/Documents/**)",
+      "Edit(~/Documents/**)",
+      "Read(~/Downloads/**)",
+      "Edit(~/Downloads/**)",
+      "Read(~/OneDrive/**)",
+      "Edit(~/OneDrive/**)",
+      "Read(~/Pictures/**)",
+      "Edit(~/Pictures/**)",
+      "Read(~/Videos/**)",
+      "Edit(~/Videos/**)",
+      "Read(~/Music/**)",
+      "Edit(~/Music/**)",
+      "Read(~/.ssh/**)",
+      "Edit(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Edit(~/.aws/**)",
+      "Read(~/.azure/**)",
+      "Edit(~/.azure/**)",
+      "Read(~/.kube/**)",
+      "Edit(~/.kube/**)"
+    ]
+  },
+  "remoteControlAtStartup": false
+}
