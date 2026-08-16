@@ -21,13 +21,63 @@ tests/        חבילת בידוד — 24 בדיקות שליליות מול DB
 
 ⚠️ **ה־migrations טרם הוחלו על שום מסד, ובדיקות הבידוד טרם רצו.** הן נכתבו ונקראו, לא הורצו. עד להרצה אין לראות ב־RLS מדיניות מוכחת. פירוט: `docs/checkpoints/milestone-2.md`.
 
-## החלה — שלוש דרכים
+## אבחון: מה כבר קיים במסד (קריאה בלבד)
+
+הרץ ב־SQL Editor **בחלון ריק**. השאילתה אינה משנה דבר — רק `select`:
+
+```sql
+select object, case when present then 'EXISTS' else 'missing' end as status
+from (
+  select 'schema: app' as object,
+         exists (select 1 from pg_namespace where nspname = 'app') as present
+  union all select 'table: profiles',
+         to_regclass('public.profiles') is not null
+  union all select 'table: households',
+         to_regclass('public.households') is not null
+  union all select 'table: household_members',
+         to_regclass('public.household_members') is not null
+  union all select 'table: household_invitations',
+         to_regclass('public.household_invitations') is not null
+  union all select 'table: audit_events',
+         to_regclass('public.audit_events') is not null
+  union all select 'type: membership_status',
+         exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                 where t.typname = 'membership_status' and n.nspname = 'public')
+  union all select 'function: accept_household_invitation',
+         exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                 where p.proname = 'accept_household_invitation' and n.nspname = 'public')
+  union all select 'function: record_audit_event',
+         exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                 where p.proname = 'record_audit_event' and n.nspname = 'public')
+  union all select 'function: is_household_member',
+         exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                 where p.proname = 'is_household_member' and n.nspname = 'app')
+  union all select 'trigger: profiles_touch_updated_at',
+         exists (select 1 from pg_trigger where tgname = 'profiles_touch_updated_at' and not tgisinternal)
+  union all select 'policies on public (count > 0)',
+         exists (select 1 from pg_policies where schemaname = 'public')
+) checks
+order by object;
+```
+
+**קריאת התוצאה**
+
+| תמונה | פירוש |
+|---|---|
+| `app`, שלוש הטבלאות הראשונות, ה־type, `is_household_member` ו־`profiles_touch_updated_at` קיימים; `household_invitations`, `audit_events`, שתי הפונקציות ו־policies חסרים | מיגרציות 1–2 הוחלו, 3–5 לא. זה המצב הצפוי אחרי הכשל |
+| `household_invitations` קיים | חלק ממיגרציה 3 כן נכנס — דווח לי לפני שתמשיך |
+
+
 
 ### א. Studio (הפשוטה; ללא סודות בכלל)
 
 1. Supabase Studio → **SQL Editor**
-2. הדבק את תוכן חמשת הקבצים **לפי הסדר**, כל אחד בהרצה נפרדת
-3. עצור בכשל ראשון ודווח את הודעת השגיאה
+2. **פתח חלון חדש, או נקה את החלון לגמרי (Ctrl+A ואז Delete), לפני כל קובץ.**
+   ה־SQL Editor שומר את התוכן הקודם בלשונית. הדבקה מתחת לתוכן קיים מריצה את שני
+   הקבצים יחד — כך נכשלה ההחלה הראשונה. מאז המיגרציות ניתנות להרצה חוזרת
+   (`ADR-0015`), כך שגם אם יקרה שוב זה יעבור, אבל עדיף לנקות.
+3. הדבק קובץ אחד, הרץ, ורק אז עבור לקובץ הבא — **לפי הסדר**
+4. עצור בכשל ראשון ודווח את הודעת השגיאה
 
 ### ב. Supabase CLI
 

@@ -21,6 +21,10 @@ create table if not exists public.profiles (
 comment on table public.profiles is
   'One row per authenticated person. Deleted with the auth user.';
 
+-- PostgreSQL has no CREATE TRIGGER IF NOT EXISTS, so every trigger is dropped
+-- first. This is what makes the migration safe to re-run after a partial or
+-- mistaken application; see ADR-0015.
+drop trigger if exists profiles_touch_updated_at on public.profiles;
 create trigger profiles_touch_updated_at
   before update on public.profiles
   for each row execute function app.touch_updated_at();
@@ -45,6 +49,7 @@ comment on table public.households is
 comment on column public.households.created_by is
   'Audit only. Confers no privilege; both partners have equal permission.';
 
+drop trigger if exists households_touch_updated_at on public.households;
 create trigger households_touch_updated_at
   before update on public.households
   for each row execute function app.touch_updated_at();
@@ -53,7 +58,20 @@ create trigger households_touch_updated_at
 -- household_members
 -- ---------------------------------------------------------------------------
 
-create type public.membership_status as enum ('active', 'revoked');
+-- CREATE TYPE has no IF NOT EXISTS either. Dropping the type is not an option
+-- once a column depends on it, so creation is guarded instead.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'membership_status' and n.nspname = 'public'
+  ) then
+    create type public.membership_status as enum ('active', 'revoked');
+  end if;
+end
+$$;
 
 create table if not exists public.household_members (
   id            uuid primary key default gen_random_uuid(),
@@ -79,6 +97,7 @@ create table if not exists public.household_members (
 comment on table public.household_members is
   'Membership edge between a profile and a household. Revocation is a state change, never a delete, so history survives.';
 
+drop trigger if exists household_members_touch_updated_at on public.household_members;
 create trigger household_members_touch_updated_at
   before update on public.household_members
   for each row execute function app.touch_updated_at();

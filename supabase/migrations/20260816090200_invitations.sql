@@ -42,6 +42,7 @@ comment on table public.household_invitations is
 comment on column public.household_invitations.token_hash is
   'SHA-256 digest. Never store, log or return the plaintext token.';
 
+drop trigger if exists household_invitations_touch_updated_at on public.household_invitations;
 create trigger household_invitations_touch_updated_at
   before update on public.household_invitations
   for each row execute function app.touch_updated_at();

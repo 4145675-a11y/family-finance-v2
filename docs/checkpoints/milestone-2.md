@@ -52,11 +52,11 @@ UI לאימות, מסכי הרשמה/כניסה, recent-auth, device/session scr
 | Format | `npm run format:check` | **PASS** | exit 0 |
 | Typecheck | `npm run typecheck` | **PASS** | שורש + 3 workspaces |
 | Lint | `npm run lint` | **PASS** | `--max-warnings=0` |
-| Unit | `npm run unit` | **PASS** | **158 passed**, 0 failed, **0 skipped**, 8 קבצים |
+| Unit | `npm run unit` | **PASS** | **183 passed**, 0 failed, **0 skipped**, 9 קבצים |
 | Build | `npm run build` | **PASS** | exit 0 |
 | Built-shell | `npm run check:shell` | **PASS** | 8/8 |
 | **Client secrets** | `npm run check:client-secrets` | **PASS** | 7 מודולים + 10 קבצי bundle, 0 ממצאים |
-| Forbidden scan | `npm run scan:forbidden` | **PASS** | 35 קבצים, 0 errors |
+| Forbidden scan | `npm run scan:forbidden` | **PASS** | 36 קבצים, 0 errors |
 | Traceability | `npm run check:traceability` | **PASS** | 26/26 |
 | **Aggregate** | `npm run verify` | **PASS** | **exit 0 אמיתי** |
 | **Migrations** | — | **NOT RUN** | חסום — אין חיבור DB |
@@ -78,6 +78,31 @@ UI לאימות, מסכי הרשמה/כניסה, recent-auth, device/session scr
 - **Financial invariants**: לא רלוונטי — אין טבלאות כספיות ואין חישוב.
 - **Security/privacy**: `force row level security` בכל טבלה; אין INSERT policy על `household_members`; `WITH CHECK` חוסם הסלמה דרך revoke; טוקן hashed בלבד; audit append-only בטריגר; `search_path = ''` בכל SECURITY DEFINER; אין DELETE policy; `anon` ללא grants.
 - **UX/RTL/states**: אין UI חדש.
+
+## אירוע: כשל בהחלה הידנית הראשונה
+
+**מה נצפה**: מיגרציות 1–2 עברו. בהרצת מיגרציה 3 התקבל
+`ERROR: 42710: trigger "profiles_touch_updated_at" for relation "profiles" already exists` —
+טריגר ששייך למיגרציה **2**, לא ל־3.
+
+**האבחון** (ספירת שורות, קריאה בלבד):
+
+| נתון | ערך |
+|---|---|
+| מיגרציה 2 | 143 שורות |
+| מיגרציה 3 | 139 שורות |
+| סכום + שורת הפרדה | **283** |
+| מה שנצפה בעורך | **283** |
+
+התאמה מדויקת. חלון ה־SQL Editor עדיין החזיק את מיגרציה 2 כשמיגרציה 3 הודבקה מתחתיה, וההרצה ביצעה את שתיהן. `create trigger` בשורה 24 של המאגר נכשל.
+
+`profiles_touch_updated_at` מוגדר **פעם אחת בלבד** בכל המאגר — אומת בגריפ ובבדיקה אוטומטית. לא היה כפל הגדרות.
+
+**מצב שנותר**: Postgres עוטף ריצת multi-statement בטרנזקציה משתמעת, ולכן ההרצה שנכשלה **התגלגלה אחורה במלואה**. הציפייה היא שמיגרציה 3 לא הוחלה כלל — אך זו ציפייה, לא ידיעה. שאילתת אבחון קריאה־בלבד ב־`supabase/README.md` מאמתת בפועל מה קיים, ולא הונחה שום הנחה לפניה.
+
+**התיקון** (`ADR-0015`): כל האובייקטים במיגרציות הפכו לניתנים להרצה חוזרת — 7 טריגרים ו־12 policies מקבלים `drop … if exists` לפני היצירה, וה־enum נעטף בבדיקת קיום מול `pg_type`. `tools/migrations.test.mjs` (25 בדיקות) אוכף זאת, כולל איסור על הגדרת אותו אובייקט בשני קבצים — הכשל שהיה מייצר בדיוק את אותה שגיאה מבלבלת.
+
+אומת שלילית: הסרת ה־`drop` של `profiles_touch_updated_at` הפילה שתי בדיקות עם הודעה שמסבירה את התיקון.
 
 ## 🔴 חסימה — נדרשת פעולה שלך
 

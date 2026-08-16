@@ -56,10 +56,12 @@ comment on function app.reject_audit_mutation() is
 -- A statement-level trigger fires even when the statement matches no rows, so
 -- an attempted `delete from audit_events` fails loudly instead of silently
 -- succeeding against zero visible rows.
+drop trigger if exists audit_events_block_update on public.audit_events;
 create trigger audit_events_block_update
   before update on public.audit_events
   execute function app.reject_audit_mutation();
 
+drop trigger if exists audit_events_block_delete on public.audit_events;
 create trigger audit_events_block_delete
   before delete on public.audit_events
   execute function app.reject_audit_mutation();

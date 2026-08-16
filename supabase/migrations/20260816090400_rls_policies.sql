@@ -22,6 +22,7 @@ alter table public.profiles force row level security;
 
 -- A person sees their own profile, and the profiles of people they share a
 -- household with — the partner needs a name to display. Nothing wider.
+drop policy if exists profiles_select_self_or_co_member on public.profiles;
 create policy profiles_select_self_or_co_member
   on public.profiles
   for select
@@ -38,6 +39,7 @@ create policy profiles_select_self_or_co_member
   );
 
 -- A profile row is created for the authenticated user and no one else.
+drop policy if exists profiles_insert_self on public.profiles;
 create policy profiles_insert_self
   on public.profiles
   for insert
@@ -45,6 +47,7 @@ create policy profiles_insert_self
   with check (id = (select auth.uid()));
 
 -- Editing another person's display name is never permitted, not even a partner's.
+drop policy if exists profiles_update_self on public.profiles;
 create policy profiles_update_self
   on public.profiles
   for update
@@ -59,6 +62,7 @@ create policy profiles_update_self
 alter table public.households enable row level security;
 alter table public.households force row level security;
 
+drop policy if exists households_select_member on public.households;
 create policy households_select_member
   on public.households
   for select
@@ -67,6 +71,7 @@ create policy households_select_member
 
 -- The creator must be the caller. Without this check a client could create a
 -- household attributed to someone else.
+drop policy if exists households_insert_self_as_creator on public.households;
 create policy households_insert_self_as_creator
   on public.households
   for insert
@@ -74,6 +79,7 @@ create policy households_insert_self_as_creator
   with check (created_by = (select auth.uid()));
 
 -- Both partners may rename the household: permissions are equal by product rule.
+drop policy if exists households_update_member on public.households;
 create policy households_update_member
   on public.households
   for update
@@ -88,6 +94,7 @@ create policy households_update_member
 alter table public.household_members enable row level security;
 alter table public.household_members force row level security;
 
+drop policy if exists household_members_select_same_household on public.household_members;
 create policy household_members_select_same_household
   on public.household_members
   for select
@@ -105,6 +112,7 @@ create policy household_members_select_same_household
 -- household; the WITH CHECK clause forbids the reverse direction, so this policy
 -- cannot be used to re-activate a revoked member or to move a row to another
 -- household.
+drop policy if exists household_members_revoke_within_household on public.household_members;
 create policy household_members_revoke_within_household
   on public.household_members
   for update
@@ -125,12 +133,14 @@ alter table public.household_invitations force row level security;
 -- Only existing members see invitations, and only for their own household. The
 -- invitee does not read this table at all: they redeem a token through the
 -- acceptance function, which needs no visibility here.
+drop policy if exists household_invitations_select_member on public.household_invitations;
 create policy household_invitations_select_member
   on public.household_invitations
   for select
   to authenticated
   using (app.is_household_member(household_id));
 
+drop policy if exists household_invitations_insert_member on public.household_invitations;
 create policy household_invitations_insert_member
   on public.household_invitations
   for insert
@@ -143,6 +153,7 @@ create policy household_invitations_insert_member
 -- Revoking is an UPDATE by a member. Acceptance is not performed through this
 -- policy — it runs inside the SECURITY DEFINER function — so a member cannot
 -- mark an invitation accepted on someone else's behalf.
+drop policy if exists household_invitations_revoke_member on public.household_invitations;
 create policy household_invitations_revoke_member
   on public.household_invitations
   for update
@@ -160,6 +171,7 @@ create policy household_invitations_revoke_member
 alter table public.audit_events enable row level security;
 alter table public.audit_events force row level security;
 
+drop policy if exists audit_events_select_member on public.audit_events;
 create policy audit_events_select_member
   on public.audit_events
   for select

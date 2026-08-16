@@ -27,3 +27,4 @@
 | [0012](0012-no-generated-agent-instruction-files.md) | אף תלות אינה כותבת קובצי הוראות לסוכנים במאגר | Accepted | 1 |
 | [0013](0013-publishable-key-everywhere.md) | publishable key בלקוח ובשרת; אין service role במסלול בקשה | Accepted | 2 |
 | [0014](0014-isolation-by-membership.md) | בידוד לפי חברות בלבד; אין הצטרפות עצמית ואין מחיקה | Accepted | 2 |
+| [0015](0015-idempotent-migrations.md) | כל migration ניתן להרצה חוזרת | Accepted | 2 |
