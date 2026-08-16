@@ -5,7 +5,10 @@
 - **Environment**: local (Windows 10, Node v24.18.1, npm 11.16.0) · אין remote, לא בוצע push
 - **Date**: 2026-08-16
 
-> **תיקון follow-up בתוך אותו ענף**: לאחר הדוח הראשוני נסגר פער שזוהה בו — חסימת הטלמטריה המקומית הייתה המלצה מתועדת ולא אכיפה. נוסף `tools/next.mjs` ובדיקת רגרסיה, ו־`ADR-0010` הוחלף על ידי `ADR-0011`. כל השערים הורצו מחדש. הספירות בטבלה למטה הן של ההרצה האחרונה.
+> **תיקוני follow-up בתוך אותו ענף** (הספירות בטבלה למטה הן של ההרצה האחרונה):
+>
+> 1. חסימת הטלמטריה המקומית הייתה המלצה מתועדת ולא אכיפה. נוסף `tools/next.mjs` ובדיקת רגרסיה; `ADR-0010` הוחלף על ידי `ADR-0011`.
+> 2. הרצת `next dev` לצפייה חזותית חשפה ש־Next 16 יוצר `AGENTS.md` ו־`CLAUDE.md` בתיקיית האפליקציה. נקבע `agentRules: false`, הקבצים נמחקו, ונוספה בדיקת רגרסיה — `ADR-0012`.
 
 ## Scope
 
@@ -59,10 +62,10 @@
 | Format | `npm run format:check` | **PASS** | exit 0 |
 | Typecheck | `npm run typecheck` | **PASS** | exit 0; שורש + 2 workspaces; TS 6.0.3 |
 | Lint | `npm run lint` | **PASS** | exit 0; `--max-warnings=0` |
-| Unit | `npm run unit` | **PASS** | **113 passed**, 0 failed, **0 skipped**, 5 קבצים |
+| Unit | `npm run unit` | **PASS** | **124 passed**, 0 failed, **0 skipped**, 6 קבצים |
 | Build | `npm run build` | **PASS** | exit 0; Next 16.3.1 דרך `tools/next.mjs`; 3 עמודים static |
 | Built-shell | `npm run check:shell` | **PASS** | 8/8 checks על ה־HTML וה־CSS הבנויים |
-| Forbidden scan | `npm run scan:forbidden` | **PASS** | 19 קבצים, 10 כללים, 0 errors |
+| Forbidden scan | `npm run scan:forbidden` | **PASS** | 20 קבצים, 10 כללים, 0 errors |
 | Traceability | `npm run check:traceability` | **PASS** | 23/23 |
 | **Aggregate** | `npm run verify` | **PASS** | **exit 0 אמיתי** |
 | Property | — | **NOT RUN** | Milestone 5 |
@@ -76,6 +79,7 @@
 | `dir="rtl"` → `dir="ltr"` ב־`layout.tsx`, ואז build מחדש | `check:shell` **exit 1**, 3 מ־8 נכשלו. המקור שוחזר ואומת |
 | `--color-primary` ב־`globals.css` שונה ב־ספרה אחת מ־`tokens.ts` | `tokens.test.ts` **exit 1** עם כשל ממוקד. שוחזר ואומת |
 | `"start": "next start"` הוחזר כ־script שעוקף את ה־launcher | `next-telemetry.test.mjs` **exit 1**. שוחזר ואומת |
+| `next dev` הופעל מחדש אחרי `agentRules: false` | שורת `Generated AGENTS.md and CLAUDE.md` **נעלמה מהלוג**; הקבצים לא נוצרו מחדש בזמן הריצה ולא אחרי הכיבוי |
 | ESLint 10 מול תוספי Next | 3 אזהרות `ERESOLVE`; ירדנו ל־9.39.5 עד ל־0 אזהרות |
 | TypeScript 7 מול typescript-eslint | peer `<6.1.0` — ננעל 6.0.3 |
 
