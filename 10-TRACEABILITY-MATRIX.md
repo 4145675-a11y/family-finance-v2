@@ -15,7 +15,10 @@
 | UX-HOME-001 | UX | home route | usability/E2E | 6 | Planned |
 | UX-TRUST-001 | UX | breakdown sheet | E2E | 6 | Planned |
 | UX-RTL-001 | UX | design system | visual | 1/6 | In progress — shell verified in M1 (lang/dir/bidi unit tests); pixel overflow at 4 widths pending M6 |
-| SEC-RLS-001 | Security | policies | negative integration | 2+ | Planned |
+| SEC-RLS-001 | Security | policies | negative integration | 2+ | Implemented in M2 — 24 negative tests written, NOT RUN (no database connection) |
+| SEC-INVITE-001 | Security | household_invitations + accept function | negative integration | 2 | Implemented in M2 — tests written, NOT RUN |
+| SEC-AUDIT-001 | Security | audit_events + append-only triggers | negative integration | 2+ | Implemented in M2 — tests written, NOT RUN |
+| SEC-KEY-001 | Security | env contract + client-secret gate | source + bundle scan | 2+ | **Verified in M2** — gate passes, negative test confirms it fails on a planted secret |
 | OFF-SYNC-001 | Architecture | sync engine | E2E/property | 7 | Planned |
 | IMP-DRAFT-001 | Architecture | import pipeline | integration | 8 | Planned |
 | AI-TOOL-001 | Architecture | advisor boundary | injection/integration | 12 | Planned |

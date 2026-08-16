@@ -67,6 +67,12 @@ jobs:
       - name: Built-shell contract (lang/dir/overflow/a11y)
         run: npm run check:shell
 
+      - name: Client-secret boundary (no service role in the browser)
+        run: npm run check:client-secrets
+
+      # The RLS isolation suite needs a database and is therefore not run here yet.
+      # It is NOT represented as a passing step. See docs/CI-GATES.md.
+
       - name: Forbidden-artifact scan
         run: npm run scan:forbidden
 

@@ -17,7 +17,8 @@
 | Typecheck | `npm run typecheck` | כן | 1 | ✅ |
 | Lint | `npm run lint` | כן | 1 | ✅ |
 | Build | `npm run build` | כן | 1 | ✅ |
-| Integration + RLS negative | `npm run integration` | כן | 2 | — |
+| Client-secret boundary | `npm run check:client-secrets` | כן | 2 | ✅ |
+| Integration + RLS negative | `npm run integration` | כן | 2 | — (חסום: דורש חיבור DB; ראה checkpoint M2) |
 | Property | `npm run property` | כן | 5 | — |
 | E2E smoke | `npm run e2e -- --grep @smoke` | כן | 6 | — |
 | Accessibility / RTL visual | `npm run a11y` | כן | 6 | — |

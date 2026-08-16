@@ -25,3 +25,5 @@
 | [0010](0010-framework-telemetry-disabled.md) | טלמטריית Next מושבתת ב־CI | Superseded by 0011 | 1 |
 | [0011](0011-next-launcher-telemetry.md) | launcher שאוכף חסימת טלמטריה בכל פלטפורמה | Accepted | 1 |
 | [0012](0012-no-generated-agent-instruction-files.md) | אף תלות אינה כותבת קובצי הוראות לסוכנים במאגר | Accepted | 1 |
+| [0013](0013-publishable-key-everywhere.md) | publishable key בלקוח ובשרת; אין service role במסלול בקשה | Accepted | 2 |
+| [0014](0014-isolation-by-membership.md) | בידוד לפי חברות בלבד; אין הצטרפות עצמית ואין מחיקה | Accepted | 2 |

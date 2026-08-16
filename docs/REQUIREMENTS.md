@@ -41,7 +41,10 @@
 | `UX-A11Y-001` | WCAG 2.2 AA, מקלדת, focus, labels, reduced motion, text scaling | 03-UX-SPEC.md § קבלה | 1/6/14 | Partial (M1 palette + focus + motion) |
 | `UX-STATE-001` | כל המצבים המחייבים קיימים ונבדקו בכל core screen | 03-UX-SPEC.md § מצבים מחייבים | 6+ | Registered |
 | `UX-DEBT-002` | כרטיס "מה קרה באמת לחוב" וציר זמן מקושר | 03-UX-SPEC.md § מסכים | 6 | Registered |
-| `SEC-RLS-001` | RLS על כל טבלה פרטית עם בדיקות שליליות בשני households | 07-SECURITY-PRIVACY.md § Authorization | 2+ | Registered |
+| `SEC-RLS-001` | RLS על כל טבלה פרטית עם בדיקות שליליות בשני households | 07-SECURITY-PRIVACY.md § Authorization | 2+ | Implemented, unverified (M2) |
+| `SEC-INVITE-001` | invitation token hashed, חד־פעמי, ניתן לביטול ופג תוקף | 07-SECURITY-PRIVACY.md § Authorization | 2 | Implemented, unverified (M2) |
+| `SEC-AUDIT-001` | audit append-only באכיפת DB; before/after מצומצמים ללא secrets | 07-SECURITY-PRIVACY.md § Audit | 2+ | Implemented, unverified (M2) |
+| `SEC-KEY-001` | service role לעולם לא בבנדל; לקוח מקבל publishable key בלבד | 07-SECURITY-PRIVACY.md § Authorization | 2+ | Verified (M2) |
 | `OFF-SYNC-001` | mutation offline עם idempotency, concurrency ו־conflict גלוי | 05-ARCHITECTURE-DATA.md § Offline | 7 | Registered |
 | `IMP-DRAFT-001` | כל יבוא הוא draft עד אישור; קובץ נמחק לפי state machine | 05-ARCHITECTURE-DATA.md § Imports | 8 | Registered |
 | `AI-TOOL-001` | AI מקבל JSON מצומצם מכלי שרת בלבד; מסמך/מייל אינם הוראות | 05-ARCHITECTURE-DATA.md § Advisor tools, 07-SECURITY-PRIVACY.md § AI/Email | 12 | Registered |

@@ -3,10 +3,10 @@
 מצב הפרויקט מול `09-MILESTONES.md`. מתעדכן בסוף כל milestone, לפני העצירה לאישור.
 
 - **תאריך עדכון אחרון**: 2026-08-16
-- **Milestone פעיל**: 1 — Repository Foundation
-- **סטטוס**: הושלם. ממתין לאישור מפורש להתחלת Milestone 2.
-- **Branch של M1**: `milestone-1-repository-foundation`, מסתעף מ־`main` ב־`e7ede12`. אין remote ולא בוצע push.
-- **היסטוריית M0**: `273d8a9` (יישום) ו־`e7ede12` (תיעוד) על `main`.
+- **Milestone פעיל**: 2 — Identity & Isolation
+- **סטטוס**: **חסום.** הקוד, ה־migrations, ה־RLS ו־24 בדיקות הבידוד נכתבו. ההחלה על מסד וההרצה של הבדיקות דורשות גישת DB שאינה ברשותי — ראה `docs/checkpoints/milestone-2.md`.
+- **Branch של M2**: `milestone-2-identity-isolation`, מסתעף מ־`main` ב־`af51add`. אין remote ולא בוצע push.
+- **מוזג ל־`main`**: Milestone 0 ו־Milestone 1 (fast-forward, ללא merge commit).
 
 ## מקרא
 
@@ -20,7 +20,7 @@
 |---:|---|---|---|---|
 | 0 | Bootstrap | **Complete — evidenced** | [milestone-0](docs/checkpoints/milestone-0.md) | נשמר ב־`273d8a9`; 4 שערים פעילים, 5 ADRs, 23 דרישות ממופות |
 | 1 | Repository Foundation | **Complete — evidenced** | [milestone-1](docs/checkpoints/milestone-1.md) | 9 שערים פעילים, 88 בדיקות, 5 ADRs נוספים |
-| 2 | Identity & Isolation | Not started | — | דורש חשבון Supabase — ראה חסמים |
+| 2 | Identity & Isolation | **In progress — blocked** | [milestone-2](docs/checkpoints/milestone-2.md) | קוד, migrations, RLS ו־24 בדיקות בידוד נכתבו; **החלה והרצה חסומות** על גישת DB |
 | 3 | Financial Accounts & Opening Picture | Not started | — | |
 | 4 | Debt Domain | Not started | — | |
 | 5 | Finance Engine | Not started | — | |
@@ -83,4 +83,9 @@
 
 ## הצעד הבא
 
-Milestone 2 — Identity & Isolation. **חסום** עד שיסופקו פרטי Supabase (ראה טבלת החסמים). אין להתחיל בלי הוראה מפורשת: **"המשך ל־Milestone 2"**.
+השלמת Milestone 2 — נדרשות שתי פעולות מקומיות שלך, ללא שיתוף ערכים בצ׳אט:
+
+1. החלת חמשת ה־migrations (`supabase/README.md`).
+2. `.env.integration.local` עם `SUPABASE_DB_URL`, ואז `npm run integration`.
+
+לאחר מכן אתקן כשלים ואסגור את ה־checkpoint. Milestone 3 לא מתחיל בלי הוראה מפורשת.
