@@ -4,6 +4,7 @@
 - **Branch**: `milestone-2-identity-isolation` (מסתעף מ־`main` ב־`af51add`)
 - **Environment**: local (Windows 10, Node v24.18.1, npm 11.16.0) · אין remote, לא בוצע push
 - **Date**: 2026-08-16
+- **Re-verified**: 2026-08-22, אחרי העברת הפרויקט לנתיב עבודה חדש. `npm run verify` הורצה מחדש ועברה, exit 0 אמיתי. הריצה החוזרת בוצעה על Node v24.19.0 / npm 11.17.0, בעוד `.nvmrc` נועל 24.18.1 ו־`packageManager` נועל npm@11.16.0 — פער מתועד, לא תוקן כאן.
 
 > **למה PARTIAL ולא PASS**: קריטריון הקבלה המרכזי של Milestone 2 לפי `09-MILESTONES.md` הוא "שני households בבדיקות חיוביות ושליליות". הבדיקות נכתבו במלואן — 24 בדיקות שליליות — אך **טרם רצו**, כי אין חיבור למסד. RLS שלא הורצה מולה בדיקה היא כוונה, לא בקרה. `CLAUDE.md` אוסר לסמן PASS על "בדיקה שלא הורצה", ולכן זה PARTIAL.
 
@@ -40,7 +41,7 @@ UI לאימות, מסכי הרשמה/כניסה, recent-auth, device/session scr
 
 ## Changes
 
-**חדש**: `supabase/migrations/` (5 קבצים) · `supabase/tests/rls-isolation.integration.test.ts` · `supabase/README.md` · `packages/contracts/` (identity.ts, index.ts, identity.test.ts, package.json, tsconfig.json) · `apps/web/lib/env.ts` + `env.test.ts` · `apps/web/lib/supabase/{client,server}.ts` · `tools/check-client-secrets.mjs` · `vitest.integration.config.ts` · `docs/THREAT-MODEL.md` · ADR 0013–0014 · checkpoint זה
+**חדש**: `supabase/migrations/` (5 קבצים) · `supabase/tests/rls-isolation.integration.test.ts` · `supabase/README.md` · `packages/contracts/` (identity.ts, index.ts, identity.test.ts, package.json, tsconfig.json) · `apps/web/lib/env.ts` + `env.test.ts` · `apps/web/lib/supabase/{client,server}.ts` · `tools/check-client-secrets.mjs` · `vitest.integration.config.ts` · `docs/THREAT-MODEL.md` · `supabase/manual/` (m2-apply-all.sql מיוצר, m2-diagnostic.sql) · `tools/build-manual-bundle.mjs` · `tools/copy-sql.mjs` · `tools/sql-guard.mjs` · `tools/migrations.test.mjs` · `tools/manual-sql.test.mjs` · ADR 0013–0015 · checkpoint זה
 
 **שונה**: `package.json` (6 תלויות, scripts `integration` ו־`check:client-secrets`) · `package-lock.json` · `tsconfig.json` · `apps/web/package.json` · `docs/REQUIREMENTS.md` · `10-TRACEABILITY-MATRIX.md` · `docs/adr/README.md`
 
@@ -52,11 +53,12 @@ UI לאימות, מסכי הרשמה/כניסה, recent-auth, device/session scr
 | Format | `npm run format:check` | **PASS** | exit 0 |
 | Typecheck | `npm run typecheck` | **PASS** | שורש + 3 workspaces |
 | Lint | `npm run lint` | **PASS** | `--max-warnings=0` |
-| Unit | `npm run unit` | **PASS** | **183 passed**, 0 failed, **0 skipped**, 9 קבצים |
+| Unit | `npm run unit` | **PASS** | **220 passed**, 0 failed, **0 skipped**, 10 קבצים |
 | Build | `npm run build` | **PASS** | exit 0 |
 | Built-shell | `npm run check:shell` | **PASS** | 8/8 |
 | **Client secrets** | `npm run check:client-secrets` | **PASS** | 7 מודולים + 10 קבצי bundle, 0 ממצאים |
-| Forbidden scan | `npm run scan:forbidden` | **PASS** | 36 קבצים, 0 errors |
+| **Manual bundle** | `npm run db:check:m2` | **PASS** | 5 מיגרציות, הצרור תואם למקור |
+| Forbidden scan | `npm run scan:forbidden` | **PASS** | 42 קבצים, 0 errors |
 | Traceability | `npm run check:traceability` | **PASS** | 26/26 |
 | **Aggregate** | `npm run verify` | **PASS** | **exit 0 אמיתי** |
 | **Migrations** | — | **NOT RUN** | חסום — אין חיבור DB |
@@ -112,7 +114,7 @@ UI לאימות, מסכי הרשמה/כניסה, recent-auth, device/session scr
 
 **מה נדרש ממך** — הכול מקומי, שום ערך בצ׳אט:
 
-1. **החל את ה־migrations** — הדרך הפשוטה היא Studio → SQL Editor, חמשת הקבצים לפי הסדר. שתי דרכים נוספות ב־`supabase/README.md`.
+1. **החל את ה־migrations** — `npm run db:copy:diagnostic` ואז `npm run db:copy:m2`. כל פקודה מעתיקה ללוח קובץ אחד ומדפיסה טביעת אצבע בלבד; פתח חלון SQL **חדש וריק** לכל הדבקה והרץ פעם אחת. הדבקה קובץ־קובץ ו־CLI/psql הן חלופות — `supabase/README.md`.
 2. **לבדיקות** — Studio → Project Settings → Database → Connection string (URI), ואז בשורש הפרויקט:
 
    ```
