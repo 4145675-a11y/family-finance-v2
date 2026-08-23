@@ -27,7 +27,7 @@
 | `PROD-CORE-003` | מה הפעולה האחת המעשית עכשיו | 01-PRODUCT-SPEC.md § חזון | 6/12 | Implemented (M6) |
 | `PROD-KPI-001` | מעל 90% מהפעולות מאושרות/מסווגות אחרי 30 יום | 01-PRODUCT-SPEC.md § הצלחה | 8 | Registered |
 | `PROD-KPI-002` | התאמת יתרות 2–3 פעמים בשבוע | 01-PRODUCT-SPEC.md § הצלחה | 3/8 | Registered |
-| `PROD-KPI-003` | המשתמש יודע מהו safe spend | 01-PRODUCT-SPEC.md § הצלחה | 6 | Implemented (M6) — בדיקת משתמש טרם בוצעה |
+| `PROD-KPI-003` | המשתמש יודע מהו safe spend | 01-PRODUCT-SPEC.md § הצלחה | 6 | Implemented (M6b) — תשובה דומיננטית אחת בשפה פשוטה |
 | `PROD-KPI-004` | כל העברה מהעסק מבוססת רווח ממומש אחרי מס ורזרבה | 01-PRODUCT-SPEC.md § הצלחה | 11 | Registered |
 | `PROD-KPI-005` | נמדדת מגמת חוב נטו ולא רק תשלומים | 01-PRODUCT-SPEC.md § הצלחה | 4–6 | Implemented (M4–M6) |
 | `PROD-KPI-006` | פחות הפתעות ופחות לחץ מדווח | 01-PRODUCT-SPEC.md § הצלחה | 14 | Registered |
@@ -35,11 +35,11 @@
 | `FIN-MODE-001` | ששת מצבי ההתנהלות ותנאי המעבר ביניהם | 02-FINANCIAL-RULES.md § מצבי ההתנהלות | 5 | Verified (M5) |
 | `FIN-WATERFALL-001` | סדר הקצאת כסף פנוי בעשרה שלבים | 02-FINANCIAL-RULES.md § מפל הקצאת כסף | 5 | Verified (M5) |
 | `FIN-ROLL-001` | גלגול חוב: פירעון, חוב חדש וקישור כשלוש עובדות נפרדות | 02-FINANCIAL-RULES.md § גלגול חוב והחלפת נושה | 4–6 | Verified (M5) — נבדק גם כ־property |
-| `UX-HOME-001` | שלוש תשובות הליבה מובנות תוך 10 שניות | 03-UX-SPEC.md § קבלה | 6 | Structure built (M6) — בדיקת משתמש טרם בוצעה |
-| `UX-TRUST-001` | כל מספר מרכזי מסביר מקור/זמן/confidence | 03-UX-SPEC.md § קבלה | 6 | Implemented (M6) |
+| `UX-HOME-001` | שלוש תשובות הליבה מובנות תוך 10 שניות | 03-UX-SPEC.md § קבלה | 6 | Structure built (M6b) — היררכיה נאכפת בבדיקה; בדיקת משתמש טרם בוצעה |
+| `UX-TRUST-001` | כל מספר מרכזי מסביר מקור/זמן/confidence | 03-UX-SPEC.md § קבלה | 6 | Verified (M6b) — כל מספר פותח פירוט; כיסוי הניסוח נאכף |
 | `UX-RTL-001` | אין horizontal overflow ב־360/390/768/1280 | 03-UX-SPEC.md § קבלה | 1/6 | Partial (M1 shell) |
-| `UX-A11Y-001` | WCAG 2.2 AA, מקלדת, focus, labels, reduced motion, text scaling | 03-UX-SPEC.md § קבלה | 1/6/14 | Partial (M1 palette + focus + motion) |
-| `UX-STATE-001` | כל המצבים המחייבים קיימים ונבדקו בכל core screen | 03-UX-SPEC.md § מצבים מחייבים | 6+ | Partial (M6) — empty/partial קיימים; loading/stale/offline/conflict ב־M7+ |
+| `UX-A11Y-001` | WCAG 2.2 AA, מקלדת, focus, labels, reduced motion, text scaling | 03-UX-SPEC.md § קבלה | 1/6/14 | Partial (M6b) — ניגודיות, focus, 44px, טקסט חלופי; axe/מקלדת בדפדפן לא הורצו |
+| `UX-STATE-001` | כל המצבים המחייבים קיימים ונבדקו בכל core screen | 03-UX-SPEC.md § מצבים מחייבים | 6+ | Partial (M6b) — empty/incomplete/stale/demo/coming-soon קיימים; offline/conflict ב־M7 |
 | `UX-DEBT-002` | כרטיס "מה קרה באמת לחוב" וציר זמן מקושר | 03-UX-SPEC.md § מסכים | 6 | Implemented (M6) |
 | `SEC-RLS-001` | RLS על כל טבלה פרטית עם בדיקות שליליות בשני households | 07-SECURITY-PRIVACY.md § Authorization | 2+ | Implemented, unverified (M2–M4) |
 | `SEC-INVITE-001` | invitation token hashed, חד־פעמי, ניתן לביטול ופג תוקף | 07-SECURITY-PRIVACY.md § Authorization | 2 | Implemented, unverified (M2) |
@@ -56,6 +56,10 @@
 | `FIN-QUALITY-001` | ציון איכות נתונים 0–100 עם רכיבים ומשקלים מתועדים | 02-FINANCIAL-RULES.md § איכות נתונים | 5 | Verified (M5) — ADR-0016 |
 | `FIN-DECISION-001` | כל תוצאה מוחזרת במעטפת החלטה מלאה עם breakdown וגרסאות | 02-FINANCIAL-RULES.md § פלט החלטה מחייב | 5 | Verified (M5) |
 | `UX-SOURCE-001` | מקור נתונים שאינו אמיתי מסומן חזותית בכל מסך שמציג אותו | 08-TEST-PLAN.md § שער גלובלי | 6 | Verified (M6) — ADR-0017 |
+| `UX-DAILY-001` | מסך הבית עונה על שלוש שאלות הליבה בלבד; הפירוט רמה אחת פנימה | 01-PRODUCT-SPEC.md § מסך הבית | 6b | Verified (M6b) — ADR-0021 |
+| `UX-COPY-001` | עברית פשוטה, חמה ולא מאשימה; ז׳רגון והאשמה נחסמים בשער | 03-UX-SPEC.md § Microcopy | 6b | Verified (M6b) — ADR-0022 |
+| `FIN-BUDGET-001` | תקציב חודשי עם שש כמויות נפרדות; תוכנית אינה מזיזה כסף | 03-UX-SPEC.md § מסכים | 6b | Verified (M6b), DB unverified |
+| `FIN-FOODWEEK-001` | הנחיה שבועית לאוכל שלעולם אינה גדולה ממה שנשאר לחודש | 01-PRODUCT-SPEC.md § Must | 6b | Verified (M6b) — ADR-0023 |
 
 ## פערים ידועים שנרשמו ב־Milestone 0
 

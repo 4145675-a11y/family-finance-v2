@@ -3,9 +3,9 @@
 מצב הפרויקט מול `09-MILESTONES.md`. מתעדכן בסוף כל milestone, לפני העצירה לאישור.
 
 - **תאריך עדכון אחרון**: 2026-08-23
-- **Milestone פעיל**: 6 — Dashboard Source of Truth
-- **סטטוס**: **מוצר מקומי פעיל.** finance-engine מלא ונבדק; הדשבורד רץ בדפדפן על נתוני הדגמה מסומנים. **המיגרציות עדיין לא הוחלו על שום מסד** — ראה חסמים.
-- **Branch**: `milestone-2-identity-isolation` — M2 עד M6 נבנו עליו. אין remote ולא בוצע push.
+- **Milestone פעיל**: 6b — Product & UX Refinement
+- **סטטוס**: **מוצר מקומי פעיל, בשפה פשוטה ובעיצוב מחודש.** מסך בית יומי, מסך תקציב עם הנחיה שבועית לאוכל, ומסכי חקירה מלאים. **המיגרציות עדיין לא הוחלו על שום מסד** — ראה חסמים.
+- **Branch**: `milestone-2-identity-isolation` — M2 עד M6b נבנו עליו. אין remote ולא בוצע push.
 - **מוזג ל־`main`**: Milestone 0 ו־Milestone 1 בלבד.
 
 ## מקרא
@@ -25,6 +25,7 @@
 | 4 | Debt Domain | **In progress — blocked** | [milestone-4](docs/checkpoints/milestone-4.md) | 3 טבלאות, טריגר אימות גלגולים; **מיגרציה לא הוחלה** |
 | 5 | Finance Engine | **Complete — evidenced** | [milestone-5](docs/checkpoints/milestone-5.md) | 13 מודולים, 206 unit + 24 property; טהור, ללא תלות במסד |
 | 6 | Dashboard Source of Truth | **In progress** | [milestone-6](docs/checkpoints/milestone-6.md) | 4 מסכים רצים; נתוני הדגמה בלבד; axe/RTL visual לא הורצו |
+| 6b | Product & UX Refinement | **In progress** | [milestone-6b](docs/checkpoints/milestone-6b-product-refinement.md) | שפה פשוטה, מסך יומי, תקציב ואוכל שבועי, עיצוב מחודש; נגישות בדפדפן לא נמדדה |
 | 7 | PWA & Offline | Not started | — | |
 | 8 | Imports & Approval Inbox | Not started | — | |
 | 9 | OCR/Voice/Email Adapters | Not started | — | דורש credentials |
@@ -44,14 +45,14 @@
 | Format | Active | `prettier --check .`, exit 0 |
 | Typecheck | Active | שורש + 4 workspaces |
 | Lint | Active | `--max-warnings=0`, type-aware |
-| Unit | Active | **581/581**, 25 קבצים, 0 מדולגות |
-| **Property** | **Active מ־M5** | **24/24**, seed קבוע 20260823, 300 runs לכל property |
-| Build | Active | 5 routes, כולן prerendered |
+| Unit | Active | **801/801**, 30 קבצים, 0 מדולגות |
+| **Property** | **Active מ־M5** | **35/35**, seed קבוע 20260823, 300 runs לכל property |
+| Build | Active | 9 routes, כולן prerendered |
 | Built-shell | Active | 8/8 על ה־HTML הבנוי |
 | Client-secret boundary | Active | 16 מודולים + 12 קבצי bundle, 0 ממצאים |
-| Manual bundle | Active | 8 מיגרציות, תואם למקורות (`ADR-0019`) |
-| Forbidden scan | Active | 89 קבצים, 0 errors |
-| Traceability | Active | 34/34 |
+| Manual bundle | Active | 10 מיגרציות, תואם למקורות (`ADR-0019`) |
+| Forbidden scan | Active | 108 קבצים, 0 errors |
+| Traceability | Active | 38/38 |
 | Integration / RLS | Defined, **חסום** | דורש `SUPABASE_DB_URL` — 24 בדיקות בידוד ממתינות |
 | E2E / axe / RTL visual | Defined, לא פעיל | Milestone ייעודי; Playwright לא מותקן |
 
@@ -59,15 +60,17 @@
 
 | # | פער | השפעה | טיפול |
 |---:|---|---|---|
-| 1 | דרישות ב־`04`, `05`, `07`, `08`, `11` ללא תוויות מזהה | traceability חלקי מחוץ ל־34 המזהים הרשומים | כל milestone רושם מזהים למה שהוא מממש — `ADR-0004` |
+| 1 | דרישות ב־`04`, `05`, `07`, `08`, `11` ללא תוויות מזהה | traceability חלקי מחוץ ל־38 המזהים הרשומים | כל milestone רושם מזהים למה שהוא מממש — `ADR-0004` |
 | 2 | `UX-DEBT-001` אינו מוקצה | אין | המזהה שמור |
 | 3 | אין git remote | CI לא רץ בפועל | אותם שערים רצים מקומית |
 | 4 | overflow לא נמדד בפיקסלים ב־360/390/768/1280 | `UX-RTL-001` מאומת מבנית בלבד | Playwright; מוצהר NOT RUN |
 | 5 | axe ומקלדת לא הורצו על המסכים החדשים | `UX-A11Y-001` חלקי | אותו milestone |
 | 6 | גופני Assistant/Heebo לא מוטמעים | טקסט עברי נופל לגופן מערכת | milestone עיצוב |
 | 7 | `.nvmrc` נועל Node 24.18.1; המכונה מריצה 24.19.0 | CI ירוץ על גרסה אחרת מהמקומית | נדרשת החלטה; לא שונה בלי ADR |
-| 8 | `UX-STATE-001` חלקי | loading/stale/offline/queued/conflict חסרים | Milestone 7 |
+| 8 | `UX-STATE-001` חלקי | offline/queued/conflict חסרים; empty/incomplete/stale/demo קיימים | Milestone 7 |
 | 9 | שלבים 8 ו־10 במפל תובעים 0 | אין קרנות ומטרות | Milestone 10; השלבים מוצגים ריקים ולא מוסתרים |
+| 10 | כפתורי העדכון המהיר מושבתים | אין שכבת שמירה מאומתת | מופעלים עם המסד; הכפתור אומר למה הוא כבוי |
+| 11 | נגישות לא נמדדה בדפדפן | `UX-A11Y-001` חלקי | axe ומקלדת דורשים Playwright; מוצהר NOT RUN |
 
 ## חסמים שדורשים פעולה או החלטה שלך
 
@@ -83,7 +86,7 @@
 שלוש פעולות מקומיות שלך, ללא שיתוף ערכים בצ׳אט:
 
 1. `npm run db:copy:diagnostic` → חלון SQL **חדש וריק** → הרץ פעם אחת → מסור את טבלת EXISTS/missing.
-2. `npm run db:copy:schema` → חלון חדש וריק → הרץ פעם אחת. שמונה המיגרציות, טרנזקציה אחת, בטוח להרצה חוזרת.
+2. `npm run db:copy:schema` → חלון חדש וריק → הרץ פעם אחת. עשר המיגרציות, טרנזקציה אחת, בטוח להרצה חוזרת.
 3. צור `.env.integration.local` עם `SUPABASE_DB_URL`, הרץ `npm run integration`, ומסור **סיכום בלבד**.
 
 לאחר מכן אתקן כשלים אמיתיים ואסגור את M2–M4 ל־PASS או אדווח מה לא מחזיק.

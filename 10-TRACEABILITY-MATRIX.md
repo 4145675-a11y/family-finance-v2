@@ -12,8 +12,8 @@
 | FIN-MONEY-001 | Financial | contracts/DB | property/migration | 3/5 | **Verified in M3/M5** — contracts, DB checks, unit + property |
 | FIN-MODE-001 | Financial | policy engine | unit/property | 5 | **Verified in M5** — 18 בדיקות, ששת המצבים נגישים |
 | FIN-WATERFALL-001 | Financial | allocation engine | property/scenario | 5 | **Verified in M5** — 13 unit + 4 property על הסדר |
-| UX-HOME-001 | UX | home route | usability/E2E | 6 | Planned |
-| UX-TRUST-001 | UX | breakdown sheet | E2E | 6 | Implemented in M6 — כל מספר מרכזי פותח breakdown |
+| UX-HOME-001 | UX | home route | usability/E2E | 6 | Structure built in M6b — סדר ההיררכיה נאכף ב־screens.test.ts; בדיקת משתמש ב־M14 |
+| UX-TRUST-001 | UX | breakdown sheet | E2E | 6 | **Verified in M6b** — כל מספר מרכזי פותח פירוט; כיסוי ניסוח נאכף ב־copy.test.ts |
 | UX-RTL-001 | UX | design system | visual | 1/6 | In progress — shell verified in M1 (lang/dir/bidi unit tests); pixel overflow at 4 widths pending M6 |
 | SEC-RLS-001 | Security | policies | negative integration | 2+ | Implemented in M2–M4 — 15 טבלאות RLS enabled+forced; **הרצה מול DB טרם בוצעה** |
 | SEC-INVITE-001 | Security | household_invitations + accept function | negative integration | 2 | Implemented in M2 — tests written, NOT RUN |
@@ -26,12 +26,12 @@
 | UX-DEBT-002 | UX | "מה קרה באמת לחוב" + linked timeline | E2E/visual | 6 | Implemented in M6 — כרטיס "מה קרה באמת לחוב" + ציר זמן |
 | PROD-KPI-001 | Product | approval inbox + classification flow | E2E/usage metric | 8 | Planned |
 | PROD-KPI-002 | Product | reconciliation flow + freshness prompts | integration/E2E | 3/8 | Planned |
-| PROD-KPI-003 | Product | safe spend hero + breakdown sheet | usability/E2E | 6 | Implemented in M6 — hero + breakdown; בדיקת משתמש ב־M14 |
+| PROD-KPI-003 | Product | safe spend hero + breakdown sheet | usability/E2E | 6 | Implemented in M6b — Hero יחיד בשפה פשוטה; בדיקת משתמש ב־M14 |
 | PROD-KPI-004 | Product | safe business transfer service | property/E2E | 11 | Planned |
 | PROD-KPI-005 | Product | net debt trend meter | property/E2E | 4–6 | Implemented in M4–M6 |
 | PROD-KPI-006 | Product | summaries + limited real-data UAT | UAT | 14 | Planned |
-| UX-A11Y-001 | UX | design system + core screens | axe/keyboard/visual | 1/6/14 | In progress — palette contrast + focus ring + reduced motion verified in M1; axe/keyboard pending M6 |
-| UX-STATE-001 | UX | core screen state matrix | E2E/visual | 6+ | Partial in M6 — empty/partial נבדקו; loading/stale/offline/conflict ב־M7+ |
+| UX-A11Y-001 | UX | design system + core screens | axe/keyboard/visual | 1/6/14 | Partial in M6b — 23 זוגות ניגודיות AA, focus, 44px, טקסט חלופי למד; **axe/מקלדת בדפדפן לא הורצו** |
+| UX-STATE-001 | UX | core screen state matrix | E2E/visual | 6+ | Partial in M6b — empty/incomplete/stale/demo/coming-soon נבדקו; offline/conflict ב־M7 |
 | FIN-ACCOUNT-001 | Architecture | financial_accounts + balance snapshots | contract/migration/integration | 3 | Implemented in M3 — 18 בדיקות חוזה; **מיגרציה לא הוחלה** |
 | FIN-SCOPE-001 | Financial | record scope + engine aggregation | unit/property | 3/5 | **Verified in M5** — transfer נטו אפס כ־property |
 | FIN-DEBT-001 | Financial | debt_events + replayDebtBalances | unit/property/integration | 4 | Implemented in M4 — 27 unit + 3 property; **מיגרציה לא הוחלה** |
@@ -40,3 +40,7 @@
 | FIN-QUALITY-001 | Financial | scoreDataQuality | unit | 5 | **Verified in M5** — סכום המשקלים 100 נאכף (ADR-0016) |
 | FIN-DECISION-001 | Financial | buildDecision | unit | 5 | **Verified in M5** — 14 שדות המעטפת נבדקים |
 | UX-SOURCE-001 | UX | dashboard data-source gate | unit | 6 | **Verified in M6** — 15 בדיקות; ייצור סגור בכל ערך דגל |
+| UX-DAILY-001 | Product | home screen hierarchy | static/unit | 6b | **Verified in M6b** — סדר, Hero יחיד, תקציב לא על הבית |
+| UX-COPY-001 | UX | copy layer + tone gate | unit | 6b | **Verified in M6b** — 31 בדיקות; כל כלל נורה על fixture |
+| FIN-BUDGET-001 | Financial | calculateBudget + budget tables | unit/property/migration | 6b | **Verified in M6b** — 24 unit + 6 property; **מיגרציה לא הוחלה** |
+| FIN-FOODWEEK-001 | Financial | calculateFoodWeek | unit/property | 6b | **Verified in M6b** — 28 unit + 4 property |

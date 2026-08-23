@@ -32,3 +32,7 @@
 | [0017](0017-development-fixture-data-source.md) | מקור נתוני פיתוח מאחורי דגל, חסום בייצור | Accepted | 6 |
 | [0018](0018-extensionless-relative-imports.md) | ייבוא יחסי ללא סיומת בקוד שנארז | Accepted | 6 |
 | [0019](0019-single-apply-all-bundle.md) | חבילת החלה אחת לכל המיגרציות | Accepted | 3 |
+| [0020](0020-visual-language-revision.md) | רענון השפה הוויזואלית אחרי צפייה במוצר רץ | Accepted | 6b |
+| [0021](0021-daily-dashboard-versus-detail-screens.md) | מסך יומי מול מסכי חקירה | Accepted | 6b |
+| [0022](0022-plain-hebrew-copy-layer.md) | המנוע מחזיר קודים; העברית נמצאת בשכבה אחת | Accepted | 6b |
+| [0023](0023-deterministic-budget-and-food-week.md) | תקציב חודשי והנחיה שבועית לאוכל כדומיין דטרמיניסטי | Accepted | 6b |
