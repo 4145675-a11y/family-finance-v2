@@ -95,7 +95,8 @@ export const copy = {
   food: {
     title: 'אוכל השבוע',
     remaining: (amountMinor: number, until: string) =>
-      `נשארו ${money(amountMinor)} עד יום ${dayName(until)}`,
+      // `dayName` already returns "יום שבת"; prefixing another "יום" doubled it.
+      `נשארו ${money(amountMinor)} עד ${dayName(until)}`,
     monthProgress: (spentMinor: number, plannedMinor: number) =>
       `מתחילת החודש יצאו ${money(spentMinor)} מתוך ${money(plannedMinor)}`,
     projection: (amountMinor: number) =>

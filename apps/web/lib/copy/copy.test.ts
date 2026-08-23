@@ -184,3 +184,25 @@ describe('the category names a family recognises', () => {
     expect(copy.budget.categories.holidays).toBe('חגים');
   });
 });
+
+describe('sentences read correctly, not just correctly assembled', () => {
+  test('the weekly food line names the day once', () => {
+    // The Hebrew locale returns "יום שבת" for a weekday, so a literal "יום"
+    // prefix produced "עד יום יום שבת" on the running screen.
+    const said = copy.food.remaining(62_000, '2026-08-15');
+    expect(said).not.toMatch(/יום\s+יום/);
+    expect(said).toContain('שבת');
+  });
+
+  test('no screen sentence repeats a word immediately', () => {
+    const sentences = [
+      copy.food.remaining(62_000, '2026-08-15'),
+      copy.food.monthProgress(120_000, 400_000),
+      copy.home.safeGap(50_000),
+      copy.home.tightestDayValue('2026-08-15', 10_000),
+    ];
+    for (const sentence of sentences) {
+      expect(sentence, sentence).not.toMatch(/\b(\S+)\s+\1\b/u);
+    }
+  });
+});
