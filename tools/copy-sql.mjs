@@ -29,7 +29,7 @@ const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MANUAL_DIR = join(REPO_ROOT, 'supabase', 'manual');
 
 /** Files that must contain no state-changing statement. */
-const READ_ONLY_FILES = new Set(['m2-diagnostic.sql']);
+const READ_ONLY_FILES = new Set(['diagnostic.sql']);
 
 /**
  * Places a file's contents on the system clipboard.

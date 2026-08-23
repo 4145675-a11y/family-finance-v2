@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
 
-import { contrastRatio, WCAG_AA } from './contrast.js';
+import { contrastRatio, WCAG_AA } from './contrast';
 import {
   color,
   minTouchTargetPx,
@@ -12,7 +12,7 @@ import {
   requiredContrast,
   space,
   typography,
-} from './tokens.js';
+} from './tokens';
 
 /** The Tailwind theme block that mirrors these tokens. */
 const GLOBALS_CSS = fileURLToPath(

@@ -6,5 +6,10 @@
   /* Root-level TypeScript that belongs to no workspace: build configuration and
      the integration suite, which targets the database rather than a package.
      Without this the linter's type-aware rules cannot resolve these files. */
-  "include": ["vitest.config.ts", "vitest.integration.config.ts", "supabase/tests/**/*.ts"]
+  "include": [
+    "vitest.config.ts",
+    "vitest.integration.config.ts",
+    "vitest.property.config.ts",
+    "supabase/tests/**/*.ts"
+  ]
 }

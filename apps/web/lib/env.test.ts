@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { publicEnvContract, readPublicEnv } from './env.js';
+import { publicEnvContract, readPublicEnv } from './env';
 
 const validUrl = 'https://abcdefghijklmnop.supabase.co';
 const validKey = 'sb_publishable_AbCdEfGhIjKlMnOpQrSt';

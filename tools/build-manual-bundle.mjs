@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Builds supabase/manual/m2-apply-all.sql from the migration files.
+ * Builds supabase/manual/apply-all.sql from the migration files.
  *
  * The bundle exists because applying five files by hand produced operational
  * mistakes: the SQL Editor retained previous content and two migrations ran as
@@ -28,7 +28,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MIGRATIONS_DIR = join(REPO_ROOT, 'supabase', 'migrations');
 const MANUAL_DIR = join(REPO_ROOT, 'supabase', 'manual');
-export const BUNDLE_PATH = join(MANUAL_DIR, 'm2-apply-all.sql');
+export const BUNDLE_PATH = join(MANUAL_DIR, 'apply-all.sql');
 
 /** Marker lines that delimit each embedded migration. */
 export const beginMarker = (name) => `-- >>> BEGIN MIGRATION: ${name}`;
@@ -45,19 +45,19 @@ export function readMigrations() {
 /** @param {{name: string, sql: string}[]} migrations */
 export function renderBundle(migrations) {
   const header = [
-    '-- Milestone 2 — all migrations, in one atomic transaction.',
+    '-- Every migration in this repository, in one atomic transaction.',
     '--',
     '-- GENERATED FILE. Do not edit.',
     '--   source: supabase/migrations/*.sql',
-    '--   regenerate: npm run db:build:m2',
+    '--   regenerate: npm run db:build',
     '--   verified by: tools/manual-sql.test.mjs',
     '--',
     `-- Contains ${migrations.length} migrations, in filename order:`,
     ...migrations.map((m, i) => `--   ${i + 1}. ${m.name}`),
     '--',
     '-- Safe to run more than once: every trigger and policy is dropped before it is',
-    '-- created, and the enum is created under an existence check (ADR-0015). Running',
-    '-- this after migrations 1-2 are already applied produces the same schema.',
+    '-- created, and every enum is created under an existence check (ADR-0015). Running',
+    '-- this over a partially applied schema produces the same result as a clean run.',
     '--',
     '-- Atomic: if any statement fails, COMMIT is never reached and the entire',
     '-- transaction rolls back. There is no partially applied state.',
@@ -91,14 +91,14 @@ function main() {
 
   if (check) {
     if (!existsSync(BUNDLE_PATH)) {
-      console.error('Bundle is missing. Run: npm run db:build:m2');
+      console.error('Bundle is missing. Run: npm run db:build');
       process.exitCode = 1;
       return;
     }
     const onDisk = readFileSync(BUNDLE_PATH, 'utf8');
     if (onDisk !== rendered) {
       console.error('Bundle is out of date with supabase/migrations.');
-      console.error('Run: npm run db:build:m2');
+      console.error('Run: npm run db:build');
       process.exitCode = 1;
       return;
     }
@@ -108,7 +108,7 @@ function main() {
 
   if (!existsSync(MANUAL_DIR)) mkdirSync(MANUAL_DIR, { recursive: true });
   writeFileSync(BUNDLE_PATH, rendered, 'utf8');
-  console.log(`Wrote supabase/manual/m2-apply-all.sql (${migrations.length} migrations).`);
+  console.log(`Wrote supabase/manual/apply-all.sql (${migrations.length} migrations).`);
 }
 
 // Run only when executed directly; the tests import the helpers instead.

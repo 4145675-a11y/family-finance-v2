@@ -5,7 +5,7 @@
  * that can be proven about them before that happens, is proven here:
  *
  *  * the diagnostic changes nothing;
- *  * the bundle is exactly the five migrations, in order, with nothing added,
+ *  *  * the bundle is exactly the migrations, in order, with nothing added,
  *    dropped or reordered;
  *  * the bundle is atomic and re-runnable.
  */
@@ -26,8 +26,8 @@ import { findMutations, isReadOnly, stripLiteralsAndComments } from './sql-guard
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const MANUAL_DIR = join(REPO_ROOT, 'supabase', 'manual');
-const DIAGNOSTIC_PATH = join(MANUAL_DIR, 'm2-diagnostic.sql');
-const BUNDLE_PATH = join(MANUAL_DIR, 'm2-apply-all.sql');
+const DIAGNOSTIC_PATH = join(MANUAL_DIR, 'diagnostic.sql');
+const BUNDLE_PATH = join(MANUAL_DIR, 'apply-all.sql');
 
 const diagnostic = readFileSync(DIAGNOSTIC_PATH, 'utf8');
 const bundle = readFileSync(BUNDLE_PATH, 'utf8');
@@ -84,7 +84,7 @@ describe('the diagnostic is read-only', () => {
 
 describe('the bundle is exactly the migrations', () => {
   test('is up to date with supabase/migrations', () => {
-    expect(bundle, 'the bundle drifted from its sources. Run: npm run db:build:m2').toBe(
+    expect(bundle, 'the bundle drifted from its sources. Run: npm run db:build').toBe(
       renderBundle(migrations),
     );
   });

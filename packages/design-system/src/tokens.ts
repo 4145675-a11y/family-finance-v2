@@ -10,7 +10,7 @@
  * tokens.test.ts fails if the two drift apart.
  */
 
-import type { HexColor } from './contrast.js';
+import type { HexColor } from './contrast';
 
 export const color = {
   background: '#F7F8F5',

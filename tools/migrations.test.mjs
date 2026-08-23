@@ -216,3 +216,106 @@ describe('tables and indexes use the IF NOT EXISTS that PostgreSQL does offer', 
     }
   });
 });
+
+describe('enumerations are created under an existence check', () => {
+  test('every enum a migration creates names itself in a pg_type guard', () => {
+    for (const { name, sql } of files) {
+      const created = [...sql.matchAll(/create type public\.(\w+) as enum/gi)].map((m) => m[1]);
+      expect(
+        created.length,
+        `${name}: expected at least one enum or none at all`,
+      ).toBeGreaterThanOrEqual(0);
+      for (const type of created) {
+        expect(
+          sql,
+          `${name}: create type public.${type} needs a guard that checks pg_type for '${type}'`,
+        ).toContain(`t.typname = '${type}'`);
+      }
+    }
+  });
+});
+
+describe('constraint triggers are re-runnable too', () => {
+  test('each CREATE CONSTRAINT TRIGGER has a preceding drop', () => {
+    for (const { name, sql } of files) {
+      for (const match of sql.matchAll(/^create constraint trigger (\w+)/gim)) {
+        const trigger = match[1];
+        const dropIndex = sql.indexOf(`drop trigger if exists ${trigger}`);
+        expect(
+          dropIndex,
+          `${name}: constraint trigger ${trigger} needs "drop trigger if exists ${trigger}" before it`,
+        ).toBeGreaterThanOrEqual(0);
+        expect(dropIndex).toBeLessThan(match.index);
+      }
+    }
+  });
+});
+
+describe('every table is protected by row level security', () => {
+  const allSql = files.map((f) => f.sql).join('\n');
+  const tables = [
+    ...new Set(
+      [...allSql.matchAll(/^create table if not exists (public\.\w+)/gim)].map((m) => m[1]),
+    ),
+  ];
+
+  test('the suite found the tables it means to check', () => {
+    // A regex that matches nothing would make every assertion below vacuous.
+    expect(tables.length).toBeGreaterThanOrEqual(12);
+  });
+
+  test.each(tables)('%s has RLS enabled', (table) => {
+    expect(allSql).toContain(`alter table ${table} enable row level security`);
+  });
+
+  test.each(tables)('%s has RLS forced, so the owner is subject to policy too', (table) => {
+    expect(allSql).toContain(`alter table ${table} force row level security`);
+  });
+
+  test.each(tables)('%s has at least one policy', (table) => {
+    const bare = table.replace('public.', '');
+    const policies = [
+      ...allSql.matchAll(/create policy (\w+)\s*\n\s*on (public\.\w+)/gim),
+    ].filter(([, , on]) => on === table);
+    expect(
+      policies.length,
+      `${bare} has no policy, so it is closed by accident rather than by design`,
+    ).toBeGreaterThan(0);
+  });
+});
+
+describe('money rows are never deleted', () => {
+  const allSql = files.map((f) => f.sql).join('\n');
+
+  test('transaction_splits is the only table with a DELETE policy', () => {
+    const deletePolicies = [
+      ...allSql.matchAll(/create policy (\w+)\s*\n\s*on (public\.\w+)\s*\n\s*for delete/gim),
+    ].map((m) => m[2]);
+    expect(deletePolicies).toEqual(['public.transaction_splits']);
+  });
+
+  test('no DELETE grant reaches a money table', () => {
+    const grants = [...allSql.matchAll(/^grant ([^)]+?) on (public\.\w+) to authenticated/gim)];
+    const withDelete = grants
+      .filter(([, verbs]) => /\bdelete\b/i.test(verbs))
+      .map(([, , table]) => table);
+    expect(withDelete).toEqual(['public.transaction_splits']);
+  });
+});
+
+describe('security definer functions pin their search path', () => {
+  test('every SECURITY DEFINER function sets search_path to empty', () => {
+    for (const { name, sql } of files) {
+      const definers = [
+        ...sql.matchAll(/create or replace function ([\w.]+)\s*\([\s\S]*?\$\$/gi),
+      ].filter(([body]) => /security definer/i.test(body));
+
+      for (const [body, fn] of definers) {
+        expect(
+          body,
+          `${name}: ${fn} is SECURITY DEFINER and must pin "set search_path = ''"`,
+        ).toMatch(/set search_path = ''/);
+      }
+    }
+  });
+});

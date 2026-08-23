@@ -1,0 +1,359 @@
+import type { BusinessDate, Currency } from '@family-finance/contracts';
+
+import {
+  businessProfit,
+  householdNeedUntilMonthEnd,
+  safeBusinessTransfer,
+  type BusinessProfit,
+  type SafeTransfer,
+} from './business';
+import { businessDateOf, endOfMonth, isOnOrBefore, startOfMonth } from './dates';
+import {
+  callRisk,
+  debtPeriodMetrics,
+  debtTotals,
+  debtTrend,
+  mandatoryMonthlyDebtPaymentsMinor,
+  replayDebtBalances,
+  type CallRisk,
+  type DebtBalance,
+  type DebtPeriodMetrics,
+  type DebtTotals,
+  type DebtTrend,
+} from './debt';
+import { buildDecision, inputHashOf, type DecisionResult } from './decision';
+import {
+  fundingGapWithinDays,
+  overdueEssentialsMinor,
+  projectDailyBalance,
+  type Forecast,
+} from './forecast';
+import { liquidCashMinor, safeHouseholdSpend, type SafeSpend } from './household';
+import { clampAtZero, maxSigned } from './money';
+import { determineOperatingMode, type ModeAssessment } from './modes';
+import { freshnessAgeDays, scoreDataQuality, type DataQualityScore } from './quality';
+import { runStressTests, stressTestsPassed, type StressScenarioResult } from './stress';
+import type { EngineInput } from './types';
+import { allocateWaterfall, noClaims, type WaterfallResult } from './waterfall';
+
+/**
+ * The one composition step: raw facts in, the dashboard's source of truth out.
+ *
+ * 01-PRODUCT-SPEC.md § מסך הבית fixes the hierarchy this must be able to answer,
+ * in order: freshness and confidence, safe spend, forecast and low point, net
+ * consumer and total debt, household against business, and one action. Everything
+ * below exists to answer exactly those, and each answer carries its own breakdown
+ * so no screen has to invent an explanation.
+ */
+
+export interface NextAction {
+  readonly key: string;
+  readonly title: string;
+  readonly detail: string;
+  readonly rationale: string;
+}
+
+export interface FinancialSnapshot {
+  readonly asOf: string;
+  readonly today: BusinessDate;
+  readonly periodStart: BusinessDate;
+  readonly periodEnd: BusinessDate;
+  readonly currency: Currency;
+  readonly quality: DataQualityScore;
+  readonly freshnessAgeDays: number | null;
+  readonly safeSpend: SafeSpend;
+  readonly decision: DecisionResult;
+  readonly forecastConservative: Forecast;
+  readonly forecastExpected: Forecast;
+  readonly debtTotals: DebtTotals;
+  /** Per-debt balances, replayed from events. Screens read these, never derive them. */
+  readonly debtBalances: readonly DebtBalance[];
+  readonly debtTrend: DebtTrend | null;
+  readonly debtMetrics: DebtPeriodMetrics;
+  readonly callRisk: CallRisk;
+  readonly householdLiquidMinor: number;
+  readonly businessLiquidMinor: number;
+  readonly businessProfit: BusinessProfit | null;
+  readonly safeTransfer: SafeTransfer;
+  readonly waterfall: WaterfallResult;
+  readonly mode: ModeAssessment;
+  readonly stressTests: readonly StressScenarioResult[];
+  readonly nextAction: NextAction;
+}
+
+/**
+ * Builds the ten waterfall claims from the input.
+ *
+ * Steps are kept strictly non-overlapping: a shekel of essential need is claimed
+ * once, by step 1, and a mortgage payment is claimed once, by step 2. Overlap
+ * would let the same obligation absorb money twice and make the remaining balance
+ * look smaller than it is.
+ *
+ * Steps 8 and 10 claim nothing yet. Sinking funds and long-term goals are
+ * Milestone 10 and have no data behind them today; claiming a guessed number
+ * would be worse than claiming none, and the step is still shown so its absence
+ * is visible rather than silent.
+ */
+function buildClaims(
+  input: EngineInput,
+  today: BusinessDate,
+  reserveFloorMinor: number,
+  balances: ReadonlyMap<string, number>,
+) {
+  const periodEnd = endOfMonth(today);
+  const claims = { ...noClaims() };
+
+  claims.essential_needs = input.plannedItems
+    .filter(
+      (item) =>
+        item.scope === 'household' &&
+        item.direction === 'outflow' &&
+        item.essential &&
+        isOnOrBefore(item.dueDate ?? item.expectedDate, periodEnd),
+    )
+    .reduce((total, item) => total + item.amountMinor, 0);
+
+  const activeDebts = input.debts.filter((debt) => debt.status === 'active');
+
+  claims.mortgage_and_material = activeDebts
+    .filter((debt) => debt.kind === 'mortgage')
+    .reduce((total, debt) => total + (debt.minimumPaymentMinor ?? 0), 0);
+
+  claims.taxes_and_held_funds =
+    input.business === null
+      ? 0
+      : input.business.accruedTaxReserveMinor + input.business.certainObligationsMinor;
+
+  claims.debt_minimums = activeDebts
+    .filter((debt) => debt.kind !== 'mortgage')
+    .reduce((total, debt) => total + (debt.minimumPaymentMinor ?? 0), 0);
+
+  claims.operating_reserve = clampAtZero(
+    reserveFloorMinor - liquidCashMinor(input.accounts, 'household'),
+  ).resultMinor;
+
+  claims.legal_or_urgent_debt = activeDebts
+    .filter((debt) => debt.urgency === 'legal' || debt.urgency === 'demanded')
+    .reduce((total, debt) => total + (balances.get(debt.id) ?? 0), 0);
+
+  // The single most expensive non-mortgage debt is the accelerated-repayment
+  // target. A debt with an unknown rate is not assumed to be cheap, but it also
+  // cannot be claimed as the most expensive: § קדימות חובות forbids claiming a
+  // precise saving without the rate.
+  const ranked = activeDebts
+    .filter((debt) => debt.kind !== 'mortgage' && debt.effectiveAnnualRateBp !== null)
+    .sort((a, b) => (b.effectiveAnnualRateBp ?? 0) - (a.effectiveAnnualRateBp ?? 0));
+  claims.expensive_debt = ranked.length > 0 ? (balances.get(ranked[0]?.id ?? '') ?? 0) : 0;
+
+  claims.buffer_growth = reserveFloorMinor;
+
+  return claims;
+}
+
+function chooseNextAction(
+  mode: ModeAssessment,
+  safeSpend: SafeSpend,
+  quality: DataQualityScore,
+  waterfall: WaterfallResult,
+  trend: DebtTrend | null,
+  conservative: Forecast,
+): NextAction {
+  if (safeSpend.fundingGapMinor > 0) {
+    return {
+      key: 'close_funding_gap',
+      title: 'לסגור את הפער לפני סוף החודש',
+      detail: `חסרים ${safeSpend.fundingGapMinor} אגורות כדי לכסות את המחויבויות עד סוף התקופה.`,
+      rationale: 'פער מימון פתוח קודם לכל פעולה אחרת — הוא הופך לחוב חדש אם לא נסגר.',
+    };
+  }
+
+  if (conservative.firstFailureDate !== null) {
+    return {
+      key: 'move_a_payment',
+      title: 'להזיז תשלום לפני יום הכשל',
+      detail: `בתחזית השמרנית היתרה יורדת מתחת לאפס ב־${conservative.firstFailureDate}.`,
+      rationale: 'יום כשל צפוי ידוע מראש ניתן למניעה; אחרי שהוא קורה הוא כבר עמלה או חוב.',
+    };
+  }
+
+  if (quality.confidence === 'low') {
+    return {
+      key: 'confirm_balances',
+      title: 'לאמת יתרות ולסווג פעולות',
+      detail: quality.missingData.join(' · ') || 'חסרים נתונים כדי לתת תשובה מחייבת.',
+      rationale: 'החלטה על בסיס נתון ישן אינה החלטה בטוחה, גם כשהמספר נראה טוב.',
+    };
+  }
+
+  if (waterfall.firstUnfundedStep !== null) {
+    const step = waterfall.allocations.find(
+      (allocation) => allocation.step === waterfall.firstUnfundedStep,
+    );
+    return {
+      key: 'fund_next_step',
+      title: `להשלים את השלב: ${step?.label ?? ''}`,
+      detail: `חסרות ${step?.unfundedMinor ?? 0} אגורות בשלב ${waterfall.firstUnfundedStep} במפל.`,
+      rationale: 'המפל ממומן לפי הסדר; שלב שלא מומן מוריד את כל מה שאחריו.',
+    };
+  }
+
+  if (trend !== null && trend.consumerDirection === 'up') {
+    return {
+      key: 'stop_new_debt',
+      title: 'לעצור יצירת חוב חדש',
+      detail: `החוב הצרכני עלה ב־${trend.netConsumerChangeMinor} אגורות מתחילת התקופה.`,
+      rationale: 'החזר שמלווה בחוב חדש גדול יותר אינו התקדמות.',
+    };
+  }
+
+  if (mode.mode === 'repayment' || mode.mode === 'buffer_building' || mode.mode === 'growth') {
+    return {
+      key: 'accelerate_repayment',
+      title: 'להפנות עודף לחוב היקר ביותר',
+      detail: 'התנאים לפירעון מואץ מתקיימים: הרזרבה עומדת ותרחישי הלחץ עוברים.',
+      rationale: 'כל שקל שמופנה לחוב היקר ביותר חוסך את העלות האפקטיבית הגבוהה ביותר.',
+    };
+  }
+
+  return {
+    key: 'hold_position',
+    title: 'לשמור על המצב ולהמשיך לאשר פעולות',
+    detail: 'אין פער פתוח ואין שלב לא ממומן.',
+    rationale: 'כשאין פעולה דחופה, השמירה על עדכניות הנתונים היא הפעולה בעלת הערך הגבוה ביותר.',
+  };
+}
+
+export function buildFinancialSnapshot(input: EngineInput): FinancialSnapshot {
+  const today = businessDateOf(input.asOf, input.timeZone);
+  const periodStart = startOfMonth(today);
+  const periodEnd = endOfMonth(today);
+
+  const quality = scoreDataQuality(input);
+  const balances = replayDebtBalances(input.debtEvents, today);
+  const totals = debtTotals(input.debts, balances);
+  const metrics = debtPeriodMetrics(input.debtEvents, input.rollovers, periodStart, today);
+  const risk = callRisk(input.debts, balances, today);
+
+  const safeSpend = safeHouseholdSpend(input, today);
+  const householdLiquidMinor = liquidCashMinor(input.accounts, 'household');
+  const businessLiquidMinor = liquidCashMinor(input.accounts, 'business');
+
+  const forecastConservative = projectDailyBalance(input, today, 'conservative');
+  const forecastExpected = projectDailyBalance(input, today, 'expected');
+
+  const profit = businessProfit(input);
+  const commitmentsMinor =
+    safeSpend.breakdown
+      .filter((line) => line.effect === 'subtracts')
+      .reduce((total, line) => total + line.amountMinor, 0) - safeSpend.reserve.floorMinor;
+  const certainIncomeMinor =
+    safeSpend.breakdown.find((line) => line.key === 'certain_income')?.amountMinor ?? 0;
+  const availableMinor = householdLiquidMinor + certainIncomeMinor;
+  const transfer = safeBusinessTransfer(
+    input,
+    profit,
+    householdNeedUntilMonthEnd(commitmentsMinor, availableMinor),
+  );
+
+  const claims = buildClaims(input, today, safeSpend.reserve.floorMinor, balances);
+  const allocatable = clampAtZero(
+    householdLiquidMinor + certainIncomeMinor + input.approvedSafeTransferMinor,
+  ).resultMinor;
+  const waterfall = allocateWaterfall(allocatable, claims);
+
+  const stressContext = {
+    largestPrivateDebtMinor: maxSigned([
+      0,
+      ...input.debts
+        .filter((debt) => debt.kind === 'private_person' && debt.status === 'active')
+        .map((debt) => balances.get(debt.id) ?? 0),
+    ]),
+    largestCardBalanceMinor: maxSigned([
+      0,
+      ...input.accounts
+        .filter((account) => account.kind === 'credit_card')
+        .map((account) => account.balance.amountMinor),
+    ]),
+    reserveFloorMinor: safeSpend.reserve.floorMinor,
+  };
+  const stressTests = runStressTests(input, today, stressContext);
+
+  const trend = input.debtBaseline === null ? null : debtTrend(input.debtBaseline, totals);
+
+  const mode = determineOperatingMode({
+    fundingGapWithin14DaysMinor: fundingGapWithinDays(input, today, 14),
+    lowPointMinor: forecastConservative.lowPointMinor,
+    reserveFloorMinor: safeSpend.reserve.floorMinor,
+    liquidCashMinor: householdLiquidMinor,
+    allMinimumsCovered:
+      householdLiquidMinor >= mandatoryMonthlyDebtPaymentsMinor(input.debts) ||
+      safeSpend.fundingGapMinor === 0,
+    hasEssentialOrLegalArrears:
+      overdueEssentialsMinor(input, today) > 0 ||
+      input.debts.some((debt) => debt.status === 'active' && debt.urgency === 'legal'),
+    conservativeForecastEndMinor: forecastConservative.endOfPeriodMinor,
+    stressTestsPassed: stressTestsPassed(stressTests),
+    netConsumerDebtChangeMinor: trend?.netConsumerChangeMinor ?? 0,
+    newDebtOriginatedMinor: metrics.newDebtOriginatedMinor,
+    consumerDebtMinor: totals.consumerDebtMinor,
+  });
+
+  const warnings: string[] = [
+    ...transfer.warnings,
+    ...(forecastConservative.firstFailureDate !== null
+      ? [`בתחזית השמרנית צפוי יום כשל ב־${forecastConservative.firstFailureDate}.`]
+      : []),
+    ...(risk.within30DaysMinor > 0
+      ? ['קיים חוב פרטי שעלול להידרש בתוך 30 יום; הוא אינו מקור כסף בתחזית.']
+      : []),
+  ];
+
+  const decision = buildDecision({
+    resultMinor: safeSpend.resultMinor,
+    fundingGapMinor: safeSpend.fundingGapMinor,
+    breakdown: safeSpend.breakdown,
+    assumptions: safeSpend.assumptions,
+    warnings,
+    missingData: quality.missingData,
+    dataQualityScore: quality.score,
+    confidence: quality.confidence,
+    freshnessAgeDays: freshnessAgeDays(input),
+    operatingMode: mode.mode,
+    stressTestsPassed: stressTestsPassed(stressTests),
+    inputHash: inputHashOf(input),
+  });
+
+  return {
+    asOf: input.asOf,
+    today,
+    periodStart,
+    periodEnd,
+    currency: input.currency,
+    quality,
+    freshnessAgeDays: freshnessAgeDays(input),
+    safeSpend,
+    decision,
+    forecastConservative,
+    forecastExpected,
+    debtTotals: totals,
+    debtBalances: [...balances].map(([debtId, balanceMinor]) => ({ debtId, balanceMinor })),
+    debtTrend: trend,
+    debtMetrics: metrics,
+    callRisk: risk,
+    householdLiquidMinor,
+    businessLiquidMinor,
+    businessProfit: profit,
+    safeTransfer: transfer,
+    waterfall,
+    mode,
+    stressTests,
+    nextAction: chooseNextAction(
+      mode,
+      safeSpend,
+      quality,
+      waterfall,
+      trend,
+      forecastConservative,
+    ),
+  };
+}

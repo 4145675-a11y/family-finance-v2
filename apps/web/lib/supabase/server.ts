@@ -3,7 +3,7 @@ import 'server-only';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-import { readPublicEnv } from '../env.js';
+import { readPublicEnv } from '../env';
 
 /**
  * Server-side Supabase client, bound to the request's cookies.

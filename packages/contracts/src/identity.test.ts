@@ -11,7 +11,7 @@ import {
   inviteToHouseholdInputSchema,
   membershipStatusSchema,
   profileSchema,
-} from './identity.js';
+} from './identity';
 
 const now = new Date().toISOString();
 

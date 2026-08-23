@@ -2,7 +2,7 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 
-import { readPublicEnv } from '../env.js';
+import { readPublicEnv } from '../env';
 
 /**
  * Browser Supabase client.
