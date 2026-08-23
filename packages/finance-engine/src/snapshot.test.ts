@@ -59,7 +59,7 @@ describe('buildFinancialSnapshot', () => {
 
   test('6. there is exactly one recommended action, with its reasoning', () => {
     expect(snapshot.nextAction.key).toBe('move_a_payment');
-    expect(snapshot.nextAction.rationale.length).toBeGreaterThan(0);
+    expect(snapshot.nextAction.params?.date).toBe('2026-08-15');
   });
 
   test('the operating mode reflects a gap inside fourteen days', () => {

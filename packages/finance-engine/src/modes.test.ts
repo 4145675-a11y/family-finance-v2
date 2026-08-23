@@ -104,7 +104,7 @@ describe('stop_new_debt', () => {
   test('a failing stress test blocks repayment and names the reason', () => {
     const result = determineOperatingMode({ ...healthy, stressTestsPassed: false });
     expect(result.mode).toBe('stop_new_debt');
-    expect(result.reasons.join(' ')).toContain('לחץ');
+    expect(result.reasons.map((r) => r.code)).toContain('mode.blocker.stress_failed');
   });
 
   test('a negative conservative forecast blocks repayment', () => {

@@ -11,6 +11,33 @@
  * amount: a float reaching a screen means a float existed somewhere upstream.
  */
 
+/**
+ * Unicode isolate characters.
+ *
+ * A number embedded in a Hebrew sentence has to be isolated or the bidi algorithm
+ * reorders the characters around it — "נשארו 620 ₪" can render with the currency
+ * on the wrong side, which in a money app reads as a different number. `<bdi>`
+ * does this in markup; these do it inside a plain string, which is what a
+ * sentence built in the copy layer needs.
+ */
+const FIRST_STRONG_ISOLATE = '⁨';
+const POP_DIRECTIONAL_ISOLATE = '⁩';
+
+/** Wraps a run so the surrounding right-to-left text cannot reorder it. */
+export function isolate(text: string): string {
+  return `${FIRST_STRONG_ISOLATE}${text}${POP_DIRECTIONAL_ISOLATE}`;
+}
+
+/** A money amount ready to sit inside a Hebrew sentence. */
+export function money(amountMinor: number, currency = 'ILS'): string {
+  return isolate(formatMoney(amountMinor, currency));
+}
+
+/** A whole number ready to sit inside a Hebrew sentence. */
+export function count(value: number): string {
+  return isolate(new Intl.NumberFormat('he-IL').format(value));
+}
+
 const currencyFormatters = new Map<string, Intl.NumberFormat>();
 
 function formatterFor(currency: string): Intl.NumberFormat {

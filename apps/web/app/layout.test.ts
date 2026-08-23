@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 
 import { NAV_ITEMS } from '../components/app-shell';
+import { copy } from '../lib/copy/copy';
 import { Badge, EmptyState, Figure, Money, StatRow } from '../components/ui';
 import RootLayout, { metadata, viewport } from './layout';
 
@@ -91,18 +92,24 @@ describe('presentational pieces', () => {
   test('the empty state states the reason and promises no numbers', () => {
     const markup = renderToStaticMarkup(createElement(EmptyState, { reason: 'הדגל כבוי' }));
     expect(markup).toContain('הדגל כבוי');
-    expect(markup).toContain('אינו ממציא מספרים');
+    expect(markup).toContain(copy.states.noSourceBody);
   });
 });
 
 describe('navigation', () => {
-  test('lists only destinations that exist', () => {
+  test('lists the five destinations 03-UX-SPEC.md names', () => {
     expect(NAV_ITEMS.map((item) => item.href)).toEqual([
       '/',
-      '/forecast',
-      '/debts',
-      '/business',
+      '/approvals',
+      '/activity',
+      '/budget',
+      '/more',
     ]);
+  });
+
+  test('each destination declares whether it is a working screen today', () => {
+    const ready = NAV_ITEMS.filter((item) => item.ready).map((item) => item.href);
+    expect(ready).toEqual(['/', '/budget', '/more']);
   });
 
   test('every destination has a Hebrew label', () => {

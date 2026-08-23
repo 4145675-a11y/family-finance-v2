@@ -2,6 +2,7 @@ import type { Confidence } from '@family-finance/contracts';
 
 import { businessDateOf, daysBetween } from './dates';
 import { roundHalfUp } from './money';
+import { notice, type EngineNotice } from './notice';
 import type { AccountPosition, EngineInput } from './types';
 
 /**
@@ -20,19 +21,19 @@ import type { AccountPosition, EngineInput } from './types';
 
 export interface QualityComponent {
   readonly key: string;
-  readonly label: string;
   /** 0–100 for this component alone. */
   readonly score: number;
   /** Weight in the final score. The weights sum to 100 (ADR-0016). */
   readonly weight: number;
-  readonly detail: string;
+  /** The one fact that explains this component's score, as a code plus numbers. */
+  readonly detail: EngineNotice;
 }
 
 export interface DataQualityScore {
   readonly score: number;
   readonly confidence: Confidence;
   readonly components: readonly QualityComponent[];
-  readonly missingData: readonly string[];
+  readonly missingData: readonly EngineNotice[];
 }
 
 /** Weights from ADR-0016. Their sum is asserted in the tests. */
@@ -87,11 +88,13 @@ function freshnessScore(
 }
 
 export function scoreDataQuality(input: EngineInput): DataQualityScore {
-  const missingData: string[] = [];
+  const missingData: EngineNotice[] = [];
 
   const freshness = freshnessScore(input.accounts, input.asOf);
   if (freshness.neverVerified > 0) {
-    missingData.push(`${freshness.neverVerified} חשבונות ללא אימות יתרה מעולם`);
+    missingData.push(
+      notice('missing.never_verified_accounts', { count: freshness.neverVerified }),
+    );
   }
 
   const {
@@ -105,7 +108,7 @@ export function scoreDataQuality(input: EngineInput): DataQualityScore {
     recentTransactionCount,
   );
   if (pendingApprovalCount > 0) {
-    missingData.push(`${pendingApprovalCount} פעולות ממתינות לאישור`);
+    missingData.push(notice('missing.pending_approvals', { count: pendingApprovalCount }));
   }
 
   const classificationScore = ratioScore(
@@ -113,7 +116,11 @@ export function scoreDataQuality(input: EngineInput): DataQualityScore {
     recentTransactionCount,
   );
   if (transactionsMissingClassificationCount > 0) {
-    missingData.push(`${transactionsMissingClassificationCount} פעולות ללא סיווג מלא`);
+    missingData.push(
+      notice('missing.unclassified_transactions', {
+        count: transactionsMissingClassificationCount,
+      }),
+    );
   }
 
   // Any unresolved reconciliation difference is treated as a full miss. A gap
@@ -124,10 +131,18 @@ export function scoreDataQuality(input: EngineInput): DataQualityScore {
       ? 100
       : 0;
   if (input.dataQuality.unresolvedReconciliationGapMinor > 0) {
-    missingData.push('פער התאמה שלא הוסבר');
+    missingData.push(
+      notice('missing.reconciliation_gap', {
+        amountMinor: input.dataQuality.unresolvedReconciliationGapMinor,
+      }),
+    );
   }
   if (input.dataQuality.unclassifiedCashMinor > 0) {
-    missingData.push('מזומן שלא סווג');
+    missingData.push(
+      notice('missing.unclassified_cash', {
+        amountMinor: input.dataQuality.unclassifiedCashMinor,
+      }),
+    );
   }
 
   const activeDebts = input.debts.filter((debt) => debt.status === 'active');
@@ -137,48 +152,53 @@ export function scoreDataQuality(input: EngineInput): DataQualityScore {
   const debtScore = ratioScore(completeDebts.length, activeDebts.length);
   const incompleteDebts = activeDebts.length - completeDebts.length;
   if (incompleteDebts > 0) {
-    missingData.push(`${incompleteDebts} חובות ללא ריבית או תשלום מינימום`);
+    missingData.push(notice('missing.incomplete_debts', { count: incompleteDebts }));
   }
 
   const components: QualityComponent[] = [
     {
       key: 'balance_freshness',
-      label: 'עדכניות יתרות',
       score: freshness.score,
       weight: QUALITY_WEIGHTS.balance_freshness,
       detail:
         freshness.oldestAgeDays === null
-          ? 'אין יתרה מאומתת'
-          : `היתרה הישנה ביותר אומתה לפני ${freshness.oldestAgeDays} ימים`,
+          ? notice('quality.freshness.none')
+          : notice('quality.freshness.oldest', { days: freshness.oldestAgeDays }),
     },
     {
       key: 'approval_backlog',
-      label: 'שיעור אישור',
       score: approvalScore,
       weight: QUALITY_WEIGHTS.approval_backlog,
-      detail: `${pendingApprovalCount} מתוך ${recentTransactionCount} ממתינות`,
+      detail: notice('quality.approvals', {
+        pending: pendingApprovalCount,
+        total: recentTransactionCount,
+      }),
     },
     {
       key: 'classification',
-      label: 'שלמות סיווג',
       score: classificationScore,
       weight: QUALITY_WEIGHTS.classification,
-      detail: `${transactionsMissingClassificationCount} פעולות חסרות סיווג`,
+      detail: notice('quality.classification', {
+        count: transactionsMissingClassificationCount,
+      }),
     },
     {
       key: 'reconciliation',
-      label: 'התאמות ומזומן מסווג',
       score: reconciliationScore,
       weight: QUALITY_WEIGHTS.reconciliation,
       detail:
-        reconciliationScore === 100 ? 'אין פערים פתוחים' : 'קיים פער התאמה או מזומן לא מסווג',
+        reconciliationScore === 100
+          ? notice('quality.reconciliation.clean')
+          : notice('quality.reconciliation.open'),
     },
     {
       key: 'debt_completeness',
-      label: 'שלמות נתוני חוב',
       score: debtScore,
       weight: QUALITY_WEIGHTS.debt_completeness,
-      detail: `${completeDebts.length} מתוך ${activeDebts.length} חובות עם ריבית ומינימום`,
+      detail: notice('quality.debts', {
+        complete: completeDebts.length,
+        total: activeDebts.length,
+      }),
     },
   ];
 

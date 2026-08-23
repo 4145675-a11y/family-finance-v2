@@ -1,40 +1,33 @@
 import { AppShell } from '../../components/app-shell';
 import {
-  Breakdown,
-  BreakdownLines,
+  BreakdownList,
   Card,
+  Disclosure,
   EmptyState,
+  Hero,
   Money,
   SourceBanner,
   StatRow,
 } from '../../components/ui';
+import { copy } from '../../lib/copy/copy';
+import { breakdownLabel, sayNotice } from '../../lib/copy/notices';
 import { loadDashboardView } from '../../lib/dashboard/load';
 
 /**
- * The business screen.
+ * The business.
  *
- * Two profit figures, on purpose. Accounting profit answers "did the business do
- * well"; realized cash profit answers "is there money that is actually ours", and
- * only the second may fund a transfer to the household
- * (02-FINANCIAL-RULES.md § נוסחאות, PROD-KPI-004).
- *
- * The transfer figure always states which of its three limits bound it, because
- * "why only this much" is the first question anyone asks of it.
+ * Two profit figures, on purpose, and in ordinary words. "רווח על הנייר" is what
+ * the business earned; "רווח שכבר בידיים" is what is actually ours after tax and
+ * what we already owe. Only the second may fund a transfer home — PROD-KPI-004 —
+ * and the whole breakdown is shown before the transfer figure, never after it.
  */
-
-const CONSTRAINT_LABEL: Readonly<Record<string, string>> = {
-  realized_profit: 'הרווח הממומש המצטבר',
-  available_cash: 'המזומן העסקי הפנוי',
-  household_need: 'צורך הבית עד סוף החודש',
-  none: 'אין נתונים מספיקים',
-};
 
 export default async function BusinessPage() {
   const { descriptor, snapshot } = await loadDashboardView();
 
   if (snapshot === null) {
     return (
-      <AppShell active="/business" title="עסק">
+      <AppShell active="/more" title={copy.business.title}>
         <EmptyState reason={descriptor.reason} />
       </AppShell>
     );
@@ -45,28 +38,23 @@ export default async function BusinessPage() {
 
   if (profit === null) {
     return (
-      <AppShell active="/business" title="עסק">
-        {!descriptor.isRealData ? (
-          <SourceBanner label={descriptor.label} reason={descriptor.reason} />
-        ) : null}
-        <Card title="אין עסק מוגדר">
-          <p className="text-text-secondary">
-            כשיוגדר עסק, יוצגו כאן תקבולים, הוצאות, מס, רזרבה, רווח ממומש והעברה בטוחה.
-          </p>
+      <AppShell active="/more" title={copy.business.title}>
+        {!descriptor.isRealData ? <SourceBanner /> : null}
+        <Card title={copy.business.title}>
+          <p className="text-text-secondary">{copy.business.none}</p>
         </Card>
       </AppShell>
     );
   }
 
   return (
-    <AppShell active="/business" title="עסק">
-      {!descriptor.isRealData ? (
-        <SourceBanner label={descriptor.label} reason={descriptor.reason} />
-      ) : null}
+    <AppShell active="/more" title={copy.business.title}>
+      {!descriptor.isRealData ? <SourceBanner /> : null}
 
-      <Card title="רווח" subtitle="רווח חשבונאי ורווח ממומש במזומן הם שני מספרים שונים.">
+      {/* The breakdown comes first. The transfer figure is the conclusion, not the headline. */}
+      <Card title={copy.business.reallyLeft}>
         <StatRow
-          label="רווח תפעולי חשבונאי"
+          label={copy.business.accountingProfit}
           value={
             <Money
               amountMinor={profit.operatingProfitMinor}
@@ -74,10 +62,10 @@ export default async function BusinessPage() {
               signed
             />
           }
-          hint="תקבולים שהתקבלו פחות הוצאות מאושרות."
+          hint={copy.business.accountingProfitNote}
         />
         <StatRow
-          label="רווח ממומש במזומן"
+          label={copy.business.cashProfit}
           value={
             <Money
               amountMinor={profit.realizedCashProfitMinor}
@@ -85,56 +73,53 @@ export default async function BusinessPage() {
               signed
             />
           }
-          hint="בניכוי מה ששולם, רזרבת המס וההתחייבויות הוודאיות."
+          hint={copy.business.cashProfitNote}
         />
         <StatRow
-          label="מזומן עסקי פנוי"
+          label="כמה יש עכשיו בחשבון העסק"
           value={
-            <Money
-              amountMinor={profit.availableCashMinor}
-              currency={snapshot.currency}
-              signed
-            />
+            <Money amountMinor={snapshot.businessLiquidMinor} currency={snapshot.currency} />
           }
         />
-        <Breakdown summary="הרכיבים">
-          <BreakdownLines lines={profit.breakdown} currency={snapshot.currency} />
-        </Breakdown>
+
+        <Disclosure summary={copy.sections.calculation}>
+          <BreakdownList
+            lines={profit.breakdown}
+            currency={snapshot.currency}
+            labelFor={breakdownLabel}
+          />
+        </Disclosure>
       </Card>
 
-      <Card
-        title="העברה בטוחה לבית"
-        subtitle="הנמוך מבין הרווח הממומש, המזומן הפנוי וצורך הבית."
-        tone={transfer.resultMinor > 0 ? 'success' : 'attention'}
-      >
-        <p className="text-[32px] leading-tight font-bold">
-          <Money amountMinor={transfer.resultMinor} currency={snapshot.currency} />
-        </p>
-        <p className="mt-2 text-text-secondary">
-          הגורם המגביל:{' '}
-          {CONSTRAINT_LABEL[transfer.bindingConstraint] ?? transfer.bindingConstraint}
-        </p>
+      <Hero
+        label={copy.business.safeToMove}
+        amountMinor={transfer.resultMinor}
+        currency={snapshot.currency}
+        caption={`${copy.business.limitedBy}: ${copy.business.limits[transfer.bindingConstraint] ?? transfer.bindingConstraint}`}
+        note={copy.business.proposalNote}
+        tone={transfer.resultMinor > 0 ? 'primary' : 'attention'}
+      />
+
+      <Card title={copy.business.limitedBy}>
+        <BreakdownList
+          lines={transfer.breakdown}
+          currency={snapshot.currency}
+          labelFor={breakdownLabel}
+        />
         <StatRow
-          label="צורך הבית עד סוף החודש"
+          label={copy.business.limits.household_need ?? ''}
           value={
             <Money amountMinor={transfer.householdNeedMinor} currency={snapshot.currency} />
           }
         />
-        <Breakdown summary="שלושת הגבולות">
-          <BreakdownLines lines={transfer.breakdown} currency={snapshot.currency} />
-        </Breakdown>
 
         {transfer.warnings.length > 0 ? (
-          <ul className="mt-3 flex list-inside list-disc flex-col gap-1 text-attention">
+          <ul className="mt-4 flex list-inside list-disc flex-col gap-1.5 text-attention">
             {transfer.warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
+              <li key={warning.code}>{sayNotice(warning)}</li>
             ))}
           </ul>
         ) : null}
-
-        <p className="mt-3 text-small text-text-secondary">
-          זהו סכום מוצע. העברה בפועל היא פעולה שדורשת אישור, והמערכת אינה מבצעת העברות בנקאיות.
-        </p>
       </Card>
     </AppShell>
   );

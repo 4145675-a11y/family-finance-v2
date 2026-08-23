@@ -3,6 +3,7 @@ import type { BusinessDate } from '@family-finance/contracts';
 
 import { endOfMonth, isOnOrBefore } from './dates';
 import { clampAtZero, maxSigned, sumSigned, toSigned } from './money';
+import { notice, type EngineNotice } from './notice';
 import type {
   AccountPosition,
   BreakdownLine,
@@ -83,25 +84,21 @@ export function reserveFloor(
   const components: BreakdownLine[] = [
     {
       key: 'manual_floor',
-      label: 'סכום מינימום שאושר ידנית',
       amountMinor: reserve.manualFloorMinor ?? 0,
       effect: 'informational',
     },
     {
       key: 'essentials_until_next_income',
-      label: 'צרכים חיוניים עד ההכנסה הוודאית הבאה',
       amountMinor: essentialsUntilNextIncomeMinor,
       effect: 'informational',
     },
     {
       key: 'incident_buffer',
-      label: 'כרית לתקלה סבירה שהוגדרה',
       amountMinor: reserve.incidentBufferMinor ?? 0,
       effect: 'informational',
     },
     {
       key: 'revolving_avoidance',
-      label: 'הסכום שמונע שימוש חדש באשראי מתגלגל',
       amountMinor: reserve.revolvingAvoidanceMinor ?? 0,
       effect: 'informational',
     },
@@ -124,7 +121,7 @@ export interface SafeSpend {
   readonly unavailableMinor: number;
   readonly breakdown: readonly BreakdownLine[];
   readonly reserve: ReserveFloor;
-  readonly assumptions: readonly string[];
+  readonly assumptions: readonly EngineNotice[];
 }
 
 /**
@@ -200,55 +197,46 @@ export function safeHouseholdSpend(input: EngineInput, today: BusinessDate): Saf
   const breakdown: BreakdownLine[] = [
     {
       key: 'verified_liquid_cash',
-      label: 'מזומן נזיל מאומת בחשבונות הבית',
       amountMinor: verifiedLiquidCashMinor,
       effect: 'adds',
     },
     {
       key: 'certain_income',
-      label: 'הכנסה ודאית עד סוף החודש',
       amountMinor: certainIncomeMinor,
       effect: 'adds',
     },
     {
       key: 'approved_business_transfer',
-      label: 'העברה מאושרת מהעסק',
       amountMinor: input.approvedSafeTransferMinor,
       effect: 'adds',
     },
     {
       key: 'essential_needs',
-      label: 'צרכים חיוניים עד סוף התקופה',
       amountMinor: essentialNeedsMinor,
       effect: 'subtracts',
     },
     {
       key: 'certain_due_items',
-      label: 'חיובים ודאיים אחרים',
       amountMinor: certainDueItemsMinor,
       effect: 'subtracts',
     },
     {
       key: 'debt_minimums',
-      label: 'משכנתה ותשלומי מינימום לחובות',
       amountMinor: debtMinimumsMinor,
       effect: 'subtracts',
     },
     {
       key: 'protected_reserves',
-      label: 'כספים שמורים',
       amountMinor: input.reserve.protectedReservesMinor,
       effect: 'subtracts',
     },
     {
       key: 'safety_floor',
-      label: 'רצפת הרזרבה',
       amountMinor: reserve.floorMinor,
       effect: 'subtracts',
     },
     {
       key: 'reconciliation_gap',
-      label: 'פערי התאמה שלא נסגרו',
       amountMinor: input.dataQuality.unresolvedReconciliationGapMinor,
       effect: 'subtracts',
     },
@@ -277,10 +265,10 @@ export function safeHouseholdSpend(input: EngineInput, today: BusinessDate): Saf
     )
     .reduce((total, item) => total + item.amountMinor, 0);
 
-  const assumptions = [
-    'הסכום מבוסס על יתרות שאומתו מול המוסדות; יתרה שלא אומתה מורידה את רמת האמינות.',
-    'הכנסה ודאית שטרם התקבלה נספרת רק אם מועדה נופל בתוך התקופה.',
-    'תשלומי מינימום לחובות נספרים במלואם לחודש הנוכחי.',
+  const assumptions: EngineNotice[] = [
+    notice('assumption.verified_balances_only'),
+    notice('assumption.certain_income_within_period'),
+    notice('assumption.debt_minimums_full_month'),
   ];
 
   return {

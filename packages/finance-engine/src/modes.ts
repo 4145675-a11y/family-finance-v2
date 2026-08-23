@@ -1,3 +1,5 @@
+import { notice, type EngineNotice } from './notice';
+
 /**
  * `FIN-MODE-001` — the six operating modes.
  *
@@ -7,8 +9,8 @@
  * ההתנהלות makes that explicit.
  *
  * Every transition here is a measurable condition on numbers the engine already
- * produced. Nothing is a judgement call, nothing is a mood, and the reasons that
- * selected the mode are returned so the user can be told why.
+ * produced. Nothing is a judgement call, and the reasons that selected the mode
+ * are returned as codes so the copy layer can say them in the family's language.
  */
 
 export const OPERATING_MODES = [
@@ -44,9 +46,9 @@ export interface ModeInputs {
 export interface ModeAssessment {
   readonly mode: OperatingMode;
   /** Why this mode and not a milder one. */
-  readonly reasons: readonly string[];
+  readonly reasons: readonly EngineNotice[];
   /** Conditions that would force a stricter mode if they became true. */
-  readonly watchList: readonly string[];
+  readonly watchList: readonly EngineNotice[];
 }
 
 /**
@@ -57,38 +59,37 @@ export interface ModeAssessment {
  * "הופעת trigger חמור מחזירה אוטומטית למצב מחמיר ומתועדת".
  */
 export function determineOperatingMode(inputs: ModeInputs): ModeAssessment {
-  const reasons: string[] = [];
+  const reasons: EngineNotice[] = [];
 
   // 1. emergency
   if (inputs.fundingGapWithin14DaysMinor > 0) {
-    reasons.push('אין כיסוי לחיוב מחייב בתוך 14 יום.');
+    reasons.push(
+      notice('mode.gap_within_14_days', { amountMinor: inputs.fundingGapWithin14DaysMinor }),
+    );
   }
   if (inputs.lowPointMinor < 0) {
-    reasons.push('נקודת השפל הצפויה שלילית — צפויה חריגה.');
+    reasons.push(notice('mode.low_point_negative', { amountMinor: -inputs.lowPointMinor }));
   }
   if (inputs.hasEssentialOrLegalArrears) {
-    reasons.push('קיים פיגור בצורך חיוני או בחוב עם סיכון משפטי.');
+    reasons.push(notice('mode.arrears'));
   }
   if (!inputs.allMinimumsCovered) {
-    reasons.push('לא כל תשלומי המינימום לחובות מכוסים.');
+    reasons.push(notice('mode.minimums_uncovered'));
   }
   if (reasons.length > 0) {
-    return {
-      mode: 'emergency',
-      reasons,
-      watchList: ['סגירת הפער המיידי היא התנאי היחיד ליציאה ממצב חירום.'],
-    };
+    return { mode: 'emergency', reasons, watchList: [notice('mode.watch.close_gap_first')] };
   }
 
   // 2. stabilization — nothing is failing now, but there is no cushion.
   if (inputs.liquidCashMinor < inputs.reserveFloorMinor) {
     return {
       mode: 'stabilization',
-      reasons: ['אין כשל מיידי, אך המזומן הנזיל נמוך מרצפת הרזרבה.'],
-      watchList: [
-        'ירידה של נקודת השפל מתחת לאפס מחזירה למצב חירום.',
-        'חוב חדש בתקופה הנוכחית מרחיק את היציבות.',
+      reasons: [
+        notice('mode.no_cushion', {
+          shortfallMinor: inputs.reserveFloorMinor - inputs.liquidCashMinor,
+        }),
       ],
+      watchList: [notice('mode.watch.low_point'), notice('mode.watch.new_debt')],
     };
   }
 
@@ -96,28 +97,25 @@ export function determineOperatingMode(inputs: ModeInputs): ModeAssessment {
   if (inputs.newDebtOriginatedMinor > 0 || inputs.netConsumerDebtChangeMinor > 0) {
     return {
       mode: 'stop_new_debt',
-      reasons: ['הרזרבה קיימת, אך בתקופה הנוכחית נוצר חוב חדש או שהחוב הצרכני גדל.'],
-      watchList: ['חודש שמסתיים ללא חוב חדש מאפשר מעבר למצב פירעון.'],
+      reasons: [notice('mode.new_debt_this_period')],
+      watchList: [notice('mode.watch.month_without_new_debt')],
     };
   }
 
   // 4. repayment — every condition in § מצבי ההתנהלות must hold at once.
-  const repaymentBlockers: string[] = [];
+  const blockers: EngineNotice[] = [];
   if (inputs.conservativeForecastEndMinor < 0) {
-    repaymentBlockers.push('התחזית השמרנית מסתיימת בשלילי.');
+    blockers.push(notice('mode.blocker.forecast_negative'));
   }
   if (!inputs.stressTestsPassed) {
-    repaymentBlockers.push('לפחות תרחיש לחץ בסיסי אחד אינו עובר.');
+    blockers.push(notice('mode.blocker.stress_failed'));
   }
 
-  if (repaymentBlockers.length > 0) {
+  if (blockers.length > 0) {
     return {
       mode: 'stop_new_debt',
-      reasons: [
-        'הרזרבה קיימת ואין חוב חדש, אך עדיין אין תנאים לפירעון מואץ.',
-        ...repaymentBlockers,
-      ],
-      watchList: ['תחזית שמרנית חיובית ותרחישי לחץ עוברים פותחים את מצב הפירעון.'],
+      reasons: [notice('mode.reserve_but_not_ready'), ...blockers],
+      watchList: [notice('mode.watch.repayment_conditions')],
     };
   }
 
@@ -128,8 +126,8 @@ export function determineOperatingMode(inputs: ModeInputs): ModeAssessment {
   if (inputs.consumerDebtMinor === 0 && bufferAboveFloorMinor >= inputs.reserveFloorMinor * 2) {
     return {
       mode: 'growth',
-      reasons: ['אין חוב צרכני והכרית עומדת על שלושה מונים מרצפת הרזרבה.'],
-      watchList: ['חוב צרכני חדש מחזיר מיד למצב עצירת חוב חדש.'],
+      reasons: [notice('mode.no_debt_large_cushion')],
+      watchList: [notice('mode.watch.new_consumer_debt')],
     };
   }
 
@@ -140,20 +138,19 @@ export function determineOperatingMode(inputs: ModeInputs): ModeAssessment {
   ) {
     return {
       mode: 'buffer_building',
-      reasons: ['החוב הצרכני יורד נטו והכרית גדולה מכפליים הרצפה.'],
-      watchList: ['עלייה בחוב הצרכני מחזירה למצב עצירת חוב חדש.'],
+      reasons: [
+        notice('mode.debt_falling_cushion_growing', {
+          amountMinor: -inputs.netConsumerDebtChangeMinor,
+        }),
+      ],
+      watchList: [notice('mode.watch.new_consumer_debt')],
     };
   }
 
   return {
     mode: 'repayment',
-    reasons: [
-      'אין פיגור, כל המינימום מכוסה, קיימת רזרבה, התחזית השמרנית אינה שלילית ותרחישי הלחץ עוברים.',
-    ],
-    watchList: [
-      'ירידת המזומן מתחת לרצפת הרזרבה מחזירה למצב ייצוב.',
-      'חוב חדש מחזיר למצב עצירת חוב חדש.',
-    ],
+    reasons: [notice('mode.all_conditions_met')],
+    watchList: [notice('mode.watch.cash_below_floor'), notice('mode.watch.new_debt')],
   };
 }
 

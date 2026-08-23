@@ -28,7 +28,6 @@ export interface StressContext {
 
 export interface StressScenarioResult {
   readonly key: string;
-  readonly label: string;
   readonly lowPointMinor: number;
   readonly lowPointDate: BusinessDate;
   readonly firstFailureDate: BusinessDate | null;
@@ -37,15 +36,11 @@ export interface StressScenarioResult {
   readonly atRiskObligations: readonly string[];
 }
 
-function shockItem(
-  id: string,
-  label: string,
-  amountMinor: number,
-  date: BusinessDate,
-): PlannedItem {
+function shockItem(id: string, amountMinor: number, date: BusinessDate): PlannedItem {
   return {
     id,
-    label,
+    // Never shown: shock items are filtered out of the at-risk list.
+    label: id,
     scope: 'household',
     direction: 'outflow',
     amountMinor,
@@ -56,18 +51,20 @@ function shockItem(
   };
 }
 
-function evaluate(
-  key: string,
-  label: string,
-  input: EngineInput,
-  today: BusinessDate,
-): StressScenarioResult {
+function evaluate(key: string, input: EngineInput, today: BusinessDate): StressScenarioResult {
   const forecast = projectDailyBalance(input, today, 'conservative');
 
   // An obligation is at risk when the balance is already below zero on the day it
   // falls due — the projection says the money will not be there.
+  // Synthetic shock items are excluded: the scenario already names itself, and
+  // listing it as an obligation would read as though the family owed it.
   const atRiskObligations = input.plannedItems
-    .filter((item) => item.scope === 'household' && item.direction === 'outflow')
+    .filter(
+      (item) =>
+        item.scope === 'household' &&
+        item.direction === 'outflow' &&
+        !item.id.startsWith('stress-'),
+    )
     .filter((item) => {
       const due = item.dueDate ?? item.expectedDate;
       const day = forecast.days.find((candidate) => candidate.date === due);
@@ -77,7 +74,6 @@ function evaluate(
 
   return {
     key,
-    label,
     lowPointMinor: forecast.lowPointMinor,
     lowPointDate: forecast.lowPointDate,
     firstFailureDate: forecast.firstFailureDate,
@@ -137,12 +133,7 @@ export function runStressTests(
     ...input,
     plannedItems: [
       ...input.plannedItems,
-      shockItem(
-        'stress-private-demand',
-        'דרישת חוב פרטית פתאומית',
-        context.largestPrivateDebtMinor,
-        addDays(today, 7),
-      ),
+      shockItem('stress-private-demand', context.largestPrivateDebtMinor, addDays(today, 7)),
     ],
   };
 
@@ -151,12 +142,7 @@ export function runStressTests(
     ...input,
     plannedItems: [
       ...input.plannedItems,
-      shockItem(
-        'stress-essential-shock',
-        'הוצאה חיונית בלתי צפויה',
-        context.reserveFloorMinor,
-        addDays(today, 3),
-      ),
+      shockItem('stress-essential-shock', context.reserveFloorMinor, addDays(today, 3)),
     ],
   };
 
@@ -165,32 +151,17 @@ export function runStressTests(
     ...input,
     plannedItems: [
       ...input.plannedItems,
-      shockItem(
-        'stress-unclassified-charge',
-        'חיוב כרטיס גדול שטרם סווג',
-        context.largestCardBalanceMinor,
-        periodEnd,
-      ),
+      shockItem('stress-unclassified-charge', context.largestCardBalanceMinor, periodEnd),
     ],
   };
 
   return [
-    evaluate(
-      'no_business_income',
-      'אפס הכנסה עסקית נוספת עד סוף החודש',
-      withoutBusinessIncome,
-      today,
-    ),
-    evaluate('receipts_down_30', 'ירידה של 30% בתקבולים העסקיים', reducedReceipts, today),
-    evaluate('receipt_delayed_14d', 'תקבול ודאי מתעכב ב־14 יום', delayedReceipt, today),
-    evaluate('private_debt_demand', 'דרישת חוב פרטית פתאומית', suddenDemand, today),
-    evaluate('essential_shock', 'הוצאה חיונית בגובה רצפת הרזרבה', unexpectedEssential, today),
-    evaluate(
-      'unclassified_card_charge',
-      'חיוב כרטיס גדול שטרם סווג',
-      unclassifiedCharge,
-      today,
-    ),
+    evaluate('no_business_income', withoutBusinessIncome, today),
+    evaluate('receipts_down_30', reducedReceipts, today),
+    evaluate('receipt_delayed_14d', delayedReceipt, today),
+    evaluate('private_debt_demand', suddenDemand, today),
+    evaluate('essential_shock', unexpectedEssential, today),
+    evaluate('unclassified_card_charge', unclassifiedCharge, today),
   ];
 }
 

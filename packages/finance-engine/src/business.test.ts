@@ -96,13 +96,13 @@ describe('safeBusinessTransfer', () => {
   test('warns when a transfer would be a draw against the business', () => {
     const input = withBusiness({ cumulativeRealizedProfitMinor: 0 });
     const transfer = safeBusinessTransfer(input, businessProfit(input), 900_000);
-    expect(transfer.warnings.join(' ')).toContain('רווח ממומש');
+    expect(transfer.warnings.map((w) => w.code)).toContain('business.no_realized_profit');
   });
 
   test('warns about overdue payables, which are deducted before anything moves', () => {
     const input = withBusiness({ overduePayablesMinor: 50_000 });
     const transfer = safeBusinessTransfer(input, businessProfit(input), 900_000);
-    expect(transfer.warnings.some((warning) => warning.includes('פיגור'))).toBe(true);
+    expect(transfer.warnings.map((w) => w.code)).toContain('business.overdue_payables');
   });
 
   test('without a business the answer is zero with an explanation', () => {

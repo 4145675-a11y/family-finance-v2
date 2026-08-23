@@ -1,4 +1,4 @@
-import type { EngineInput } from '@family-finance/finance-engine';
+import type { BudgetInput, EngineInput, FoodWeekInput } from '@family-finance/finance-engine';
 
 /**
  * Development fixture — invented figures for a household that does not exist.
@@ -442,5 +442,153 @@ export function demoHouseholdInput(asOf: string = new Date().toISOString()): Eng
       transactionsMissingClassificationCount: 11,
       unresolvedReconciliationGapMinor: 0,
     },
+  };
+}
+
+/**
+ * A monthly budget for the same invented household.
+ *
+ * The figures are deliberately uncomfortable: food is running ahead of plan and
+ * two categories are already past theirs. A demo where everything is on track
+ * would show none of the screens that matter.
+ */
+export function demoBudgetInput(asOf: string = new Date().toISOString()): BudgetInput {
+  const today = asOf.slice(0, 10);
+
+  return {
+    period: asOf.slice(0, 7),
+    asOf: today,
+    currency: 'ILS',
+    dataAgeDays: 2,
+    isFirstMonthDraft: false,
+    lines: [
+      {
+        categoryId: 'cat-food',
+        categoryKey: 'food',
+        plannedMinor: ils(6_200),
+        weeklyGuidance: true,
+      },
+      {
+        categoryId: 'cat-housing',
+        categoryKey: 'housing_and_bills',
+        plannedMinor: ils(4_800),
+        weeklyGuidance: false,
+      },
+      {
+        categoryId: 'cat-transport',
+        categoryKey: 'transport_and_fuel',
+        plannedMinor: ils(1_450),
+        weeklyGuidance: false,
+      },
+      {
+        categoryId: 'cat-health',
+        categoryKey: 'health',
+        plannedMinor: ils(600),
+        weeklyGuidance: false,
+      },
+      {
+        categoryId: 'cat-education',
+        categoryKey: 'education',
+        plannedMinor: ils(3_100),
+        weeklyGuidance: false,
+      },
+      {
+        categoryId: 'cat-clothing',
+        categoryKey: 'clothing',
+        plannedMinor: ils(450),
+        weeklyGuidance: false,
+      },
+      {
+        categoryId: 'cat-celebrations',
+        categoryKey: 'celebrations_and_gifts',
+        plannedMinor: ils(500),
+        weeklyGuidance: false,
+      },
+      {
+        categoryId: 'cat-cash',
+        categoryKey: 'cash_and_small',
+        plannedMinor: ils(700),
+        weeklyGuidance: false,
+      },
+      {
+        categoryId: 'cat-holidays',
+        categoryKey: 'holidays',
+        plannedMinor: ils(400),
+        weeklyGuidance: false,
+      },
+      {
+        categoryId: 'cat-other',
+        categoryKey: 'other',
+        plannedMinor: ils(300),
+        weeklyGuidance: false,
+      },
+    ],
+    spend: [
+      {
+        categoryId: 'cat-food',
+        approvedMinor: ils(3_180),
+        pendingMinor: ils(240),
+        committedMinor: 0,
+      },
+      {
+        categoryId: 'cat-housing',
+        approvedMinor: ils(1_900),
+        pendingMinor: 0,
+        committedMinor: ils(2_600),
+      },
+      {
+        categoryId: 'cat-transport',
+        approvedMinor: ils(980),
+        pendingMinor: ils(120),
+        committedMinor: 0,
+      },
+      { categoryId: 'cat-health', approvedMinor: ils(720), pendingMinor: 0, committedMinor: 0 },
+      {
+        categoryId: 'cat-education',
+        approvedMinor: ils(3_100),
+        pendingMinor: 0,
+        committedMinor: 0,
+      },
+      {
+        categoryId: 'cat-clothing',
+        approvedMinor: ils(180),
+        pendingMinor: 0,
+        committedMinor: 0,
+      },
+      {
+        categoryId: 'cat-celebrations',
+        approvedMinor: ils(620),
+        pendingMinor: 0,
+        committedMinor: 0,
+      },
+      {
+        categoryId: 'cat-cash',
+        approvedMinor: ils(410),
+        pendingMinor: ils(90),
+        committedMinor: 0,
+      },
+      { categoryId: 'cat-holidays', approvedMinor: 0, pendingMinor: 0, committedMinor: 0 },
+      { categoryId: 'cat-other', approvedMinor: ils(150), pendingMinor: 0, committedMinor: 0 },
+    ],
+  };
+}
+
+/**
+ * The weekly food picture, taken from the same budget line.
+ *
+ * Includes one large stock-up shop, because that is the case a naive weekly
+ * budget gets wrong: it looks like a disastrous week and is actually a full
+ * cupboard.
+ */
+export function demoFoodInput(asOf: string = new Date().toISOString()): FoodWeekInput {
+  return {
+    asOf: asOf.slice(0, 10),
+    monthlyPlannedMinor: ils(6_200),
+    approvedThisMonthMinor: ils(3_180),
+    pendingThisMonthMinor: ils(240),
+    spentThisWeekMinor: ils(1_120),
+    largePurchaseThisWeekMinor: ils(640),
+    carryForwardEnabled: true,
+    dataAgeDays: 2,
   };
 }

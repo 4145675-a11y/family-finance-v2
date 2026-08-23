@@ -1,5 +1,6 @@
 import type { Confidence } from '@family-finance/contracts';
 
+import type { EngineNotice } from './notice';
 import type { BreakdownLine, DecisionStatus } from './types';
 
 /**
@@ -32,9 +33,9 @@ export interface DecisionResult {
   readonly resultMinor: number;
   readonly fundingGapMinor: number;
   readonly breakdown: readonly BreakdownLine[];
-  readonly assumptions: readonly string[];
-  readonly warnings: readonly string[];
-  readonly missingData: readonly string[];
+  readonly assumptions: readonly EngineNotice[];
+  readonly warnings: readonly EngineNotice[];
+  readonly missingData: readonly EngineNotice[];
   readonly dataQualityScore: number;
   readonly confidence: Confidence;
   /** Age in days of the freshest confirmed balance; null when none exists. */
@@ -88,9 +89,9 @@ export interface DecisionDraft {
   readonly resultMinor: number;
   readonly fundingGapMinor: number;
   readonly breakdown: readonly BreakdownLine[];
-  readonly assumptions: readonly string[];
-  readonly warnings: readonly string[];
-  readonly missingData: readonly string[];
+  readonly assumptions: readonly EngineNotice[];
+  readonly warnings: readonly EngineNotice[];
+  readonly missingData: readonly EngineNotice[];
   readonly dataQualityScore: number;
   readonly confidence: Confidence;
   readonly freshnessAgeDays: number | null;

@@ -43,7 +43,7 @@ describe('scoreDataQuality', () => {
       baseInput({ accounts: [account({ verifiedAt: '2026-07-25T06:00:00.000Z' })] }),
     );
     expect(never.score).toBeLessThan(old.score);
-    expect(never.missingData.join(' ')).toContain('אימות');
+    expect(never.missingData.map((m) => m.code)).toContain('missing.never_verified_accounts');
   });
 
   test('a balance older than thirty days contributes nothing to freshness', () => {
@@ -61,7 +61,7 @@ describe('scoreDataQuality', () => {
       dataQuality: { ...input.dataQuality, pendingApprovalCount: 20 },
     });
     expect(quality.score).toBeLessThan(100);
-    expect(quality.missingData.join(' ')).toContain('ממתינות');
+    expect(quality.missingData.map((m) => m.code)).toContain('missing.pending_approvals');
   });
 
   test('any unresolved reconciliation gap zeroes that component outright', () => {
@@ -78,7 +78,7 @@ describe('scoreDataQuality', () => {
       baseInput({ debts: [debt({ effectiveAnnualRateBp: null })] }),
     );
     expect(quality.components.find((part) => part.key === 'debt_completeness')?.score).toBe(0);
-    expect(quality.missingData.join(' ')).toContain('ריבית');
+    expect(quality.missingData.map((m) => m.code)).toContain('missing.incomplete_debts');
   });
 
   test('confidence drops to low once enough is missing', () => {
@@ -103,7 +103,7 @@ describe('scoreDataQuality', () => {
       expect(component.score).toBeGreaterThanOrEqual(0);
       expect(component.score).toBeLessThanOrEqual(100);
       expect(component.weight).toBeGreaterThan(0);
-      expect(component.detail.length).toBeGreaterThan(0);
+      expect(component.detail.code.length).toBeGreaterThan(0);
     }
   });
 });
@@ -195,9 +195,9 @@ describe('decideStatus', () => {
   });
 
   test('missing data with low confidence is its own answer', () => {
-    expect(decideStatus({ ...draft, confidence: 'low', missingData: ['יתרות לא אומתו'] })).toBe(
-      'insufficient_data',
-    );
+    expect(
+      decideStatus({ ...draft, confidence: 'low', missingData: [{ code: 'missing.x' }] }),
+    ).toBe('insufficient_data');
   });
 });
 
@@ -205,8 +205,8 @@ describe('buildDecision', () => {
   const draft: DecisionDraft = {
     resultMinor: 380_000,
     fundingGapMinor: 0,
-    breakdown: [{ key: 'cash', label: 'מזומן', amountMinor: 500_000, effect: 'adds' }],
-    assumptions: ['הנחה'],
+    breakdown: [{ key: 'cash', amountMinor: 500_000, effect: 'adds' }],
+    assumptions: [{ code: 'assumption.verified_balances_only' }],
     warnings: [],
     missingData: [],
     dataQualityScore: 100,

@@ -113,3 +113,28 @@ export {
   type RolloverSource,
   type RolloverStatus,
 } from './debt';
+
+export {
+  BUDGET_CATEGORY_KEYS,
+  WEEKLY_GUIDED_CATEGORY,
+  approveBudgetChangeInputSchema,
+  budgetCategoryKeySchema,
+  budgetChangeSchema,
+  budgetChangeStatusSchema,
+  budgetLineSchema,
+  budgetPeriodSchema,
+  budgetSchema,
+  budgetStatusSchema,
+  createBudgetInputSchema,
+  proposeBudgetChangeInputSchema,
+  type ApproveBudgetChangeInput,
+  type Budget,
+  type BudgetCategoryKey,
+  type BudgetChange,
+  type BudgetChangeStatus,
+  type BudgetLine,
+  type BudgetPeriod,
+  type BudgetStatus,
+  type CreateBudgetInput,
+  type ProposeBudgetChangeInput,
+} from './budget';

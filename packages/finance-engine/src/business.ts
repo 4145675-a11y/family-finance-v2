@@ -1,4 +1,5 @@
 import { liquidCashMinor } from './household';
+import { notice, type EngineNotice } from './notice';
 import { clampAtZero, minSigned } from './money';
 import type { BreakdownLine, EngineInput } from './types';
 
@@ -53,49 +54,41 @@ export function businessProfit(input: EngineInput): BusinessProfit | null {
   const breakdown: BreakdownLine[] = [
     {
       key: 'received_income',
-      label: 'תקבולים שהתקבלו בפועל',
       amountMinor: business.receivedIncomeMinor,
       effect: 'adds',
     },
     {
       key: 'paid_expenses',
-      label: 'הוצאות ששולמו',
       amountMinor: business.paidExpensesMinor,
       effect: 'subtracts',
     },
     {
       key: 'tax_reserve',
-      label: 'רזרבת מס שנצברה',
       amountMinor: business.accruedTaxReserveMinor,
       effect: 'subtracts',
     },
     {
       key: 'certain_obligations',
-      label: 'התחייבויות עסקיות ודאיות',
       amountMinor: business.certainObligationsMinor,
       effect: 'subtracts',
     },
     {
       key: 'operating_reserve',
-      label: 'רזרבה תפעולית',
       amountMinor: business.operatingReserveMinor,
       effect: 'subtracts',
     },
     {
       key: 'overdue_payables',
-      label: 'תשלומים עסקיים בפיגור',
       amountMinor: business.overduePayablesMinor,
       effect: 'subtracts',
     },
     {
       key: 'liquid_business_cash',
-      label: 'מזומן נזיל בחשבונות העסק',
       amountMinor: liquidBusinessCashMinor,
       effect: 'informational',
     },
     {
       key: 'approved_expenses',
-      label: 'הוצאות מאושרות (לרווח חשבונאי)',
       amountMinor: business.approvedExpensesMinor,
       effect: 'informational',
     },
@@ -109,7 +102,7 @@ export interface SafeTransfer {
   readonly bindingConstraint: 'realized_profit' | 'available_cash' | 'household_need' | 'none';
   readonly householdNeedMinor: number;
   readonly breakdown: readonly BreakdownLine[];
-  readonly warnings: readonly string[];
+  readonly warnings: readonly EngineNotice[];
 }
 
 /**
@@ -134,24 +127,21 @@ export function safeBusinessTransfer(
       bindingConstraint: 'none',
       householdNeedMinor,
       breakdown: [],
-      warnings: ['אין עסק מוגדר, ולכן אין העברה בטוחה לחשב.'],
+      warnings: [notice('business.none_defined')],
     };
   }
 
   const candidates = [
     {
       key: 'realized_profit' as const,
-      label: 'רווח ממומש מצטבר',
       amountMinor: business.cumulativeRealizedProfitMinor,
     },
     {
       key: 'available_cash' as const,
-      label: 'מזומן עסקי פנוי',
       amountMinor: profit.availableCashMinor,
     },
     {
       key: 'household_need' as const,
-      label: 'צורך הבית עד סוף החודש',
       amountMinor: householdNeedMinor,
     },
   ];
@@ -160,15 +150,17 @@ export function safeBusinessTransfer(
   const { resultMinor } = clampAtZero(lowest);
   const binding = candidates.find((candidate) => candidate.amountMinor === lowest);
 
-  const warnings: string[] = [];
+  const warnings: EngineNotice[] = [];
   if (profit.availableCashMinor < 0) {
-    warnings.push('המזומן העסקי הפנוי שלילי: יש התחייבויות שמכסות יותר מהיתרה הנזילה.');
+    warnings.push(notice('business.available_cash_negative'));
   }
   if (business.cumulativeRealizedProfitMinor <= 0) {
-    warnings.push('אין רווח ממומש מצטבר, ולכן כל העברה תהיה משיכה על חשבון העסק.');
+    warnings.push(notice('business.no_realized_profit'));
   }
   if (business.overduePayablesMinor > 0) {
-    warnings.push('קיימים תשלומים עסקיים בפיגור; הם מנוכים לפני כל העברה.');
+    warnings.push(
+      notice('business.overdue_payables', { amountMinor: business.overduePayablesMinor }),
+    );
   }
 
   return {
@@ -177,7 +169,6 @@ export function safeBusinessTransfer(
     householdNeedMinor,
     breakdown: candidates.map((candidate) => ({
       key: candidate.key,
-      label: candidate.label,
       amountMinor: candidate.amountMinor,
       effect: 'informational' as const,
     })),

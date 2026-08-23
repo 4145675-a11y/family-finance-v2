@@ -1,4 +1,4 @@
-import type { EngineInput } from '@family-finance/finance-engine';
+import type { BudgetInput, EngineInput, FoodWeekInput } from '@family-finance/finance-engine';
 
 /**
  * Which data source the dashboard is reading, and whether it is allowed to.
@@ -89,8 +89,10 @@ export function currentEnvironment(): EnvironmentFacts {
 
 export interface DashboardSource {
   readonly descriptor: DataSourceDescriptor;
-  /** Null whenever the descriptor says there is no source. */
+  /** All null whenever the descriptor says there is no source. */
   readonly input: EngineInput | null;
+  readonly budget: BudgetInput | null;
+  readonly food: FoodWeekInput | null;
 }
 
 /**
@@ -105,9 +107,17 @@ export async function loadDashboardSource(
   const descriptor = resolveDataSource(env);
 
   if (descriptor.kind !== 'development_fixture') {
-    return { descriptor, input: null };
+    return { descriptor, input: null, budget: null, food: null };
   }
 
-  const { demoHouseholdInput } = await import('./fixtures/demo-household');
-  return { descriptor, input: demoHouseholdInput() };
+  const { demoHouseholdInput, demoBudgetInput, demoFoodInput } =
+    await import('./fixtures/demo-household');
+  // One instant for all three, so the screens never disagree about what day it is.
+  const asOf = new Date().toISOString();
+  return {
+    descriptor,
+    input: demoHouseholdInput(asOf),
+    budget: demoBudgetInput(asOf),
+    food: demoFoodInput(asOf),
+  };
 }

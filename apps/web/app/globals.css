@@ -8,22 +8,28 @@
  * tokens.ts first and copy the value here.
  */
 @theme {
-  --color-background: #f7f8f5;
+  --color-background: #faf7f2;
   --color-surface: #ffffff;
-  --color-text-primary: #18302b;
-  --color-text-secondary: #5e706c;
-  --color-primary: #285e61;
-  --color-primary-hover: #204e50;
-  --color-success: #2f7d62;
-  --color-attention: #9e6515;
-  --color-danger: #b43a3a;
-  --color-border: #dde5e1;
-  --color-border-interactive: #8b908e;
+  --color-surface-muted: #f3eee6;
+  --color-text-primary: #1b2a2c;
+  --color-text-secondary: #586b6c;
+  --color-primary: #1e4f73;
+  --color-primary-hover: #173d5a;
+  --color-success: #2c7a5e;
+  --color-attention: #9a6410;
+  --color-danger: #af3a34;
+  --color-border: #e6ded2;
+  --color-border-interactive: #87837b;
   --color-focus: #2b6cb0;
 
   --radius-control: 8px;
   --radius-card: 14px;
   --radius-hero: 18px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(27, 42, 44, 0.04), 0 2px 8px rgba(27, 42, 44, 0.04);
+  --shadow-raised: 0 2px 4px rgba(27, 42, 44, 0.05), 0 8px 24px rgba(27, 42, 44, 0.06);
+  --shadow-hero: 0 4px 12px rgba(30, 79, 115, 0.1), 0 16px 40px rgba(30, 79, 115, 0.1);
 
   --font-sans:
     'Assistant', 'Heebo', system-ui, -apple-system, 'Segoe UI', 'Noto Sans Hebrew', sans-serif;
@@ -32,6 +38,8 @@
   --text-body--line-height: 1.55;
   --text-small: 14px;
   --text-small--line-height: 1.5;
+  --text-display: 44px;
+  --text-display--line-height: 1.1;
 }
 
 @layer base {
@@ -39,6 +47,8 @@
     /* Prevents a wide child from scrolling the whole document sideways.
        03-UX-SPEC.md UX-RTL-001: no horizontal overflow at any width. */
     overflow-x: hidden;
+    /* Anchors and skip links land below the sticky header rather than under it. */
+    scroll-padding-top: 5rem;
   }
 
   body {
@@ -49,12 +59,39 @@
     line-height: var(--text-body--line-height);
     /* Long Hebrew words and pasted identifiers must wrap rather than widen the page. */
     overflow-wrap: break-word;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Body text never drops below 16px, whatever a utility class asks for. */
+  p,
+  li,
+  dd,
+  dt,
+  td,
+  th {
+    font-size: max(1rem, var(--text-body));
   }
 
   /* A visible focus ring is a requirement, not a preference (UX-A11Y-001). */
   :focus-visible {
-    outline: 2px solid var(--color-focus);
+    outline: 3px solid var(--color-focus);
     outline-offset: 2px;
+    border-radius: var(--radius-control);
+  }
+
+  /* Numbers keep a single column width so a changing figure does not jitter. */
+  bdi {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The disclosure marker sits on the correct side in a right-to-left document. */
+  summary {
+    cursor: pointer;
+    list-style-position: inside;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -66,5 +103,26 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+@layer components {
+  /*
+   * A progress bar that never relies on colour alone (UX-A11Y-001): the track and
+   * the fill differ in lightness as well as hue, and every use carries a text
+   * alternative next to it.
+   */
+  .progress-track {
+    background-color: var(--color-surface-muted);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    height: 0.625rem;
+    border: 1px solid var(--color-border);
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    transition: width 200ms ease-out;
   }
 }

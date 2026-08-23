@@ -31,6 +31,7 @@ import {
 import { liquidCashMinor, safeHouseholdSpend, type SafeSpend } from './household';
 import { clampAtZero, maxSigned } from './money';
 import { determineOperatingMode, type ModeAssessment } from './modes';
+import { notice, type EngineNotice, type NoticeParams } from './notice';
 import { freshnessAgeDays, scoreDataQuality, type DataQualityScore } from './quality';
 import { runStressTests, stressTestsPassed, type StressScenarioResult } from './stress';
 import type { EngineInput } from './types';
@@ -46,11 +47,15 @@ import { allocateWaterfall, noClaims, type WaterfallResult } from './waterfall';
  * so no screen has to invent an explanation.
  */
 
+/**
+ * The single thing worth doing now.
+ *
+ * A key plus the numbers the sentence needs. The wording lives in the copy layer:
+ * this is a decision, not a phrase, and the two change for different reasons.
+ */
 export interface NextAction {
   readonly key: string;
-  readonly title: string;
-  readonly detail: string;
-  readonly rationale: string;
+  readonly params?: NoticeParams;
 }
 
 export interface FinancialSnapshot {
@@ -158,31 +163,19 @@ function chooseNextAction(
   trend: DebtTrend | null,
   conservative: Forecast,
 ): NextAction {
+  // Ordered by urgency, not by how good the news is. The first branch that
+  // matches wins, so the family is never shown a pleasant suggestion while
+  // something is actually on fire.
   if (safeSpend.fundingGapMinor > 0) {
-    return {
-      key: 'close_funding_gap',
-      title: 'לסגור את הפער לפני סוף החודש',
-      detail: `חסרים ${safeSpend.fundingGapMinor} אגורות כדי לכסות את המחויבויות עד סוף התקופה.`,
-      rationale: 'פער מימון פתוח קודם לכל פעולה אחרת — הוא הופך לחוב חדש אם לא נסגר.',
-    };
+    return { key: 'close_funding_gap', params: { amountMinor: safeSpend.fundingGapMinor } };
   }
 
   if (conservative.firstFailureDate !== null) {
-    return {
-      key: 'move_a_payment',
-      title: 'להזיז תשלום לפני יום הכשל',
-      detail: `בתחזית השמרנית היתרה יורדת מתחת לאפס ב־${conservative.firstFailureDate}.`,
-      rationale: 'יום כשל צפוי ידוע מראש ניתן למניעה; אחרי שהוא קורה הוא כבר עמלה או חוב.',
-    };
+    return { key: 'move_a_payment', params: { date: conservative.firstFailureDate } };
   }
 
   if (quality.confidence === 'low') {
-    return {
-      key: 'confirm_balances',
-      title: 'לאמת יתרות ולסווג פעולות',
-      detail: quality.missingData.join(' · ') || 'חסרים נתונים כדי לתת תשובה מחייבת.',
-      rationale: 'החלטה על בסיס נתון ישן אינה החלטה בטוחה, גם כשהמספר נראה טוב.',
-    };
+    return { key: 'confirm_balances', params: { missingCount: quality.missingData.length } };
   }
 
   if (waterfall.firstUnfundedStep !== null) {
@@ -191,36 +184,23 @@ function chooseNextAction(
     );
     return {
       key: 'fund_next_step',
-      title: `להשלים את השלב: ${step?.label ?? ''}`,
-      detail: `חסרות ${step?.unfundedMinor ?? 0} אגורות בשלב ${waterfall.firstUnfundedStep} במפל.`,
-      rationale: 'המפל ממומן לפי הסדר; שלב שלא מומן מוריד את כל מה שאחריו.',
+      params: {
+        step: waterfall.firstUnfundedStep,
+        stepKey: step?.key ?? '',
+        amountMinor: step?.unfundedMinor ?? 0,
+      },
     };
   }
 
   if (trend !== null && trend.consumerDirection === 'up') {
-    return {
-      key: 'stop_new_debt',
-      title: 'לעצור יצירת חוב חדש',
-      detail: `החוב הצרכני עלה ב־${trend.netConsumerChangeMinor} אגורות מתחילת התקופה.`,
-      rationale: 'החזר שמלווה בחוב חדש גדול יותר אינו התקדמות.',
-    };
+    return { key: 'stop_new_debt', params: { amountMinor: trend.netConsumerChangeMinor } };
   }
 
   if (mode.mode === 'repayment' || mode.mode === 'buffer_building' || mode.mode === 'growth') {
-    return {
-      key: 'accelerate_repayment',
-      title: 'להפנות עודף לחוב היקר ביותר',
-      detail: 'התנאים לפירעון מואץ מתקיימים: הרזרבה עומדת ותרחישי הלחץ עוברים.',
-      rationale: 'כל שקל שמופנה לחוב היקר ביותר חוסך את העלות האפקטיבית הגבוהה ביותר.',
-    };
+    return { key: 'accelerate_repayment' };
   }
 
-  return {
-    key: 'hold_position',
-    title: 'לשמור על המצב ולהמשיך לאשר פעולות',
-    detail: 'אין פער פתוח ואין שלב לא ממומן.',
-    rationale: 'כשאין פעולה דחופה, השמירה על עדכניות הנתונים היא הפעולה בעלת הערך הגבוה ביותר.',
-  };
+  return { key: 'hold_position' };
 }
 
 export function buildFinancialSnapshot(input: EngineInput): FinancialSnapshot {
@@ -298,13 +278,13 @@ export function buildFinancialSnapshot(input: EngineInput): FinancialSnapshot {
     consumerDebtMinor: totals.consumerDebtMinor,
   });
 
-  const warnings: string[] = [
+  const warnings: EngineNotice[] = [
     ...transfer.warnings,
     ...(forecastConservative.firstFailureDate !== null
-      ? [`בתחזית השמרנית צפוי יום כשל ב־${forecastConservative.firstFailureDate}.`]
+      ? [notice('warn.failure_day', { date: forecastConservative.firstFailureDate })]
       : []),
     ...(risk.within30DaysMinor > 0
-      ? ['קיים חוב פרטי שעלול להידרש בתוך 30 יום; הוא אינו מקור כסף בתחזית.']
+      ? [notice('warn.private_debt_callable', { amountMinor: risk.within30DaysMinor })]
       : []),
   ];
 

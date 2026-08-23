@@ -160,10 +160,14 @@ export interface EngineInput {
   readonly dataQuality: DataQualityInputs;
 }
 
-/** One line of a breakdown: what went into a number, and which way it pulled. */
+/**
+ * One line of a breakdown: what went into a number, and which way it pulled.
+ *
+ * There is deliberately no label. The key is the contract; the words belong to
+ * the copy layer, which is where they can be reviewed as product language.
+ */
 export interface BreakdownLine {
   readonly key: string;
-  readonly label: string;
   readonly amountMinor: number;
   readonly effect: 'adds' | 'subtracts' | 'informational';
 }

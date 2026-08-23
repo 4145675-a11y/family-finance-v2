@@ -132,3 +132,28 @@ export {
 } from './decision';
 
 export { buildFinancialSnapshot, type FinancialSnapshot, type NextAction } from './snapshot';
+
+export { notice, type EngineNotice, type NoticeParams } from './notice';
+
+export {
+  BUDGET_CALCULATION_VERSION,
+  BudgetError,
+  calculateBudget,
+  proposeBudgetTransfer,
+  type BudgetInput,
+  type BudgetLineInput,
+  type BudgetLineResult,
+  type BudgetLineStatus,
+  type BudgetResult,
+  type BudgetTotals,
+  type BudgetTransferProposal,
+  type CategorySpendInput,
+} from './budget';
+
+export {
+  FOOD_WEEK_CALCULATION_VERSION,
+  calculateFoodWeek,
+  type FoodWeekGuidance,
+  type FoodWeekInput,
+  type FoodWeekStatus,
+} from './food-week';
