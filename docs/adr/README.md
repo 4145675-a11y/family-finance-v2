@@ -28,3 +28,7 @@
 | [0013](0013-publishable-key-everywhere.md) | publishable key בלקוח ובשרת; אין service role במסלול בקשה | Accepted | 2 |
 | [0014](0014-isolation-by-membership.md) | בידוד לפי חברות בלבד; אין הצטרפות עצמית ואין מחיקה | Accepted | 2 |
 | [0015](0015-idempotent-migrations.md) | כל migration ניתן להרצה חוזרת | Accepted | 2 |
+| [0016](0016-data-quality-weights.md) | משקלי ציון איכות הנתונים | Accepted | 5 |
+| [0017](0017-development-fixture-data-source.md) | מקור נתוני פיתוח מאחורי דגל, חסום בייצור | Accepted | 6 |
+| [0018](0018-extensionless-relative-imports.md) | ייבוא יחסי ללא סיומת בקוד שנארז | Accepted | 6 |
+| [0019](0019-single-apply-all-bundle.md) | חבילת החלה אחת לכל המיגרציות | Accepted | 3 |

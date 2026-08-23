@@ -114,7 +114,7 @@ UI לאימות, מסכי הרשמה/כניסה, recent-auth, device/session scr
 
 **מה נדרש ממך** — הכול מקומי, שום ערך בצ׳אט:
 
-1. **החל את ה־migrations** — `npm run db:copy:diagnostic` ואז `npm run db:copy:m2`. כל פקודה מעתיקה ללוח קובץ אחד ומדפיסה טביעת אצבע בלבד; פתח חלון SQL **חדש וריק** לכל הדבקה והרץ פעם אחת. הדבקה קובץ־קובץ ו־CLI/psql הן חלופות — `supabase/README.md`.
+1. **החל את ה־migrations** — `npm run db:copy:diagnostic` ואז `npm run db:copy:schema`. כל פקודה מעתיקה ללוח קובץ אחד ומדפיסה טביעת אצבע בלבד; פתח חלון SQL **חדש וריק** לכל הדבקה והרץ פעם אחת. הדבקה קובץ־קובץ ו־CLI/psql הן חלופות — `supabase/README.md`.
 2. **לבדיקות** — Studio → Project Settings → Database → Connection string (URI), ואז בשורש הפרויקט:
 
    ```

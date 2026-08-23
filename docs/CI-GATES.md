@@ -18,8 +18,10 @@
 | Lint | `npm run lint` | כן | 1 | ✅ |
 | Build | `npm run build` | כן | 1 | ✅ |
 | Client-secret boundary | `npm run check:client-secrets` | כן | 2 | ✅ |
+| Built shell (Hebrew RTL) | `npm run check:shell` | כן | 1 | ✅ |
+| Manual bundle up to date | `npm run db:check` | כן | 3 | ✅ |
 | Integration + RLS negative | `npm run integration` | כן | 2 | — (חסום: דורש חיבור DB; ראה checkpoint M2) |
-| Property | `npm run property` | כן | 5 | — |
+| Property | `npm run property` | כן | 5 | ✅ (רץ מקומית; אין remote) |
 | E2E smoke | `npm run e2e -- --grep @smoke` | כן | 6 | — |
 | Accessibility / RTL visual | `npm run a11y` | כן | 6 | — |
 | Dependency + secret scan | ייקבע ב־Milestone 1 | כן | 1 | — |
