@@ -126,13 +126,13 @@ const NOTICE_COPY: Readonly<Record<string, (params?: Params) => string>> = {
   'business.no_realized_profit': () =>
     'עוד אין רווח שנשאר בידיים, ולכן כל העברה תהיה על חשבון העסק.',
   'business.overdue_payables': (p) =>
-    `יש ${money(num(p, 'amountMinor'))} תשלומים של העסק שכבר איחרו. הם יורדים לפני כל העברה.`,
+    `לעסק יש תשלומים באיחור בסך ${money(num(p, 'amountMinor'))}. הם יורדים לפני כל העברה הביתה.`,
 
   // Warnings on the home screen.
   'warn.failure_day': (p) =>
     `לפי התחזית, ב־${formatBusinessDate(text(p, 'date'))} הכסף עלול להיגמר.`,
   'warn.private_debt_callable': (p) =>
-    `${money(num(p, 'amountMinor'))} שהלוו לנו עלולים להידרש בחודש הקרוב. לא סמכנו עליהם בתחזית.`,
+    `יש ${money(num(p, 'amountMinor'))} שהלוו לנו ועלולים להתבקש בחזרה החודש. לא סמכנו עליהם.`,
 
   // What is missing.
   'missing.never_verified_accounts': (p) =>

@@ -2,29 +2,22 @@ import Link from 'next/link';
 
 import { AppShell } from '../components/app-shell';
 import {
-  ActionButton,
   Badge,
   BreakdownList,
   Card,
   Disclosure,
   EmptyState,
-  Figure,
   Hero,
   Money,
   ProgressBar,
   SectionTitle,
+  SoonChip,
   SourceBanner,
   StatCard,
   StatRow,
 } from '../components/ui';
 import { copy } from '../lib/copy/copy';
-import {
-  ACTION_COPY,
-  ACTION_WHY,
-  breakdownLabel,
-  qualityLabel,
-  sayNotice,
-} from '../lib/copy/notices';
+import { breakdownLabel, qualityLabel, sayNotice } from '../lib/copy/notices';
 import { loadDashboardView } from '../lib/dashboard/load';
 import { formatBusinessDate } from '../lib/format';
 
@@ -33,20 +26,18 @@ import { formatBusinessDate } from '../lib/format';
  *
  * It exists to make today's decision, and nothing else. 01-PRODUCT-SPEC.md gives
  * it three questions — how much can we spend, are the debts going down, what
- * should we do now — and everything here is arranged around answering those in
- * seconds:
+ * should we do now — and the layout answers those first and puts everything else
+ * one level away:
  *
- *   1. one dominant answer;
- *   2. one recommended action;
- *   3. four compact cards;
- *   4. quick updates;
- *   5. everything else, collapsed.
+ *   1. one dominant answer, beside one recommended action;
+ *   2. four compact cards: food this week, debts, month end, business;
+ *   3. quick updates;
+ *   4. everything else, collapsed.
  *
- * The full detail has not been removed, it has been moved. Anything a family
- * needs to investigate rather than decide lives on its own screen or behind a
- * disclosure, because a screen that shows everything helps with nothing.
- *
- * Nothing here calculates. Every figure comes from the engine.
+ * Two rules the screen holds itself to. It never calculates: every figure comes
+ * from the engine snapshot. And it never shows a bare frightening zero — when the
+ * safe amount is zero the screen says what that means in words, and the
+ * arithmetic follows underneath.
  */
 
 export default async function HomePage() {
@@ -66,17 +57,15 @@ export default async function HomePage() {
 
   const certainInMinor =
     safeSpend.breakdown.find((line) => line.key === 'certain_income')?.amountMinor ?? 0;
-  const mustGoOutMinor = safeSpend.breakdown
-    .filter((line) =>
-      ['essential_needs', 'certain_due_items', 'debt_minimums'].includes(line.key),
-    )
-    .reduce((total, line) => total + line.amountMinor, 0);
 
   const cannotCalculate = decision.status === 'insufficient_data';
   const hasGap = safeSpend.fundingGapMinor > 0;
+  const showsAmount = !cannotCalculate && safeSpend.resultMinor > 0;
 
-  const action = ACTION_COPY[snapshot.nextAction.key];
-  const why = ACTION_WHY[snapshot.nextAction.key];
+  /** Non-essential household payments still to leave this month — what can move. */
+  const movablePayments = input.plannedItems.filter(
+    (item) => item.scope === 'household' && item.direction === 'outflow' && !item.essential,
+  );
 
   const freshnessLabel =
     snapshot.freshnessAgeDays === null
@@ -87,72 +76,198 @@ export default async function HomePage() {
           ? copy.freshness.yesterday
           : copy.freshness.days(snapshot.freshnessAgeDays);
 
+  const statusChips = (
+    <>
+      <Badge
+        tone={
+          snapshot.freshnessAgeDays !== null && snapshot.freshnessAgeDays <= 3
+            ? 'success'
+            : 'attention'
+        }
+      >
+        {freshnessLabel}
+      </Badge>
+      <Badge tone={quality.confidence === 'high' ? 'success' : 'attention'}>
+        {quality.missingData.length > 0
+          ? copy.confidence.partial(quality.missingData.length)
+          : copy.confidence[quality.confidence]}
+      </Badge>
+    </>
+  );
+
   return (
-    <AppShell active="/" title={copy.home.title} subtitle={copy.home.greeting}>
+    <AppShell active="/" title={copy.home.title} showHeading={false} status={statusChips}>
       {!descriptor.isRealData ? <SourceBanner /> : null}
 
-      {/* 1 — how reliable is what follows. One line, not a card. */}
-      <div className="flex flex-wrap items-center gap-2 px-1">
-        <Badge
-          tone={
-            snapshot.freshnessAgeDays !== null && snapshot.freshnessAgeDays <= 3
-              ? 'success'
-              : 'attention'
-          }
-        >
-          {freshnessLabel}
-        </Badge>
-        <Badge tone={quality.confidence === 'high' ? 'success' : 'attention'}>
-          {quality.missingData.length > 0
-            ? copy.confidence.partial(quality.missingData.length)
-            : copy.confidence[quality.confidence]}
-        </Badge>
+      {/* The answer and what to do about it, side by side once there is room. */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="flex flex-col lg:col-span-2">
+          <Hero
+            asHeading
+            label={copy.home.safeTitle}
+            amountMinor={showsAmount ? safeSpend.resultMinor : null}
+            headline={
+              cannotCalculate ? copy.home.safeCannotCalculate : copy.home.safeZeroHeadline
+            }
+            currency={snapshot.currency}
+            caption={showsAmount ? copy.home.safeUntil(snapshot.periodEnd) : undefined}
+            note={
+              cannotCalculate
+                ? copy.home.safeCannotCalculateWhy(quality.missingData.length)
+                : hasGap
+                  ? copy.home.safeGap(safeSpend.fundingGapMinor)
+                  : showsAmount
+                    ? copy.home.safeMeaning
+                    : copy.home.safeZeroNote
+            }
+            tone={cannotCalculate || hasGap ? 'attention' : 'primary'}
+          />
+
+          <Disclosure summary={copy.home.howWeCalculated}>
+            <p className="mb-2 text-small text-text-secondary">{copy.home.calculationNote}</p>
+            <BreakdownList
+              lines={safeSpend.breakdown}
+              currency={snapshot.currency}
+              labelFor={breakdownLabel}
+            />
+            <ul className="mt-3 flex list-inside list-disc flex-col gap-1 text-small text-text-secondary">
+              {safeSpend.assumptions.map((assumption) => (
+                <li key={assumption.code}>{sayNotice(assumption)}</li>
+              ))}
+            </ul>
+          </Disclosure>
+        </div>
+
+        {/* One recommendation, and a way to act on it. */}
+        <Card title={copy.home.actionTitle} tone="primary" className="lg:self-start">
+          {snapshot.nextAction.key === 'close_funding_gap' ? (
+            <>
+              <p className="text-text-secondary">{copy.plan.gapIntro}</p>
+              <Disclosure summary={copy.plan.gapTitle} tone="action">
+                <ul className="flex flex-col gap-2.5">
+                  <li>
+                    <p className="font-medium">{copy.plan.movePayments}</p>
+                    <p className="text-small text-text-secondary">
+                      {movablePayments.length > 0
+                        ? copy.plan.movePaymentsWhy(movablePayments.length)
+                        : copy.plan.noMovable}
+                    </p>
+                  </li>
+                  <li>
+                    <p className="font-medium">
+                      {snapshot.safeTransfer.resultMinor > 0
+                        ? copy.plan.businessTransfer(snapshot.safeTransfer.resultMinor)
+                        : copy.plan.noBusinessTransfer}
+                    </p>
+                  </li>
+                  <li>
+                    <p className="font-medium">{copy.plan.expectedIncome(certainInMinor)}</p>
+                  </li>
+                  {quality.missingData.length > 0 ? (
+                    <li>
+                      <p className="font-medium">{copy.plan.updateDetails}</p>
+                    </li>
+                  ) : null}
+                </ul>
+              </Disclosure>
+            </>
+          ) : snapshot.nextAction.key === 'move_a_payment' &&
+            forecast.firstFailureDate !== null ? (
+            <>
+              <p className="text-text-secondary">
+                {copy.plan.failureDayIntro(forecast.firstFailureDate)}
+              </p>
+              <Disclosure summary={copy.plan.failureDayTitle} tone="action">
+                {movablePayments.length === 0 ? (
+                  <p>{copy.plan.noMovable}</p>
+                ) : (
+                  <ul className="flex flex-col">
+                    {movablePayments.map((item) => (
+                      <li key={item.id}>
+                        <StatRow
+                          label={item.label}
+                          value={
+                            <Money
+                              amountMinor={item.amountMinor}
+                              currency={snapshot.currency}
+                            />
+                          }
+                          hint={formatBusinessDate(item.dueDate ?? item.expectedDate)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Disclosure>
+            </>
+          ) : snapshot.nextAction.key === 'confirm_balances' ? (
+            <>
+              <p className="text-text-secondary">{copy.plan.confirmIntro}</p>
+              <Disclosure summary={copy.plan.confirmTitle} tone="action">
+                <ul className="flex list-inside list-disc flex-col gap-1.5">
+                  {quality.missingData.map((item) => (
+                    <li key={item.code}>{sayNotice(item)}</li>
+                  ))}
+                </ul>
+              </Disclosure>
+            </>
+          ) : (
+            <>
+              <p className="font-medium">{copy.plan.holdTitle}</p>
+              <p className="mt-1.5 text-text-secondary">{copy.plan.holdIntro}</p>
+            </>
+          )}
+        </Card>
       </div>
 
-      {/* 2 — the one dominant answer. */}
-      <Hero
-        label={copy.home.safeTitle}
-        amountMinor={cannotCalculate ? null : safeSpend.resultMinor}
-        currency={snapshot.currency}
-        caption={cannotCalculate ? undefined : copy.home.safeUntil(snapshot.periodEnd)}
-        note={
-          cannotCalculate
-            ? copy.home.safeCannotCalculateWhy(quality.missingData.length)
-            : hasGap
-              ? copy.home.safeGap(safeSpend.fundingGapMinor)
-              : safeSpend.resultMinor === 0
-                ? copy.home.safeZero
-                : copy.home.safeMeaning
-        }
-        tone={cannotCalculate || hasGap ? 'attention' : 'primary'}
-      />
-
-      <Disclosure summary={copy.home.howWeCalculated}>
-        <p className="mb-3 text-small text-text-secondary">{copy.home.calculationNote}</p>
-        <BreakdownList
-          lines={safeSpend.breakdown}
-          currency={snapshot.currency}
-          labelFor={breakdownLabel}
-        />
-        <ul className="mt-4 flex list-inside list-disc flex-col gap-1 text-small text-text-secondary">
-          {safeSpend.assumptions.map((assumption) => (
-            <li key={assumption.code}>{sayNotice(assumption)}</li>
-          ))}
-        </ul>
-      </Disclosure>
-
-      {/* 3 — one, and only one, recommended action. */}
-      <Card title={copy.home.actionTitle} tone="primary">
-        <p className="text-[20px] leading-snug font-semibold">
-          {action === undefined ? snapshot.nextAction.key : action(snapshot.nextAction.params)}
-        </p>
-        <p className="mt-2 text-text-secondary">
-          {why === undefined ? '' : why(snapshot.nextAction.params)}
-        </p>
-      </Card>
-
-      {/* 4 — the four compact daily cards. */}
+      {/* The four compact daily cards. */}
       <div className="grid gap-4 sm:grid-cols-2">
+        <StatCard
+          title={copy.food.title}
+          tone={
+            food === null || food.status === 'insufficient_data'
+              ? 'neutral'
+              : food.status === 'on_track'
+                ? 'success'
+                : 'attention'
+          }
+          headline={
+            food === null || food.status === 'insufficient_data'
+              ? copy.food.noPlan
+              : copy.food.remaining(food.weekRemainingMinor, food.weekEndsOn)
+          }
+          meaning={
+            food === null
+              ? undefined
+              : copy.food.monthProgress(food.monthSpentMinor, food.monthPlannedMinor)
+          }
+          footer={
+            <Link className="text-primary underline underline-offset-4" href="/budget">
+              {copy.food.budgetLink}
+            </Link>
+          }
+        >
+          {food === null ? null : (
+            <div className="flex flex-col gap-2">
+              <ProgressBar
+                value={food.monthSpentMinor}
+                max={Math.max(food.monthPlannedMinor, food.monthSpentMinor)}
+                tone={food.status === 'on_track' ? 'success' : 'attention'}
+                label={copy.food.ariaProgress(food.monthSpentMinor, food.monthPlannedMinor)}
+              />
+              <p className="text-small text-text-secondary">
+                {food.status === 'over_month'
+                  ? copy.food.overMonth
+                  : food.weekOverPaceMinor > 0
+                    ? copy.food.overPace(food.weekOverPaceMinor, food.nextWeekAllowanceMinor)
+                    : food.status === 'ahead_of_pace'
+                      ? copy.food.projection(food.projectedMonthMinor)
+                      : copy.food.onTrack}
+              </p>
+            </div>
+          )}
+        </StatCard>
+
         <StatCard
           title={copy.home.debtTitle}
           tone={
@@ -200,67 +315,15 @@ export default async function HomePage() {
         </StatCard>
 
         <StatCard
-          title={copy.food.title}
-          tone={
-            food === null || food.status === 'insufficient_data'
-              ? 'neutral'
-              : food.status === 'over_month'
-                ? 'attention'
-                : food.status === 'ahead_of_pace'
-                  ? 'attention'
-                  : 'success'
-          }
-          headline={
-            food === null || food.status === 'insufficient_data'
-              ? copy.food.noPlan
-              : copy.food.remaining(food.weekRemainingMinor, food.weekEndsOn)
-          }
-          meaning={
-            food === null
-              ? undefined
-              : copy.food.monthProgress(food.monthSpentMinor, food.monthPlannedMinor)
-          }
-          footer={
-            <Link className="text-primary underline underline-offset-4" href="/budget">
-              {copy.food.budgetLink}
-            </Link>
-          }
-        >
-          {food === null ? null : (
-            <div className="flex flex-col gap-2">
-              <ProgressBar
-                value={food.monthSpentMinor}
-                max={Math.max(food.monthPlannedMinor, food.monthSpentMinor)}
-                tone={food.status === 'over_month' ? 'attention' : 'success'}
-                label={copy.food.ariaProgress(food.monthSpentMinor, food.monthPlannedMinor)}
-              />
-              <p className="text-small text-text-secondary">
-                {food.status === 'over_month'
-                  ? copy.food.overMonth
-                  : food.weekOverPaceMinor > 0
-                    ? copy.food.overPace(food.weekOverPaceMinor, food.nextWeekAllowanceMinor)
-                    : food.status === 'ahead_of_pace'
-                      ? copy.food.projection(food.projectedMonthMinor)
-                      : copy.food.onTrack}
-              </p>
-            </div>
-          )}
-        </StatCard>
-
-        <StatCard
           title={copy.home.monthEndTitle}
           headline={
-            forecast.firstFailureDate === null ? (
-              <Money amountMinor={forecast.endOfPeriodMinor} currency={snapshot.currency} />
-            ) : (
-              <Figure>{formatBusinessDate(forecast.firstFailureDate)}</Figure>
-            )
+            <Money amountMinor={forecast.lowPointMinor} currency={snapshot.currency} signed />
           }
           tone={forecast.firstFailureDate === null ? 'neutral' : 'attention'}
           meaning={
             forecast.firstFailureDate === null
-              ? copy.home.noTightDay
-              : copy.home.tightestDayValue(forecast.lowPointDate, forecast.lowPointMinor)
+              ? copy.home.tightestDayOn(forecast.lowPointDate)
+              : copy.home.runsOutOn(forecast.firstFailureDate)
           }
           footer={
             <Link className="text-primary underline underline-offset-4" href="/forecast">
@@ -274,7 +337,12 @@ export default async function HomePage() {
           />
           <StatRow
             label={copy.home.mustGoOut}
-            value={<Money amountMinor={mustGoOutMinor} currency={snapshot.currency} />}
+            value={
+              <Money
+                amountMinor={safeSpend.committedOutflowMinor}
+                currency={snapshot.currency}
+              />
+            }
           />
         </StatCard>
 
@@ -288,6 +356,13 @@ export default async function HomePage() {
                 ? copy.home.businessSafeTransfer(snapshot.safeTransfer.resultMinor)
                 : copy.home.businessNotSafe
           }
+          meaning={
+            snapshot.businessProfit === null
+              ? undefined
+              : copy.business.limits[snapshot.safeTransfer.bindingConstraint] !== undefined
+                ? `${copy.business.limitedBy}: ${copy.business.limits[snapshot.safeTransfer.bindingConstraint]}`
+                : undefined
+          }
           footer={
             <Link className="text-primary underline underline-offset-4" href="/business">
               {copy.home.businessLink}
@@ -296,26 +371,18 @@ export default async function HomePage() {
         />
       </div>
 
-      {/* 5 — quick updates. One is visually primary; the rest are quieter. */}
+      {/* Quick updates. Not built yet, and shown as a plan rather than a broken button. */}
       <Card title={copy.home.updatesTitle}>
         <div className="flex flex-wrap gap-2">
-          <ActionButton variant="primary" disabled title={copy.states.devOnly}>
-            {copy.actions.addExpense}
-          </ActionButton>
-          <ActionButton disabled title={copy.states.devOnly}>
-            {copy.actions.addIncome}
-          </ActionButton>
-          <ActionButton disabled title={copy.states.devOnly}>
-            {copy.actions.updateBalance}
-          </ActionButton>
-          <ActionButton disabled title={copy.states.devOnly}>
-            {copy.actions.uploadStatement}
-          </ActionButton>
+          <SoonChip>{copy.actions.addExpense}</SoonChip>
+          <SoonChip>{copy.actions.addIncome}</SoonChip>
+          <SoonChip>{copy.actions.updateBalance}</SoonChip>
+          <SoonChip>{copy.actions.uploadStatement}</SoonChip>
         </div>
-        <p className="mt-3 text-small text-text-secondary">{copy.states.devOnly}</p>
+        <p className="mt-2.5 text-small text-text-secondary">{copy.states.soonUpdates}</p>
       </Card>
 
-      {/* 6 — everything else, collapsed. */}
+      {/* Everything else, collapsed. */}
       <SectionTitle>{copy.home.moreTitle}</SectionTitle>
 
       {decision.warnings.length > 0 ? (
@@ -365,6 +432,12 @@ export default async function HomePage() {
               />
             ))}
         </Disclosure>
+
+        <p className="mt-3 px-1 text-small text-text-secondary">
+          <Link className="text-primary underline underline-offset-4" href="/more">
+            {copy.home.moreLink}
+          </Link>
+        </p>
       </Card>
     </AppShell>
   );

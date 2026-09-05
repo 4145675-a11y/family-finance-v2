@@ -199,7 +199,7 @@ describe('sentences read correctly, not just correctly assembled', () => {
       copy.food.remaining(62_000, '2026-08-15'),
       copy.food.monthProgress(120_000, 400_000),
       copy.home.safeGap(50_000),
-      copy.home.tightestDayValue('2026-08-15', 10_000),
+      copy.home.tightestDayOn('2026-08-15'),
     ];
     for (const sentence of sentences) {
       expect(sentence, sentence).not.toMatch(/\b(\S+)\s+\1\b/u);

@@ -1,4 +1,6 @@
-import { count, formatBusinessDate, money } from '../format';
+import { count as countText, formatBusinessDate, formatWeekday, money } from '../format';
+
+const count = countText;
 
 /**
  * Everything this product says, in one place.
@@ -17,14 +19,10 @@ import { count, formatBusinessDate, money } from '../format';
  * digit run so right-to-left text cannot reorder it.
  */
 
-const dayName = (date: string): string =>
-  new Intl.DateTimeFormat('he-IL', { weekday: 'long' }).format(
-    new Date(`${date}T12:00:00.000Z`),
-  );
-
 export const copy = {
   app: {
     name: 'הכסף שלנו',
+    household: 'משק הבית',
     tagline: 'תמונה אחת ברורה של הבית, העסק והחובות',
   },
 
@@ -50,34 +48,37 @@ export const copy = {
     safeTitle: 'כמה אפשר להוציא בלי להסתבך',
     safeUntil: (date: string) => `עד ${formatBusinessDate(date)}`,
     safeMeaning: 'הסכום כולל רק כסף שכבר קיים ורק הכנסות שבטוח ייכנסו.',
-    safeZero: 'כרגע אין סכום פנוי להוצאה נוספת.',
+    // A very large "0 ₪" is accurate and frightening. The screen says what the
+    // zero means, and the arithmetic follows underneath it.
+    safeZeroHeadline: 'כרגע לא כדאי להוסיף הוצאות שאינן מתוכננות',
+    safeZeroNote: 'כל מה שנכנס החודש כבר מיועד לתשלומים שנקבעו.',
     safeGap: (amountMinor: number) =>
-      `חסרים ${money(amountMinor)} כדי לכסות את מה שחייב לצאת החודש.`,
+      `לפי הנתונים שיש כרגע, חסרים ${money(amountMinor)} לכיסוי כל התשלומים עד סוף החודש.`,
     safeCannotCalculate: 'עדיין אי אפשר לחשב סכום בטוח.',
     safeCannotCalculateWhy: (missing: number) =>
       missing === 1
         ? 'חסר עוד פרט אחד. בואו נשלים אותו ואז נדע.'
         : `חסרים עוד ${count(missing)} פרטים. בואו נשלים אותם ואז נדע.`,
-    howWeCalculated: 'איך חישבנו?',
+    howWeCalculated: 'איך הגענו לזה?',
     calculationNote: 'כל שורה כאן מצטרפת לסכום שלמעלה.',
 
     debtTitle: 'החובות',
-    debtDown: (amountMinor: number) => `החובות ירדו החודש ב־${money(amountMinor)}`,
-    debtUp: (amountMinor: number) => `החובות גדלו החודש ב־${money(amountMinor)}`,
-    debtFlat: 'סך החובות כמעט לא השתנה',
+    debtDown: (amountMinor: number) => `החוב ירד החודש ב־${money(amountMinor)}`,
+    debtUp: (amountMinor: number) => `החוב גדל החודש ב־${money(amountMinor)}`,
+    debtFlat: 'סך החוב כמעט לא השתנה',
     debtDownNote: 'זו התקדמות אמיתית.',
-    debtFlatNote: 'שולם חוב אחד, אבל נפתח חוב חדש. לכן הסכום הכולל כמעט לא זז.',
-    debtUpNote: 'החודש נוסף יותר ממה שירד.',
+    debtFlatNote: 'שולם חוב אחד ונפתח חוב חדש, ולכן הסכום הכולל כמעט לא זז.',
+    debtUpNote: 'נלקח החודש יותר ממה שהוחזר.',
     debtTotalNow: 'סך החובות היום',
     debtLink: 'לראות את כל החובות',
 
     monthEndTitle: 'סוף החודש',
     certainIn: 'כסף שבטוח ייכנס',
     mustGoOut: 'תשלומים שחייבים לרדת',
-    tightestDay: 'היום שבו יישאר הכי מעט כסף',
-    tightestDayValue: (date: string, amountMinor: number) =>
-      `${formatBusinessDate(date)} — יישארו ${money(amountMinor)}`,
-    noTightDay: 'לא צפוי יום שבו נגמר הכסף',
+    tightestDay: 'היום הכי צפוף',
+    tightestDayOn: (date: string) => `הכי צפוף ב־${formatBusinessDate(date)}`,
+    runsOutOn: (date: string) => `ב־${formatBusinessDate(date)} הכסף עלול להיגמר`,
+    noTightDay: 'לא צפוי יום שבו הכסף נגמר',
     forecastLink: 'לראות את כל החודש',
 
     businessTitle: 'העסק',
@@ -90,13 +91,41 @@ export const copy = {
     actionTitle: 'מה כדאי לעשות עכשיו',
     updatesTitle: 'עדכון מהיר',
     moreTitle: 'עוד דברים שאפשר לבדוק',
+    moreLink: 'לכל המסכים והפירוטים',
+  },
+
+  // The recommendation is a way forward, not a verdict. Each plan lists concrete
+  // moves the engine can already point at, so "close the gap" stops being an
+  // instruction to conjure money and becomes a short list of real options.
+  plan: {
+    gapTitle: 'בואו נבנה תוכנית לסגירת הפער',
+    gapIntro: 'אף אחד לא משלים סכום כזה ביום אחד. אלה הכיוונים שאפשר לבדוק כבר עכשיו:',
+    movePayments: 'לבדוק אילו תשלומים אפשר להזיז',
+    movePaymentsWhy: (payments: number) =>
+      payments === 1
+        ? 'יש תשלום אחד שאינו חיוני החודש. דחייה שלו משנה את התמונה.'
+        : `יש ${countText(payments)} תשלומים שאינם חיוניים החודש. דחייה של אחד מהם משנה את התמונה.`,
+    noMovable: 'כל התשלומים החודש חיוניים, ולכן אין מה להזיז.',
+    businessTransfer: (amountMinor: number) =>
+      `אפשר להעביר מהעסק עד ${money(amountMinor)} בבטחה`,
+    noBusinessTransfer: 'כרגע אין כסף בעסק שבטוח להעביר לבית.',
+    expectedIncome: (amountMinor: number) => `${money(amountMinor)} אמורים להיכנס עד סוף החודש`,
+    updateDetails: 'לעדכן פרטים חסרים כדי לדייק את התמונה',
+    seeCalculation: 'לראות איך הגענו לזה',
+    failureDayTitle: 'בואו נזיז תשלום אחד',
+    failureDayIntro: (date: string) =>
+      `ב־${formatBusinessDate(date)} הכסף עלול להיגמר. הזזה של תשלום אחד לפני התאריך הזה מספיקה כדי למנוע את זה.`,
+    confirmTitle: 'בואו נשלים את הפרטים החסרים',
+    confirmIntro: 'עם הפרטים האלה אפשר יהיה לתת מספר מדויק במקום הערכה:',
+    holdTitle: 'אין כרגע משהו דחוף',
+    holdIntro: 'זה מצב טוב. שווה להמשיך לעדכן יתרות כדי שהתמונה תישאר נכונה.',
   },
 
   food: {
     title: 'אוכל השבוע',
     remaining: (amountMinor: number, until: string) =>
-      // `dayName` already returns "יום שבת"; prefixing another "יום" doubled it.
-      `נשארו ${money(amountMinor)} עד ${dayName(until)}`,
+      // `formatWeekday` already returns "יום שבת"; a second "יום" doubled it once.
+      `נשארו ${money(amountMinor)} עד ${formatWeekday(until)}`,
     monthProgress: (spentMinor: number, plannedMinor: number) =>
       `מתחילת החודש יצאו ${money(spentMinor)} מתוך ${money(plannedMinor)}`,
     projection: (amountMinor: number) =>
@@ -265,6 +294,8 @@ export const copy = {
     offline: 'אין כרגע חיבור. המספרים כאן הם מהפעם האחרונה שהתעדכנו.',
     pending: 'ממתין לאישור',
     devOnly: 'הפעולה הזו עוד לא מחוברת לשמירה אמיתית, ולכן היא כבויה כרגע.',
+    soon: 'בקרוב',
+    soonUpdates: 'רישום הוצאה, הכנסה או יתרה יופעל כשהנתונים יתחברו למקום קבוע.',
   },
 
   actions: {
@@ -282,6 +313,7 @@ export const copy = {
     ourProgress: 'ההתקדמות שלנו',
     allAccounts: 'כל החשבונות',
     calculation: 'פירוט החישוב',
+    technical: 'פרטים טכניים',
   },
 } as const;
 

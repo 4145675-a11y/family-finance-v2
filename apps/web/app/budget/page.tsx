@@ -53,7 +53,8 @@ export default async function BudgetPage() {
   const projectedShortMinor = totals.projectedMinor - totals.plannedMinor;
 
   return (
-    <AppShell active="/budget" title={copy.budget.title} subtitle={copy.budget.subtitle}>
+    <AppShell active="/budget" title={copy.budget.title}>
+      <p className="-mt-2 px-1 text-text-secondary">{copy.budget.subtitle}</p>
       {!descriptor.isRealData ? <SourceBanner /> : null}
 
       {budget.lines.length === 0 ? (

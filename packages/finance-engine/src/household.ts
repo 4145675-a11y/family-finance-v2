@@ -119,6 +119,16 @@ export interface SafeSpend {
   readonly fundingGapMinor: number;
   readonly conditionalMinor: number;
   readonly unavailableMinor: number;
+  /**
+   * What must actually leave the household before the period ends: essential
+   * needs, other settled charges and debt minimums.
+   *
+   * Distinct from `unavailableMinor`, which also holds money that is merely set
+   * aside. A screen asking "how much has to go out" is asking about this one, and
+   * summing breakdown lines on the screen to get it would put an arithmetic
+   * decision in a component.
+   */
+  readonly committedOutflowMinor: number;
   readonly breakdown: readonly BreakdownLine[];
   readonly reserve: ReserveFloor;
   readonly assumptions: readonly EngineNotice[];
@@ -275,6 +285,7 @@ export function safeHouseholdSpend(input: EngineInput, today: BusinessDate): Saf
     resultMinor,
     fundingGapMinor: shortfallMinor,
     conditionalMinor,
+    committedOutflowMinor: essentialNeedsMinor + certainDueItemsMinor + debtMinimumsMinor,
     unavailableMinor:
       input.reserve.protectedReservesMinor + reserve.floorMinor + debtMinimumsMinor,
     breakdown,

@@ -4,8 +4,8 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'מרכז השליטה הכלכלי המשפחתי',
-  description: 'מקור אמת זוגי לבית, לעסק ולחובות.',
+  title: 'הכסף שלנו',
+  description: 'תמונה אחת ברורה של הבית, העסק והחובות.',
 };
 
 export const viewport: Viewport = {

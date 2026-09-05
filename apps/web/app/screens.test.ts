@@ -130,10 +130,12 @@ describe('the home screen keeps its hierarchy', () => {
     );
   });
 
-  test('the four daily cards are debts, food, month end and business', () => {
+  test('the four daily cards are food, debts, month end and business, in that order', () => {
+    // Food leads: it is the figure a family steers week by week, and the one they
+    // open the app for on most days.
     const order = [
-      'copy.home.debtTitle',
       'copy.food.title',
+      'copy.home.debtTitle',
       'copy.home.monthEndTitle',
       'copy.home.businessTitle',
     ];
@@ -165,9 +167,12 @@ describe('the home screen keeps its hierarchy', () => {
     expect(home).toContain('copy.food.title');
   });
 
-  test('actions that cannot yet save are disabled and say why', () => {
-    expect(home).toContain('disabled');
-    expect(home).toContain('copy.states.devOnly');
+  test('actions that cannot yet save are shown as planned, not as broken buttons', () => {
+    // A greyed-out control that looks like a production action reads as broken
+    // software. A labelled "בקרוב" chip reads as a plan.
+    expect(home).toContain('SoonChip');
+    expect(home).toContain('copy.states.soonUpdates');
+    expect(home, 'no disabled control should reach the daily screen').not.toContain('disabled');
   });
 });
 
@@ -198,5 +203,105 @@ describe('the budget screen', () => {
   test('carries the weekly food figure in full', () => {
     expect(budget).toContain('copy.food.remaining');
     expect(budget).toContain('copy.food.projection');
+  });
+});
+
+const homeSource = read('page.tsx');
+
+describe('the daily screen stays a daily screen', () => {
+  const home = homeSource;
+
+  test('the safe amount is never shown as a bare zero', () => {
+    // A very large "0 ₪" is accurate and frightening. The screen says what the
+    // zero means in words, and the arithmetic follows underneath it.
+    expect(home).toContain('copy.home.safeZeroHeadline');
+    expect(home).toContain('safeSpend.resultMinor > 0');
+  });
+
+  test('a shortfall is stated as a fact, with its amount', () => {
+    expect(home).toContain('copy.home.safeGap');
+    expect(home).toContain('safeSpend.fundingGapMinor');
+  });
+
+  test('missing data produces an explanation instead of a number', () => {
+    expect(home).toContain('copy.home.safeCannotCalculateWhy');
+    expect(home).toContain("decision.status === 'insufficient_data'");
+  });
+
+  test('the recommendation offers a concrete plan, not only a sentence', () => {
+    expect(home).toContain('copy.plan.gapTitle');
+    expect(home).toContain('copy.plan.movePayments');
+    expect(home).toContain('copy.plan.businessTransfer');
+    expect(home).toContain('copy.plan.expectedIncome');
+  });
+
+  test('the plan is built from engine figures, never invented', () => {
+    expect(home).toContain('snapshot.safeTransfer.resultMinor');
+    expect(home).toContain('input.plannedItems.filter');
+  });
+
+  test('the technical calculation version is not on the daily screen', () => {
+    expect(home).not.toContain('CALCULATION_VERSION');
+    expect(home).not.toContain('POLICY_VERSION');
+  });
+
+  test('the technical version is still available, under "עוד"', () => {
+    const more = read('more/page.tsx');
+    expect(more).toContain('CALCULATION_VERSION');
+    expect(more).toContain('POLICY_VERSION');
+  });
+
+  test('the month-end card leads with the amount, not with a date', () => {
+    const monthEnd = home.slice(home.indexOf('copy.home.monthEndTitle'));
+    const headline = monthEnd.slice(0, monthEnd.indexOf('meaning='));
+    expect(headline).toContain('forecast.lowPointMinor');
+  });
+});
+
+describe('the shell', () => {
+  const home = homeSource;
+  const shell = readFileSync(join(APP_ROOT, '..', 'components', 'app-shell.tsx'), 'utf8');
+
+  test('desktop navigation sits on the right of a Hebrew document', () => {
+    // In a right-to-left document `flex-row` already lays children out from the
+    // right, so the navigation — the first child — is the right-hand column.
+    // `flex-row-reverse` pushed it to the left, which is what shipped until the
+    // layout was looked at in a browser.
+    // Only the classes are judged. The comment above them explains the trap and
+    // necessarily names it.
+    const classes = [...shell.matchAll(/className={?`?"?([^"`}]*)/g)]
+      .map((match) => match[1] ?? '')
+      .join(' ');
+    expect(classes).toContain('sm:flex-row');
+    expect(classes).not.toContain('flex-row-reverse');
+  });
+
+  test('the navigation is the first child, so reading order matches the layout', () => {
+    expect(shell.indexOf('<nav')).toBeLessThan(shell.indexOf('<main'));
+  });
+
+  test('mobile keeps bottom navigation', () => {
+    expect(shell).toContain('fixed inset-x-0 bottom-0');
+    expect(shell).toContain('sm:hidden');
+  });
+
+  test('every navigation target meets the minimum touch size', () => {
+    expect(shell).toContain('min-h-11');
+    expect(shell).toContain('min-w-11');
+  });
+
+  test('the header carries the product identity in one line', () => {
+    expect(shell).toContain('copy.app.name');
+    expect(shell).toContain('<Mark />');
+  });
+
+  test('the header does not carry technical version content', () => {
+    expect(shell).not.toContain('CALCULATION_VERSION');
+  });
+
+  test('the home screen renders exactly one h1, and it is the question', () => {
+    expect(home).toContain('showHeading={false}');
+    expect(home).toContain('asHeading');
+    expect((home.match(/<h1/g) ?? []).length).toBe(0);
   });
 });

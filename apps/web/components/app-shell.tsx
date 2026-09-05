@@ -1,22 +1,26 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { CALCULATION_VERSION, POLICY_VERSION } from '@family-finance/finance-engine';
-
 import { copy } from '../lib/copy/copy';
-import { Figure } from './ui';
+import { Mark } from './ui';
 
 /**
- * The application shell: header, navigation and footer.
+ * The application shell: header, navigation and content column.
  *
  * 03-UX-SPEC.md § ניווט fixes the five destinations and asks for bottom navigation
  * on mobile and a right-hand sidebar on desktop. Both are rendered from the same
- * list here, so the two can never drift apart.
+ * list, so the two can never drift apart.
  *
- * Approvals and activity are real routes that say plainly they are still being
- * built. That is an honest state rather than a placeholder pretending to be a
- * capability: nothing there shows a number, and no navigation item leads to
- * something that looks finished and is not.
+ * The sidebar uses `flex-row`, not `flex-row-reverse`. In a right-to-left
+ * document `row` already lays children out from the right, so the first child —
+ * the navigation — sits on the right where a Hebrew reader expects it. Reversing
+ * it, which is what this shell did until the layout was inspected in a browser,
+ * pushed the navigation to the left.
+ *
+ * The header is one line. It carries who we are, how fresh the picture is and how
+ * complete it is, and nothing else: vertical space above the answer is the most
+ * expensive space on the screen. The calculation version moved to "עוד" — it is
+ * real evidence, and it is not something a family reads at breakfast.
  */
 
 export interface NavItem {
@@ -53,51 +57,61 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 export function AppShell({
   active,
   title,
-  subtitle,
+  status,
+  showHeading = true,
   children,
 }: {
   active: string;
   title: string;
-  subtitle?: string;
+  /** Freshness and completeness chips, shown at the end of the header line. */
+  status?: ReactNode;
+  /**
+   * Whether the shell renders the page's `h1`. The home screen sets this false
+   * because its dominant question is the heading — one `h1`, and it is the thing
+   * the reader is actually looking at.
+   */
+  showHeading?: boolean;
   children: ReactNode;
 }) {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-5 px-4 pt-5 pb-28 sm:px-6 sm:pb-10">
-      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <div>
-          <h1 className="text-[24px] leading-tight font-bold sm:text-[32px]">{title}</h1>
-          {subtitle ? <p className="mt-1 text-text-secondary">{subtitle}</p> : null}
-        </div>
-        <p className="text-small text-text-secondary">{copy.app.name}</p>
+    <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-4 px-4 pt-4 pb-24 sm:px-6 sm:pb-8">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <Link
+          href="/"
+          className="flex items-center gap-2 rounded-control text-primary transition-colors hover:text-primary-hover"
+        >
+          <Mark />
+          <span className="text-[18px] font-bold text-text-primary">{copy.app.name}</span>
+          <span className="text-small text-text-secondary">· {copy.app.household}</span>
+        </Link>
+        {status ? <div className="flex flex-wrap items-center gap-2">{status}</div> : null}
       </header>
 
-      <div className="flex flex-col gap-5 sm:flex-row-reverse sm:items-start sm:gap-6">
-        {/* Desktop navigation, on the right as a Hebrew document expects. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+        {/* First child, and therefore the right-hand column in a Hebrew document. */}
         <nav
           aria-label={copy.nav.ariaMain}
-          className="hidden shrink-0 flex-col gap-1 rounded-card border border-border bg-surface p-2 shadow-card sm:flex sm:w-44"
+          className="hidden shrink-0 flex-col gap-1 rounded-card border border-border bg-surface p-2 shadow-card sm:flex sm:w-40"
         >
           {NAV_ITEMS.map((item) => (
             <NavLink key={item.href} item={item} active={item.href === active} />
           ))}
         </nav>
 
-        <main className="flex min-w-0 flex-1 flex-col gap-5">{children}</main>
+        <main className="flex min-w-0 flex-1 flex-col gap-4">
+          {showHeading ? (
+            <h1 className="px-1 text-[24px] leading-tight font-bold">{title}</h1>
+          ) : null}
+          {children}
+        </main>
       </div>
-
-      <footer className="mt-auto border-t border-border pt-4 text-small text-text-secondary">
-        <p>
-          גרסת חישוב <Figure>{CALCULATION_VERSION}</Figure> · גרסת כללים{' '}
-          <Figure>{POLICY_VERSION}</Figure>
-        </p>
-      </footer>
 
       {/* Mobile bottom navigation. Every target is at least 44px, per the design system. */}
       <nav
         aria-label={copy.nav.ariaBottom}
         className="fixed inset-x-0 bottom-0 border-t border-border bg-surface sm:hidden"
       >
-        <ul className="mx-auto flex max-w-5xl items-stretch gap-1 px-2 py-2">
+        <ul className="mx-auto flex max-w-6xl items-stretch gap-1 px-2 py-2">
           {NAV_ITEMS.map((item) => (
             <li key={item.href} className="flex flex-1">
               <NavLink item={item} active={item.href === active} />

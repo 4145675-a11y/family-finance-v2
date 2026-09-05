@@ -1,7 +1,9 @@
 import Link from 'next/link';
 
+import { CALCULATION_VERSION, POLICY_VERSION } from '@family-finance/finance-engine';
+
 import { AppShell } from '../../components/app-shell';
-import { Card } from '../../components/ui';
+import { Card, Figure, StatRow } from '../../components/ui';
 import { copy } from '../../lib/copy/copy';
 
 /**
@@ -34,6 +36,13 @@ export default function MorePage() {
             </li>
           ))}
         </ul>
+      </Card>
+
+      {/* Real evidence, and not something a family reads at breakfast. It moved
+          off the home screen for that reason, and it did not disappear. */}
+      <Card title={copy.sections.technical}>
+        <StatRow label="גרסת חישוב" value={<Figure>{CALCULATION_VERSION}</Figure>} />
+        <StatRow label="גרסת כללים" value={<Figure>{POLICY_VERSION}</Figure>} />
       </Card>
     </AppShell>
   );

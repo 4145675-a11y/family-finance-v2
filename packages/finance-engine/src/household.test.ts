@@ -237,3 +237,29 @@ describe('safeHouseholdSpend', () => {
     expect(safeHouseholdSpend(baseInput(), today).assumptions.length).toBeGreaterThan(0);
   });
 });
+
+describe('committedOutflowMinor', () => {
+  test('is what has to leave: essentials, settled charges and debt minimums', () => {
+    // 600,000 rent + 0 other certain charges + 120,000 debt minimum.
+    expect(safeHouseholdSpend(baseInput(), today).committedOutflowMinor).toBe(720_000);
+  });
+
+  test('excludes money that is only set aside', () => {
+    const input = baseInput();
+    const result = safeHouseholdSpend(
+      { ...input, reserve: { ...input.reserve, protectedReservesMinor: 50_000 } },
+      today,
+    );
+    // The reserve raises what is unavailable, but nothing extra has to be paid.
+    expect(result.committedOutflowMinor).toBe(720_000);
+    expect(result.unavailableMinor).toBeGreaterThan(result.committedOutflowMinor);
+  });
+
+  test('never exceeds the sum of the subtracting breakdown lines', () => {
+    const result = safeHouseholdSpend(baseInput(), today);
+    const subtracted = result.breakdown
+      .filter((line) => line.effect === 'subtracts')
+      .reduce((total, line) => total + line.amountMinor, 0);
+    expect(result.committedOutflowMinor).toBeLessThanOrEqual(subtracted);
+  });
+});

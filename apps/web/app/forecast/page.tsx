@@ -66,7 +66,10 @@ export default async function ForecastPage() {
         tone={conservative.firstFailureDate === null ? 'neutral' : 'attention'}
       >
         <p className="text-[24px] leading-tight font-semibold">
-          {copy.home.tightestDayValue(conservative.lowPointDate, conservative.lowPointMinor)}
+          <Money amountMinor={conservative.lowPointMinor} currency={snapshot.currency} signed />
+        </p>
+        <p className="mt-1.5 text-text-secondary">
+          {copy.home.tightestDayOn(conservative.lowPointDate)}
         </p>
         {conservative.firstFailureDate !== null ? (
           <p className="mt-2 text-attention">
