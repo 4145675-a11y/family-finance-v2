@@ -106,3 +106,29 @@ export {
   type DuplicateAssessment,
   type ExistingRecord,
 } from './duplicates';
+
+// Synthetic fixtures. Test material only: no real financial data, ever.
+export {
+  bankStatementPdf,
+  buildCsv,
+  buildPdf,
+  buildXlsx,
+  dateSerial,
+  householdExpensesXlsx,
+  scannedPdf,
+  type CsvFixtureOptions,
+  type PdfFixtureOptions,
+  type XlsxFixtureSheet,
+} from './fixtures/documents';
+
+export {
+  cell,
+  columnName,
+  minorToDecimalText,
+  safeSheetName,
+  writeWorkbook,
+  type WriteCellValue,
+  type WriteSheet,
+} from './xlsx-write';
+
+export { crc32, writeZip, type ZipFile } from './zip-write';

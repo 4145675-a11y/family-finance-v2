@@ -43,6 +43,16 @@ export const businessSchema = z.object({
   name: z.string().trim().min(1).max(120),
   /** Reserve applied to received income, in basis points (2500 = 25%). */
   taxReserveRateBp: z.number().int().min(0).max(10_000),
+  /**
+   * What the business must keep to keep operating: the float that pays suppliers
+   * and covers a slow month.
+   *
+   * 02-FINANCIAL-RULES.md § נוסחאות subtracts it from available cash before any
+   * transfer home, so it has to be a number the owner set rather than one derived
+   * from turnover — a business that has never had a slow month would otherwise be
+   * told it needs nothing in reserve.
+   */
+  operatingReserveMinor: amountMinorSchema,
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
   version: versionSchema,
