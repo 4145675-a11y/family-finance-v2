@@ -56,6 +56,21 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
       // CLAUDE.md: an empty catch is forbidden. This catches it at lint time too.
       'no-empty': ['error', { allowEmptyCatch: false }],
+      /*
+       * An underscore-prefixed *argument* may be unused.
+       *
+       * A framework fixes the shape of a handler — a server action always
+       * receives the previous form state and the submitted data — and a handler
+       * that needs only one of them still has to declare both. The underscore is
+       * the author saying so.
+       *
+       * Variables and caught errors are deliberately not exempted: an unused
+       * local is usually a mistake, and an ignored error is forbidden outright.
+       */
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { args: 'after-used', argsIgnorePattern: '^_', varsIgnorePattern: '' },
+      ],
     },
   },
 

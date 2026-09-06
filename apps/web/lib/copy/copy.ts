@@ -28,12 +28,24 @@ export const copy = {
 
   nav: {
     home: 'בית',
+    entry: 'רישום',
+    upload: 'העלאה',
     approvals: 'אישורים',
-    activity: 'תנועה',
+    accounts: 'חשבונות',
     planning: 'תכנון',
+    debts: 'חובות',
+    forecast: 'תחזית',
+    business: 'עסק',
+    tasks: 'משימות',
+    reports: 'דוחות',
+    activity: 'תנועה',
     more: 'עוד',
+    groupToday: 'היום',
+    groupPicture: 'התמונה',
+    groupKeeping: 'סדר',
     ariaMain: 'ניווט ראשי',
     ariaBottom: 'ניווט תחתון',
+    skipToContent: 'דילוג לתוכן',
   },
 
   demo: {

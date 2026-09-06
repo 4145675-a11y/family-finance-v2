@@ -12,6 +12,9 @@
   "dependencies": {
     "@family-finance/contracts": "*",
     "@family-finance/design-system": "*",
+    "@family-finance/document-import": "*",
+    "@family-finance/finance-engine": "*",
+    "@family-finance/local-store": "*",
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.112.3",
     "next": "16.3.1",

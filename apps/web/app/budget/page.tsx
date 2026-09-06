@@ -1,19 +1,29 @@
+import { BUDGET_CATEGORY_KEYS } from '@family-finance/contracts';
+
+import { setBudgetLineAction, startBudgetAction } from '../../lib/actions/entries';
 import { AppShell } from '../../components/app-shell';
+import {
+  ActionForm,
+  HiddenValue,
+  MoneyField,
+  SelectField,
+  TextField,
+} from '../../components/form';
+import { NoHousehold } from '../../components/screen';
 import {
   Badge,
   Card,
   Disclosure,
-  EmptyState,
   Figure,
   Money,
   ProgressBar,
-  SourceBanner,
   StatRow,
 } from '../../components/ui';
 import { copy } from '../../lib/copy/copy';
 import { sayNotice } from '../../lib/copy/notices';
 import { loadDashboardView } from '../../lib/dashboard/load';
 import { formatBusinessDate } from '../../lib/format';
+import { todayInJerusalem } from '../../lib/forms';
 
 /**
  * "התקציב שלנו" — the monthly budget.
@@ -38,24 +48,80 @@ const STATUS_LABEL = {
   over: copy.budget.statusOver,
 } as const;
 
-export default async function BudgetPage() {
-  const { descriptor, budget, food } = await loadDashboardView();
+/*
+ * Rendered per request. The figures come from the household's own store, and a
+ * prerendered copy would show what the build saw rather than what is true now.
+ */
+export const dynamic = 'force-dynamic';
 
-  if (budget === null) {
+export default async function BudgetPage() {
+  const view = await loadDashboardView();
+  const { descriptor, budget, food, document } = view;
+
+  // No household at all: an invitation, not an empty table.
+  if (document === null && budget === null) {
     return (
-      <AppShell active="/budget" title={copy.budget.title}>
-        <EmptyState reason={descriptor.reason} />
+      <NoHousehold active="/budget" title={copy.budget.title} reason={descriptor.reason} />
+    );
+  }
+
+  // A household with no budget for this month: the one thing to do is start one,
+  // and the screen offers exactly that rather than reporting an absence.
+  if (budget === null) {
+    const period = (view.periodStart ?? todayInJerusalem()).slice(0, 7);
+    return (
+      <AppShell
+        source={descriptor}
+        active="/budget"
+        title={copy.budget.title}
+        subtitle={copy.budget.subtitle}
+      >
+        <Card title={copy.budget.empty}>
+          <p className="text-text-secondary">{copy.budget.emptyAction}</p>
+          <div className="mt-4">
+            <ActionForm action={startBudgetAction} submitLabel={copy.budget.emptyAction}>
+              <TextField
+                name="period"
+                label={copy.budget.monthTotal}
+                type="month"
+                defaultValue={period}
+              />
+            </ActionForm>
+          </div>
+        </Card>
       </AppShell>
     );
   }
 
   const { totals } = budget;
   const projectedShortMinor = totals.projectedMinor - totals.plannedMinor;
+  const budgetId =
+    document?.budgets.find((candidate) => candidate.period === budget.period)?.id ?? null;
 
   return (
-    <AppShell active="/budget" title={copy.budget.title}>
+    <AppShell source={descriptor} active="/budget" title={copy.budget.title}>
       <p className="-mt-2 px-1 text-text-secondary">{copy.budget.subtitle}</p>
-      {!descriptor.isRealData ? <SourceBanner /> : null}
+
+      {budgetId !== null ? (
+        <Card title={copy.budget.planned} subtitle={copy.budget.draftNote}>
+          <ActionForm action={setBudgetLineAction} submitLabel={copy.budget.planned}>
+            <>
+              <HiddenValue name="budgetId" value={budgetId} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectField
+                  name="categoryKey"
+                  label={copy.budget.title}
+                  options={BUDGET_CATEGORY_KEYS.map((key) => ({
+                    value: key,
+                    label: copy.budget.categories[key] ?? key,
+                  }))}
+                />
+                <MoneyField name="plannedMinor" label={copy.budget.planned} />
+              </div>
+            </>
+          </ActionForm>
+        </Card>
+      ) : null}
 
       {budget.lines.length === 0 ? (
         <Card title={copy.budget.empty}>

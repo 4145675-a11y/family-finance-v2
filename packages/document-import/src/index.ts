@@ -1,3 +1,5 @@
+export type { ImportWarningCode } from '@family-finance/contracts';
+
 export {
   Deadline,
   LIMITS,
@@ -22,6 +24,8 @@ export {
   readZipEntry,
   type ZipEntry,
 } from './zip';
+
+export { stripControlCharacters, stripXmlForbiddenCharacters } from './text-safety';
 
 export { decodeXmlPart, decodeXmlText, localName, scanXml, type XmlToken } from './xml';
 

@@ -1,12 +1,16 @@
+import { addDebtAction, recordRolloverAction } from '../../lib/actions/entries';
 import { AppShell } from '../../components/app-shell';
+import { ActionForm, MoneyField, SelectField, TextField } from '../../components/form';
+import { screens } from '../../lib/copy/screens';
+import { todayInJerusalem } from '../../lib/forms';
 import {
   Badge,
   Card,
+  SectionTitle,
   Disclosure,
   EmptyState,
   Figure,
   Money,
-  SourceBanner,
   StatRow,
 } from '../../components/ui';
 import { copy } from '../../lib/copy/copy';
@@ -27,27 +31,36 @@ import { formatBasisPoints, formatBusinessDate } from '../../lib/format';
  * number.
  */
 
+/*
+ * Rendered per request. The figures come from the household's own store, and a
+ * prerendered copy would show what the build saw rather than what is true now.
+ */
+export const dynamic = 'force-dynamic';
+
 export default async function DebtsPage() {
   const { descriptor, snapshot, input } = await loadDashboardView();
 
   if (snapshot === null || input === null) {
     return (
-      <AppShell active="/more" title={copy.debts.title}>
+      <AppShell source={descriptor} active="/more" title={copy.debts.title}>
         <EmptyState reason={descriptor.reason} />
       </AppShell>
     );
   }
 
   const { debtMetrics: metrics, debtTrend: trend, callRisk: risk } = snapshot;
+
+  /** The debts a rollover can name. Two are needed for a swap to mean anything. */
+  const debtOptions = input.debts
+    .filter((debt) => debt.status === 'active')
+    .map((debt) => ({ value: debt.id, label: debt.creditorName }));
   const balanceOf = (debtId: string) =>
     snapshot.debtBalances.find((entry) => entry.debtId === debtId)?.balanceMinor ?? 0;
   const activeDebts = input.debts.filter((debt) => debt.status === 'active');
   const confirmedSwaps = input.rollovers.filter((link) => link.status === 'confirmed');
 
   return (
-    <AppShell active="/more" title={copy.debts.title}>
-      {!descriptor.isRealData ? <SourceBanner /> : null}
-
+    <AppShell source={descriptor} active="/more" title={copy.debts.title}>
       <Card
         title={copy.debts.realStoryTitle}
         tone={trend?.consumerDirection === 'down' ? 'success' : 'neutral'}
@@ -282,6 +295,101 @@ export default async function DebtsPage() {
           </table>
         </div>
       </Card>
+
+      <SectionTitle>{screens.entry.debtTitle}</SectionTitle>
+
+      <Card title={copy.debts.creditor}>
+        <ActionForm action={addDebtAction} submitLabel={screens.entry.save} resetOnSuccess>
+          <>
+            <TextField name="creditorName" label={copy.debts.creditor} maxLength={160} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                name="kind"
+                label={screens.accounts.kind}
+                defaultValue="bank_loan"
+                options={[
+                  { value: 'bank_loan', label: 'הלוואה מהבנק' },
+                  { value: 'mortgage', label: copy.debts.mortgageTag },
+                  { value: 'revolving_credit', label: 'אשראי מתגלגל' },
+                  { value: 'overdraft', label: 'מינוס' },
+                  { value: 'private_person', label: 'חוב לאדם פרטי' },
+                  { value: 'institution', label: 'חוב למוסד' },
+                  { value: 'other', label: 'אחר' },
+                ]}
+              />
+              <MoneyField name="openingBalanceMinor" label={copy.debts.balance} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                name="openedOn"
+                label={screens.entry.date}
+                type="date"
+                defaultValue={todayInJerusalem()}
+              />
+              <TextField
+                name="annualRatePercent"
+                label={copy.debts.cost}
+                hint={copy.debts.unknownCostNote}
+                required={false}
+                inputMode="decimal"
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <MoneyField
+                name="minimumPaymentMinor"
+                label={copy.debts.monthly}
+                required={false}
+              />
+              <SelectField
+                name="urgency"
+                label={copy.debts.urgentTitle}
+                defaultValue="none"
+                options={[
+                  { value: 'none', label: copy.debts.urgency['none'] ?? '' },
+                  { value: 'watch', label: copy.debts.urgency['watch'] ?? '' },
+                  { value: 'demanded', label: copy.debts.urgency['demanded'] ?? '' },
+                  { value: 'legal', label: copy.debts.urgency['legal'] ?? '' },
+                ]}
+              />
+            </div>
+          </>
+        </ActionForm>
+      </Card>
+
+      {/*
+        A rollover is three facts, and the form makes that visible: which debt was
+        repaid, which one paid for it, and how much. The total does not move, and
+        the card above says exactly that.
+      */}
+      {debtOptions.length < 2 ? null : (
+        <Card title={copy.debts.swapTitle}>
+          <ActionForm action={recordRolloverAction} submitLabel={screens.entry.save}>
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectField
+                  name="fromDebtId"
+                  label={copy.debts.repaid}
+                  options={debtOptions}
+                />
+                <SelectField
+                  name="toDebtId"
+                  label={copy.debts.borrowed}
+                  options={debtOptions}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <MoneyField name="amountMinor" label={screens.entry.amount} />
+                <TextField
+                  name="occurredOn"
+                  label={screens.entry.date}
+                  type="date"
+                  defaultValue={todayInJerusalem()}
+                />
+              </div>
+            </>
+          </ActionForm>
+        </Card>
+      )}
     </AppShell>
   );
 }

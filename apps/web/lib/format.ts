@@ -185,3 +185,25 @@ export const STATUS_LABEL: Readonly<Record<string, string>> = {
   not_safe: 'לא בטוח',
   insufficient_data: 'אין מספיק נתונים',
 };
+
+/**
+ * A stored amount as the text a person edits.
+ *
+ * The one place minor units become a decimal for a form field. Screens are
+ * forbidden from doing this inline — `screens.test.ts` enforces it — because a
+ * conversion scattered across twenty components is a conversion that will
+ * eventually be done differently in one of them.
+ *
+ * String surgery rather than division: `-1` agora is `-0.01`, not
+ * `-0.009999999999999998`.
+ */
+export function toAmountInput(amountMinor: number | null | undefined): string {
+  if (amountMinor === null || amountMinor === undefined) return '';
+  if (!Number.isInteger(amountMinor)) {
+    throw new Error(`an editable amount must be integer minor units, got ${amountMinor}`);
+  }
+
+  const negative = amountMinor < 0;
+  const digits = String(Math.abs(amountMinor)).padStart(3, '0');
+  return `${negative ? '-' : ''}${digits.slice(0, -2)}.${digits.slice(-2)}`;
+}

@@ -1,23 +1,27 @@
 import type { BudgetInput, EngineInput, FoodWeekInput } from '@family-finance/finance-engine';
 
 /**
- * Which data source the dashboard is reading, and whether it is allowed to.
+ * Which data source the screens are reading, and whether they are allowed to.
  *
- * The application has no verified database yet — Milestone 2's migrations have
- * never been applied — so the only way to see the product working locally is a
- * development fixture. CLAUDE.md permits exactly one shape for that: an adapter,
- * in dev or test only, behind a feature flag that is off by default, failing
- * closed. This module is that gate, and it is deliberately the only place that
- * decides.
+ * There are three answers now, and the order between them is the whole point.
  *
- * Fail closed means: in a production build the fixture is unreachable no matter
- * what the environment says, and when no source is available the dashboard shows
- * that it has no data rather than showing numbers from nowhere. A screen full of
- * invented figures that looks real is the single most dangerous thing this
- * project could ship.
+ *  1. The household's own store, once they have set one up. Real data, and the
+ *     normal case.
+ *  2. A development fixture, only in a development build and only behind a flag
+ *     that is off by default — the one shape CLAUDE.md permits for invented
+ *     figures in a development build.
+ *  3. Nothing, which is a real answer: the screens say they have no data rather
+ *     than showing numbers from nowhere.
+ *
+ * The real store always wins. A developer with the fixture flag on who then sets
+ * up a household sees their own figures, because a flag quietly overriding a
+ * family's actual money is the worst failure this module could have.
+ *
+ * Fail closed still holds: in a production build the fixture is unreachable no
+ * matter what the environment says.
  */
 
-export type DataSourceKind = 'none' | 'development_fixture';
+export type DataSourceKind = 'none' | 'local_store' | 'development_fixture';
 
 export interface DataSourceDescriptor {
   readonly kind: DataSourceKind;
@@ -31,6 +35,8 @@ export interface DataSourceDescriptor {
 export interface EnvironmentFacts {
   readonly nodeEnv: string | undefined;
   readonly flag: string | undefined;
+  /** Whether the household has been set up on this machine. */
+  readonly hasLocalStore: boolean;
 }
 
 export const DEV_DATA_FLAG = 'NEXT_PUBLIC_DEV_DATA_SOURCE';
@@ -38,24 +44,22 @@ export const DEV_DATA_FLAG = 'NEXT_PUBLIC_DEV_DATA_SOURCE';
 /** The single literal that switches the fixture on. Anything else is off. */
 const FLAG_ON = 'on';
 
-/**
- * Decides the active source from the environment.
- *
- * Two conditions, both required, in this order:
- *
- *  1. The build is not production. This is checked first and cannot be overridden
- *     by the flag, so a production deployment with a stray environment variable
- *     still serves no fixture.
- *  2. The flag is set to exactly `on`. Not "true", not "1", not any truthy
- *     string — a single literal, so the switch cannot be flipped by accident.
- */
 export function resolveDataSource(env: EnvironmentFacts): DataSourceDescriptor {
+  if (env.hasLocalStore) {
+    return {
+      kind: 'local_store',
+      label: 'הנתונים שלכם',
+      isRealData: true,
+      reason: 'המספרים כאן מגיעים ממה שהזנתם ואישרתם, ונשמרים על המחשב הזה בלבד.',
+    };
+  }
+
   if (env.nodeEnv === 'production') {
     return {
       kind: 'none',
       label: 'אין מקור נתונים',
       isRealData: false,
-      reason: 'זו סביבת ייצור. נתוני הדגמה חסומים בה לחלוטין, וחיבור למסד האמת טרם אומת.',
+      reason: 'עוד לא הוקם כאן משק בית. אפשר להתחיל בהגדרה, וכל מה שתזינו יישמר במחשב הזה.',
     };
   }
 
@@ -64,7 +68,7 @@ export function resolveDataSource(env: EnvironmentFacts): DataSourceDescriptor {
       kind: 'none',
       label: 'אין מקור נתונים',
       isRealData: false,
-      reason: `מקור נתוני הפיתוח כבוי. הפעלה: ${DEV_DATA_FLAG}=${FLAG_ON} בסביבת פיתוח בלבד.`,
+      reason: 'עוד לא הוקם כאן משק בית. אפשר להתחיל בהגדרה, וכל מה שתזינו יישמר במחשב הזה.',
     };
   }
 
@@ -73,17 +77,18 @@ export function resolveDataSource(env: EnvironmentFacts): DataSourceDescriptor {
     label: 'נתוני הדגמה לפיתוח',
     isRealData: false,
     reason:
-      'המסך מוצג על נתוני הדגמה מומצאים, כדי לבדוק את המנוע והתצוגה לפני שיש מסד מאומת. אלה אינם הכספים שלכם.',
+      'המסך מוצג על נתוני הדגמה מומצאים, כדי לבדוק את המנוע והתצוגה. אלה אינם הכספים שלכם.',
   };
 }
 
 /** Reads the current process environment. Kept apart so the rule above is testable. */
-export function currentEnvironment(): EnvironmentFacts {
+export function currentEnvironment(hasLocalStore: boolean): EnvironmentFacts {
   return {
     nodeEnv: process.env.NODE_ENV,
     // Referenced as a complete literal: Next only inlines NEXT_PUBLIC_* when it
     // can see the whole expression at build time.
     flag: process.env.NEXT_PUBLIC_DEV_DATA_SOURCE,
+    hasLocalStore,
   };
 }
 
@@ -102,7 +107,7 @@ export interface DashboardSource {
  * yes, so a production bundle never pulls the fixture in at all.
  */
 export async function loadDashboardSource(
-  env: EnvironmentFacts = currentEnvironment(),
+  env: EnvironmentFacts = currentEnvironment(false),
 ): Promise<DashboardSource> {
   const descriptor = resolveDataSource(env);
 

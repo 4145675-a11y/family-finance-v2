@@ -14,7 +14,8 @@ import { extractPages, type PdfPageText } from './pdf-text';
  * per page and surfaced in Hebrew on the review screen, alongside the two things
  * that actually help: enter the figures by hand, or fetch the searchable version
  * from the bank's site. Optical character recognition is a separate capability
- * behind `OcrProvider`, deliberately unimplemented locally rather than faked.
+ * behind `OcrProvider`, which is deliberately left unimplemented locally rather
+ * than filled with something that pretends to read a page.
  */
 
 export interface PdfExtraction {
@@ -45,9 +46,9 @@ export interface OcrProvider {
 /**
  * The only OCR provider that ships.
  *
- * It is not a stub standing in for a working one: it reports itself unavailable
- * and refuses to be called, so nothing downstream can mistake an empty result for
- * a recognised page.
+ * It does not stand in for a working one. It reports itself unavailable and
+ * refuses to be called, so nothing downstream can mistake an empty result for a
+ * recognised page.
  */
 export const unavailableOcrProvider: OcrProvider = {
   name: 'none',

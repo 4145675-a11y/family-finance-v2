@@ -1,4 +1,9 @@
+import { transferToHouseholdAction } from '../../lib/actions/entries';
 import { AppShell } from '../../components/app-shell';
+import { ActionForm, MoneyField, SelectField, TextField } from '../../components/form';
+import { screens } from '../../lib/copy/screens';
+import { todayInJerusalem } from '../../lib/forms';
+import { toAmountInput } from '../../lib/format';
 import {
   BreakdownList,
   Card,
@@ -6,7 +11,6 @@ import {
   EmptyState,
   Hero,
   Money,
-  SourceBanner,
   StatRow,
 } from '../../components/ui';
 import { copy } from '../../lib/copy/copy';
@@ -22,12 +26,30 @@ import { loadDashboardView } from '../../lib/dashboard/load';
  * and the whole breakdown is shown before the transfer figure, never after it.
  */
 
+/*
+ * Rendered per request. The figures come from the household's own store, and a
+ * prerendered copy would show what the build saw rather than what is true now.
+ */
+export const dynamic = 'force-dynamic';
+
 export default async function BusinessPage() {
-  const { descriptor, snapshot } = await loadDashboardView();
+  const { descriptor, snapshot, document } = await loadDashboardView();
+
+  // The two sides of a transfer. Both lists come from the household's own
+  // accounts; a transfer with nowhere to land is simply not offered.
+  const openAccounts = (document?.accounts ?? []).filter(
+    (account) => account.closedAt === null,
+  );
+  const businessAccounts = openAccounts
+    .filter((account) => account.scope === 'business')
+    .map((account) => ({ value: account.id, label: account.name }));
+  const householdAccounts = openAccounts
+    .filter((account) => account.scope === 'household')
+    .map((account) => ({ value: account.id, label: account.name }));
 
   if (snapshot === null) {
     return (
-      <AppShell active="/more" title={copy.business.title}>
+      <AppShell source={descriptor} active="/more" title={copy.business.title}>
         <EmptyState reason={descriptor.reason} />
       </AppShell>
     );
@@ -38,8 +60,7 @@ export default async function BusinessPage() {
 
   if (profit === null) {
     return (
-      <AppShell active="/more" title={copy.business.title}>
-        {!descriptor.isRealData ? <SourceBanner /> : null}
+      <AppShell source={descriptor} active="/more" title={copy.business.title}>
         <Card title={copy.business.title}>
           <p className="text-text-secondary">{copy.business.none}</p>
         </Card>
@@ -48,9 +69,7 @@ export default async function BusinessPage() {
   }
 
   return (
-    <AppShell active="/more" title={copy.business.title}>
-      {!descriptor.isRealData ? <SourceBanner /> : null}
-
+    <AppShell source={descriptor} active="/more" title={copy.business.title}>
       {/* The breakdown comes first. The transfer figure is the conclusion, not the headline. */}
       <Card title={copy.business.reallyLeft}>
         <StatRow
@@ -121,6 +140,47 @@ export default async function BusinessPage() {
           </ul>
         ) : null}
       </Card>
+
+      {/*
+        Recording the transfer. The application does not move money — it records
+        that the family did, as one transaction with two sides so the consolidated
+        view nets to zero (02-FINANCIAL-RULES.md § Scopes ותנועות).
+      */}
+      {businessAccounts.length === 0 || householdAccounts.length === 0 ? null : (
+        <Card title={copy.business.safeToMove} subtitle={copy.business.proposalNote}>
+          <ActionForm action={transferToHouseholdAction} submitLabel={copy.business.safeToMove}>
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectField
+                  name="businessAccountId"
+                  label={copy.business.title}
+                  options={businessAccounts}
+                />
+                <SelectField
+                  name="householdAccountId"
+                  label={copy.app.household}
+                  options={householdAccounts}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <MoneyField
+                  name="amountMinor"
+                  label={screens.entry.amount}
+                  defaultValue={
+                    transfer.resultMinor > 0 ? toAmountInput(transfer.resultMinor) : ''
+                  }
+                />
+                <TextField
+                  name="transactionDate"
+                  label={screens.entry.date}
+                  type="date"
+                  defaultValue={todayInJerusalem()}
+                />
+              </div>
+            </>
+          </ActionForm>
+        </Card>
+      )}
     </AppShell>
   );
 }

@@ -6,16 +6,15 @@ import {
   BreakdownList,
   Card,
   Disclosure,
-  EmptyState,
   Hero,
+  LinkButton,
   Money,
   ProgressBar,
   SectionTitle,
-  SoonChip,
-  SourceBanner,
   StatCard,
   StatRow,
 } from '../components/ui';
+import { NoHousehold } from '../components/screen';
 import { copy } from '../lib/copy/copy';
 import { breakdownLabel, qualityLabel, sayNotice } from '../lib/copy/notices';
 import { loadDashboardView } from '../lib/dashboard/load';
@@ -40,15 +39,17 @@ import { formatBusinessDate } from '../lib/format';
  * arithmetic follows underneath.
  */
 
+/*
+ * Rendered per request. The figures come from the household's own store, and a
+ * prerendered copy would show what the build saw rather than what is true now.
+ */
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const { descriptor, snapshot, input, food } = await loadDashboardView();
 
   if (snapshot === null || input === null) {
-    return (
-      <AppShell active="/" title={copy.home.title}>
-        <EmptyState reason={descriptor.reason} />
-      </AppShell>
-    );
+    return <NoHousehold active="/" title={copy.home.title} reason={descriptor.reason} />;
   }
 
   const { safeSpend, decision, quality } = snapshot;
@@ -96,9 +97,13 @@ export default async function HomePage() {
   );
 
   return (
-    <AppShell active="/" title={copy.home.title} showHeading={false} status={statusChips}>
-      {!descriptor.isRealData ? <SourceBanner /> : null}
-
+    <AppShell
+      source={descriptor}
+      active="/"
+      title={copy.home.title}
+      showHeading={false}
+      status={statusChips}
+    >
       {/* The answer and what to do about it, side by side once there is room. */}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col lg:col-span-2">
@@ -371,15 +376,20 @@ export default async function HomePage() {
         />
       </div>
 
-      {/* Quick updates. Not built yet, and shown as a plan rather than a broken button. */}
+      {/* Quick updates. Every one of these opens a working screen. */}
       <Card title={copy.home.updatesTitle}>
-        <div className="flex flex-wrap gap-2">
-          <SoonChip>{copy.actions.addExpense}</SoonChip>
-          <SoonChip>{copy.actions.addIncome}</SoonChip>
-          <SoonChip>{copy.actions.updateBalance}</SoonChip>
-          <SoonChip>{copy.actions.uploadStatement}</SoonChip>
+        <div className="flex flex-wrap gap-2.5">
+          <LinkButton href="/entry">{copy.actions.addExpense}</LinkButton>
+          <LinkButton href="/entry" tone="secondary">
+            {copy.actions.addIncome}
+          </LinkButton>
+          <LinkButton href="/accounts" tone="secondary">
+            {copy.actions.updateBalance}
+          </LinkButton>
+          <LinkButton href="/upload" tone="secondary">
+            {copy.actions.uploadStatement}
+          </LinkButton>
         </div>
-        <p className="mt-2.5 text-small text-text-secondary">{copy.states.soonUpdates}</p>
       </Card>
 
       {/* Everything else, collapsed. */}

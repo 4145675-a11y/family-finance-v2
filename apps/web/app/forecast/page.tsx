@@ -6,7 +6,6 @@ import {
   EmptyState,
   Figure,
   Money,
-  SourceBanner,
   StatRow,
 } from '../../components/ui';
 import { copy } from '../../lib/copy/copy';
@@ -23,12 +22,18 @@ import { formatBusinessDate } from '../../lib/format';
  * screen that blurs them is how a family spends money that has not arrived.
  */
 
+/*
+ * Rendered per request. The figures come from the household's own store, and a
+ * prerendered copy would show what the build saw rather than what is true now.
+ */
+export const dynamic = 'force-dynamic';
+
 export default async function ForecastPage() {
   const { descriptor, snapshot, input } = await loadDashboardView();
 
   if (snapshot === null || input === null) {
     return (
-      <AppShell active="/more" title={copy.forecast.title}>
+      <AppShell source={descriptor} active="/more" title={copy.forecast.title}>
         <EmptyState reason={descriptor.reason} />
       </AppShell>
     );
@@ -51,9 +56,7 @@ export default async function ForecastPage() {
       .reduce((total, item) => total + item.amountMinor, 0);
 
   return (
-    <AppShell active="/more" title={copy.forecast.title}>
-      {!descriptor.isRealData ? <SourceBanner /> : null}
-
+    <AppShell source={descriptor} active="/more" title={copy.forecast.title}>
       <Card title={copy.forecast.endQuestion}>
         <p className="text-display font-bold text-primary">
           <Money amountMinor={conservative.endOfPeriodMinor} currency={snapshot.currency} />

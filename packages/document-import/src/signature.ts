@@ -1,6 +1,7 @@
 import type { ImportFileKind } from '@family-finance/contracts';
 
 import { LIMITS, MalformedDocumentError } from './limits';
+import { stripControlCharacters } from './text-safety';
 
 /**
  * What a file actually is, decided from its bytes.
@@ -144,15 +145,6 @@ export function extensionOf(name: string): string {
   return name.slice(lastDot).toLowerCase();
 }
 
-/**
- * Control characters, written as escapes.
- *
- * A literal control character in source is invisible to a reviewer, which is
- * exactly the wrong property for a security filter.
- */
-// eslint-disable-next-line no-control-regex -- removing control characters requires naming them
-const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/g;
-
 /** Characters Windows and POSIX both treat as structural in a path. */
 const PATH_PUNCTUATION = /[<>:"|?*\\/]/g;
 
@@ -166,8 +158,7 @@ const PATH_PUNCTUATION = /[<>:"|?*\\/]/g;
  */
 export function sanitiseFileName(name: string): string {
   const withoutPath = name.split(/[\\/]/g).pop() ?? '';
-  const cleaned = withoutPath
-    .replace(CONTROL_CHARACTERS, '')
+  const cleaned = stripControlCharacters(withoutPath)
     .replace(PATH_PUNCTUATION, '')
     .replace(/\.{2,}/g, '.')
     .replace(/^\.+/, '')

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
 
-import { NAV_ITEMS } from '../components/app-shell';
+import { NAV_ITEMS, PHONE_NAV } from '../components/app-shell';
 
 /**
  * Structural rules about the screens themselves.
@@ -39,6 +39,9 @@ const read = (page: string) => readFileSync(join(APP_ROOT, page), 'utf8');
 /** Screens that read financial data, as opposed to the honest placeholders. */
 const DATA_PAGES = pages.filter((page) => read(page).includes('loadDashboardView'));
 
+/** Screens that put a monetary figure in front of a person. */
+const MONEY_PAGES = DATA_PAGES.filter((page) => /<Money[s/>]/.test(read(page)));
+
 describe('the routes that exist', () => {
   test('every navigation destination has a page', () => {
     for (const item of NAV_ITEMS) {
@@ -49,22 +52,41 @@ describe('the routes that exist', () => {
     }
   });
 
-  test('navigation is the five destinations 03-UX-SPEC.md names', () => {
-    expect(NAV_ITEMS.map((item) => item.label)).toEqual([
+  test('the phone bar carries the five things a person does standing up', () => {
+    expect(PHONE_NAV.map((item) => item.label)).toEqual([
       'בית',
+      'רישום',
       'אישורים',
-      'תנועה',
       'תכנון',
       'עוד',
     ]);
   });
 
-  test('the destinations that are not built yet say so rather than showing figures', () => {
-    for (const item of NAV_ITEMS.filter((entry) => !entry.ready)) {
-      const source = read(`${item.href.slice(1)}/page.tsx`);
-      expect(source).toContain('ComingSoon');
-      expect(source, `${item.href} must not read financial data yet`).not.toContain(
-        'loadDashboardView',
+  test('every screen in the navigation is built, and none of them says "coming soon"', () => {
+    for (const item of NAV_ITEMS) {
+      const source = read(item.href === '/' ? 'page.tsx' : `${item.href.slice(1)}/page.tsx`);
+      expect(source, `${item.href} is still a placeholder`).not.toContain('ComingSoon');
+    }
+  });
+
+  test('every screen that reads the household is rendered per request', () => {
+    // A prerendered financial screen shows what the build saw. There is no
+    // acceptable version of that, so it is a structural rule rather than a habit.
+    for (const page of DATA_PAGES) {
+      expect(read(page), `${page} would be prerendered`).toContain("dynamic = 'force-dynamic'");
+    }
+  });
+
+  test('a screen never mutates the store itself', () => {
+    // Writes go through a server action, which validates, audits and revalidates.
+    // A page calling a command directly would skip all three.
+    for (const page of pages) {
+      const source = read(page);
+      expect(source, `${page} runs a store command directly`).not.toMatch(
+        /householdStore\(\)\.run\(/,
+      );
+      expect(source, `${page} writes to the store directly`).not.toMatch(
+        /\.replaceDocument\(|\.mutate\(/,
       );
     }
   });
@@ -81,6 +103,9 @@ describe('screens do not calculate', () => {
     const source = read(page);
     // Converting minor units, applying a rate or averaging inside a component is
     // how a screen and the engine start disagreeing about what a number means.
+    // `toAmountInput` is the one reviewed conversion from minor units to the
+    // text a person edits. Anything else doing it inline is how two screens end
+    // up rounding differently.
     expect(source, `${page} converts minor units itself`).not.toMatch(/\/\s*100\b/);
     expect(source, `${page} scales an amount itself`).not.toMatch(/Minor\s*\*\s*\d/);
     expect(source, `${page} divides an amount itself`).not.toMatch(/Minor\s*\/\s*\d/);
@@ -104,14 +129,25 @@ describe('screens do not calculate', () => {
 });
 
 describe('screens fail closed', () => {
-  test.each(DATA_PAGES)('%s renders an empty state when there is no data', (page) => {
+  test.each(DATA_PAGES)('%s says so rather than showing nothing', (page) => {
     const source = read(page);
-    expect(source).toContain('EmptyState');
+    // Either the honest empty state, or the invitation to set a household up.
+    // Both branch explicitly on the absence; neither substitutes a zero.
+    expect(source, `${page} has no answer for a missing household`).toMatch(
+      /EmptyState|NoHousehold|EmptyPrompt/,
+    );
     expect(source, `${page} must branch on a missing source`).toMatch(/=== null/);
   });
 
-  test.each(DATA_PAGES)('%s shows the demo banner whenever data is not real', (page) => {
-    expect(read(page)).toContain('descriptor.isRealData');
+  test.each(MONEY_PAGES)('%s cannot show invented figures without saying so', (page) => {
+    // The banner is the shell's job now, and passing the descriptor is what turns
+    // it on. A screen that renders money and does not pass it could show fixture
+    // figures silently, which is the one failure this whole gate exists for.
+    // The shell renders the banner from `source`; a page outside the shell —
+    // the print view — declares it directly.
+    expect(read(page), `${page} renders money without declaring its source`).toMatch(
+      /source={|SourceNotice/,
+    );
   });
 });
 
@@ -166,13 +202,13 @@ describe('the home screen keeps its hierarchy', () => {
     expect(home).not.toContain('budget.lines');
     expect(home).toContain('copy.food.title');
   });
-
-  test('actions that cannot yet save are shown as planned, not as broken buttons', () => {
-    // A greyed-out control that looks like a production action reads as broken
-    // software. A labelled "בקרוב" chip reads as a plan.
-    expect(home).toContain('SoonChip');
-    expect(home).toContain('copy.states.soonUpdates');
-    expect(home, 'no disabled control should reach the daily screen').not.toContain('disabled');
+  test('every quick action on the home screen opens a working screen', () => {
+    // These were "בקרוב" chips while there was nothing to save into. There is
+    // now, so a chip would be a lie in the other direction.
+    expect(home).not.toContain('SoonChip');
+    expect(home).toContain('href="/entry"');
+    expect(home).toContain('href="/accounts"');
+    expect(home).toContain('href="/upload"');
   });
 });
 

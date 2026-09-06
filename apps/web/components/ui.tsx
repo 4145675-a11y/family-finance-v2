@@ -411,3 +411,227 @@ export function ComingSoon({ title }: { title: string }) {
     </Card>
   );
 }
+
+/**
+ * A link that looks and behaves like a button.
+ *
+ * Deliberately an anchor rather than a button with an onClick: navigation is a
+ * link, and making it one means the middle-click, the long-press and the
+ * screen-reader announcement all work without any code.
+ */
+export function LinkButton({
+  href,
+  children,
+  tone = 'primary',
+  className = '',
+}: {
+  href: string;
+  children: ReactNode;
+  tone?: 'primary' | 'secondary';
+  className?: string;
+}) {
+  const styles =
+    tone === 'primary'
+      ? 'bg-primary text-surface hover:bg-primary-hover'
+      : 'border border-border-interactive bg-surface text-text-primary hover:bg-surface-muted';
+
+  return (
+    <a
+      href={href}
+      className={`inline-flex min-h-11 items-center justify-center rounded-control px-4 py-2 font-medium transition-colors ${styles} ${className}`}
+    >
+      {children}
+    </a>
+  );
+}
+
+/**
+ * A statement that needs to be noticed without being alarming.
+ *
+ * `role="note"` rather than `role="alert"`: an alert interrupts a screen-reader
+ * user mid-sentence, and almost nothing on these screens earns that. The one
+ * thing that does — a form's result — is announced by the form itself.
+ */
+export function Notice({
+  tone = 'neutral',
+  title,
+  children,
+}: {
+  tone?: Tone;
+  title?: string;
+  children: ReactNode;
+}) {
+  const styles: Record<Tone, string> = {
+    neutral: 'border-border bg-surface-muted/60',
+    primary: 'border-primary/30 bg-primary/5',
+    success: 'border-success/35 bg-success/5',
+    attention: 'border-attention/40 bg-attention/5',
+    danger: 'border-danger/40 bg-danger/5',
+  };
+
+  return (
+    <aside role="note" className={`rounded-control border px-4 py-3 ${styles[tone]}`}>
+      {title === undefined ? null : (
+        <p className={`font-semibold ${TONE_TEXT[tone]}`}>{title}</p>
+      )}
+      <div className={`text-small ${title === undefined ? '' : 'mt-1'} text-text-secondary`}>
+        {children}
+      </div>
+    </aside>
+  );
+}
+
+/**
+ * A table that becomes a list of cards on a phone.
+ *
+ * A financial table has four to six columns, and on a 360px screen those either
+ * scroll sideways — which UX-RTL-001 forbids for the page and which nobody does
+ * for a table either — or stack. They stack: each row becomes a card with the
+ * column names as labels, which is readable with a thumb.
+ */
+export function DataTable({
+  caption,
+  columns,
+  rows,
+}: {
+  caption: string;
+  columns: readonly string[];
+  rows: readonly { key: string; cells: readonly ReactNode[] }[];
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-0 border-collapse text-start">
+        <caption className="sr-only">{caption}</caption>
+        <thead className="hidden sm:table-header-group">
+          <tr className="border-b border-border">
+            {columns.map((column) => (
+              <th
+                key={column}
+                scope="col"
+                className="px-2 py-2 text-start text-small font-semibold text-text-secondary"
+              >
+                {column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="flex flex-col gap-3 sm:table-row-group sm:gap-0">
+          {rows.map((row) => (
+            <tr
+              key={row.key}
+              className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3 sm:table-row sm:border-0 sm:border-b sm:border-border sm:bg-transparent sm:p-0"
+            >
+              {row.cells.map((cell, index) => (
+                <td
+                  key={columns[index] ?? String(index)}
+                  className="flex items-baseline justify-between gap-3 px-0 py-0.5 sm:table-cell sm:px-2 sm:py-2.5"
+                >
+                  <span className="text-small text-text-secondary sm:hidden">
+                    {columns[index]}
+                  </span>
+                  <span className="min-w-0 text-end sm:text-start">{cell}</span>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** How far through something the household is, as a bar plus the words. */
+export function Meter({
+  label,
+  done,
+  total,
+  caption,
+}: {
+  label: string;
+  done: number;
+  total: number;
+  caption: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="font-medium">{label}</span>
+        <span className="text-small text-text-secondary">{caption}</span>
+      </div>
+      <ProgressBar
+        value={done}
+        max={Math.max(total, 1)}
+        tone={done >= total ? 'success' : 'primary'}
+        label={caption}
+      />
+    </div>
+  );
+}
+
+/**
+ * A short list of destinations, for a screen that is a hub.
+ *
+ * Rendered as a list of links rather than tabs: these are pages, they have URLs,
+ * and a person who bookmarks "the budget" should get the budget.
+ */
+export function LinkList({
+  items,
+}: {
+  items: readonly { href: string; title: string; description: string }[];
+}) {
+  return (
+    <ul className="grid gap-3 sm:grid-cols-2">
+      {items.map((item) => (
+        <li key={item.href}>
+          <a
+            href={item.href}
+            className="flex min-h-11 flex-col justify-center rounded-card border border-border bg-surface p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
+          >
+            <span className="font-semibold text-primary">{item.title}</span>
+            <span className="mt-1 text-small text-text-secondary">{item.description}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * What a screen shows before the household has anything in it.
+ *
+ * An empty state with a way forward, not an apology. The difference matters most
+ * on the first day, which is the only day every family has in common.
+ */
+export function EmptyPrompt({
+  title,
+  body,
+  actionHref,
+  actionLabel,
+}: {
+  title: string;
+  body: string;
+  actionHref?: string;
+  actionLabel?: string;
+}) {
+  return (
+    <Card title={title} tone="neutral">
+      <p className="text-text-secondary">{body}</p>
+      {actionHref !== undefined && actionLabel !== undefined ? (
+        <div className="mt-4">
+          <LinkButton href={actionHref}>{actionLabel}</LinkButton>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+/** A quiet label for a row's state: pending, included, approved. */
+export function StateChip({
+  children,
+  tone = 'neutral',
+}: {
+  children: ReactNode;
+  tone?: Tone;
+}) {
+  return <Badge tone={tone}>{children}</Badge>;
+}

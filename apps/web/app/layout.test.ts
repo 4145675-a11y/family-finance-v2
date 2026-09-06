@@ -1,11 +1,17 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 
-import { NAV_ITEMS } from '../components/app-shell';
+import { NAV_GROUPS, NAV_ITEMS, PHONE_NAV } from '../components/app-shell';
 import { copy } from '../lib/copy/copy';
 import { Badge, EmptyState, Figure, Money, StatRow } from '../components/ui';
 import RootLayout, { metadata, viewport } from './layout';
+
+const WEB_ROOT = fileURLToPath(new URL('../', import.meta.url));
 
 /**
  * The rendered document shell and the presentational pieces every screen uses.
@@ -97,19 +103,29 @@ describe('presentational pieces', () => {
 });
 
 describe('navigation', () => {
-  test('lists the five destinations 03-UX-SPEC.md names', () => {
-    expect(NAV_ITEMS.map((item) => item.href)).toEqual([
+  test('every destination in the sidebar is a real screen', () => {
+    for (const item of NAV_ITEMS) {
+      const route = item.href === '/' ? 'page.tsx' : `${item.href.slice(1)}/page.tsx`;
+      expect(existsSync(join(WEB_ROOT, 'app', route)), `${item.href} has no page`).toBe(true);
+    }
+  });
+
+  test('the phone bar carries five destinations, and they are the daily ones', () => {
+    expect(PHONE_NAV.map((item) => item.href)).toEqual([
       '/',
+      '/entry',
       '/approvals',
-      '/activity',
       '/budget',
       '/more',
     ]);
   });
 
-  test('each destination declares whether it is a working screen today', () => {
-    const ready = NAV_ITEMS.filter((item) => item.ready).map((item) => item.href);
-    expect(ready).toEqual(['/', '/budget', '/more']);
+  test('the sidebar groups the rest rather than listing twenty links flat', () => {
+    expect(NAV_GROUPS.length).toBeGreaterThanOrEqual(2);
+    for (const group of NAV_GROUPS) {
+      expect(group.title.length).toBeGreaterThan(0);
+      expect(group.items.length).toBeGreaterThan(0);
+    }
   });
 
   test('every destination has a Hebrew label', () => {

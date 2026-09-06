@@ -1,3 +1,4 @@
+import { stripXmlForbiddenCharacters } from './text-safety';
 import { writeZip, type ZipFile } from './zip-write';
 
 /**
@@ -27,19 +28,20 @@ export interface WriteSheet {
   readonly rows: readonly (readonly WriteCellValue[])[];
 }
 
-/** Escapes text for XML content. */
+/**
+ * Escapes text for XML content.
+ *
+ * Characters XML 1.0 cannot carry are dropped first. A workbook containing one is
+ * refused outright by every spreadsheet application, so an export missing a byte
+ * nobody could see is strictly better than one that will not open.
+ */
 function escapeXml(text: string): string {
-  return (
-    text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;')
-      // Control characters are not legal in XML 1.0 at all.
-      // eslint-disable-next-line no-control-regex -- stripping them is the point
-      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
-  );
+  return stripXmlForbiddenCharacters(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 /** Zero-based column index to a spreadsheet column name: 0 → A, 26 → AA. */

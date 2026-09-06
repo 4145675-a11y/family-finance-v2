@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="הכסף שלנו">
+  <!--
+    The product mark, drawn rather than photographed: a roof over a coin — a
+    household, and the money inside it. The same shape as the <Mark> component in
+    components/ui.tsx, at icon scale with the brand background behind it.
+  -->
+  <rect width="512" height="512" rx="96" fill="#1e4f73"/>
+  <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M118 222 256 114l138 108"/>
+    <path d="M150 248v146a32 32 0 0 0 32 32h148a32 32 0 0 0 32-32V248"/>
+    <circle cx="256" cy="318" r="56"/>
+  </g>
+</svg>
