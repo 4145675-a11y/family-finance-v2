@@ -18,7 +18,7 @@
 | Lint | `npm run lint` | כן | 1 | ✅ |
 | Build | `npm run build` | כן | 1 | ✅ |
 | Client-secret boundary | `npm run check:client-secrets` | כן | 2 | ✅ |
-| Built shell (Hebrew RTL) | `npm run check:shell` | כן | 1 | ✅ |
+| Built shell (Hebrew RTL, landmarks, manifest) | `npm run check:shell` | כן | 1/7 | ✅ |
 | Manual bundle up to date | `npm run db:check` | כן | 3 | ✅ |
 | Integration + RLS negative | `npm run integration` | כן | 2 | — (חסום: דורש חיבור DB; ראה checkpoint M2) |
 | Property | `npm run property` | כן | 5 | ✅ (רץ מקומית; אין remote) |

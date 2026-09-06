@@ -66,3 +66,11 @@
 1. `UX-DEBT-001` אינו מוקצה. המטריצה המקורית פותחת ב־`UX-DEBT-002`. המזהה שמור ואינו יוקצה מחדש לדרישה אחרת.
 2. מסמכי `04-DESIGN-SYSTEM.md`, `05-ARCHITECTURE-DATA.md`, `07-SECURITY-PRIVACY.md`, `08-TEST-PLAN.md` ו־`11-OPERATIONS.md` נושאים דרישות מחייבות ללא תוויות מזהה בגוף הטקסט. חמישה מזהים מהם כבר נרשמו כאן דרך המטריצה (`SEC-RLS-001`, `OFF-SYNC-001`, `IMP-DRAFT-001`, `AI-TOOL-001`, ובעקיפין `UX-STATE-001`). שאר הדרישות באותם מסמכים יקבלו מזהים ב־milestone שמממש אותן, לפי כלל ההרחבה למעלה. Milestone 0 לא המציא דרישות חדשות ולא שינה טקסט סמכותי.
 3. אין מסמך במספר `06`. הרצף `05` → `07` עקבי בין README, פרומפט ה־bootstrap ורשימת הקבצים בפועל, ולכן זהו פער מספור ולא קובץ חסר.
+| `LOCAL-STORE-001` | מקור אמת מקומי בעל גרסת פורמט, נכתב אטומית, עם audit append-only | 05-ARCHITECTURE-DATA.md § גבולות | 7 | Verified (M7) — ADR-0024; 85 בדיקות ב־packages/local-store |
+| `LOCAL-BACKUP-001` | גיבוי מקומי עם checksum, תצוגה מקדימה לפני שחזור, ודחייה מנומקת של קובץ פגום | 11-OPERATIONS.md § גיבוי | 7 | Verified (M7) — ADR-0024 |
+| `IMP-PARSE-001` | קריאת xlsx, csv ו־PDF טקסטואלי מקומית, עם provenance לכל שורה | 05-ARCHITECTURE-DATA.md § Imports | 7 | Verified (M7) — ADR-0025 |
+| `IMP-SAFETY-001` | חתימת קובץ, גבולות פריסה, איסור מאקרו ונוסחאות, ואיסור בניית נתיב משם שהמשתמש נתן | 07-SECURITY-PRIVACY.md § Uploads | 7 | Verified (M7) — ADR-0025 |
+| `IMP-APPROVE-001` | שום הצעת יבוא אינה משנה יתרה, תקציב, חוב או תחזית לפני אישור מפורש; היפוך אפשרי | 05-ARCHITECTURE-DATA.md § Imports | 7 | Verified (M7) |
+| `ENTRY-MANUAL-001` | הזנה ידנית מלאה: חשבון, יתרה, הוצאה, הכנסה, העברה, פריט צפוי, חוב, תשלום חוב, גלגול, תקציב, משימה | 01-PRODUCT-SPEC.md § Must | 7 | Verified (M7) |
+| `REP-EXPORT-001` | דוחות מקומיים עם תקופה, חותמת זמן והפרדה בין מאושר לממתין; ייצוא xlsx ו־CSV | 05-ARCHITECTURE-DATA.md § Reports | 7 | Verified (M7) — ADR-0026; PDF דרך הדפסת הדפדפן |
+| `PWA-INSTALL-001` | manifest, אייקונים ו־service worker שאינו מגיש מסך פיננסי מהמטמון | 05-ARCHITECTURE-DATA.md § Offline | 7 | Verified (M7) |

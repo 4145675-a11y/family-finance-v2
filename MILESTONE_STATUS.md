@@ -2,17 +2,22 @@
 
 מצב הפרויקט מול `09-MILESTONES.md`. מתעדכן בסוף כל milestone, לפני העצירה לאישור.
 
-- **תאריך עדכון אחרון**: 2026-08-23
-- **Milestone פעיל**: 6b — Product & UX Refinement
-- **סטטוס**: **מוצר מקומי פעיל, בשפה פשוטה ובעיצוב מחודש.** מסך בית יומי, מסך תקציב עם הנחיה שבועית לאוכל, ומסכי חקירה מלאים. **המיגרציות עדיין לא הוחלו על שום מסד** — ראה חסמים.
-- **Branch**: `milestone-2-identity-isolation` — M2 עד M6b נבנו עליו. אין remote ולא בוצע push.
+- **תאריך עדכון אחרון**: 2026-09-06
+- **Milestone פעיל**: 7 — Local Product
+- **סטטוס**: **מוצר מקומי שלם ושמיש.** משפחה יכולה להקים משק בית, להזין הכול ידנית, להעלות
+  קובץ בנק, לעבור עליו ולאשר, לראות תמונה יומית, לנהל תקציב וחובות, להפיק דוחות, לייצא
+  ולגבות — הכול על המחשב הזה, בלי שום חשבון חיצוני. **המיגרציות עדיין לא הוחלו על שום מסד**
+  ובדיקות הבידוד עדיין לא הורצו — ראה חסמים.
+- **Branch**: `milestone-2-identity-isolation` — **השם מיושן.** M2 עד M7 נבנו עליו. אין
+  remote ולא בוצע push.
 - **מוזג ל־`main`**: Milestone 0 ו־Milestone 1 בלבד.
 
 ## מקרא
 
 `Not started` · `In progress` · `Complete — evidenced` · `Blocked`
 
-אין `Complete` בלי דוח Checkpoint עם פקודות שהורצו ותוצאות. אין `Complete` חלקי — milestone שלא הושלם במלואו נשאר `In progress` עם רשימת פערים.
+אין `Complete` בלי דוח Checkpoint עם פקודות שהורצו ותוצאות. אין `Complete` חלקי — milestone
+שלא הושלם במלואו נשאר `In progress` עם רשימת פערים.
 
 ## טבלת מצב
 
@@ -21,80 +26,75 @@
 | 0 | Bootstrap | **Complete — evidenced** | [milestone-0](docs/checkpoints/milestone-0.md) | 4 שערים, 5 ADRs, 23 דרישות |
 | 1 | Repository Foundation | **Complete — evidenced** | [milestone-1](docs/checkpoints/milestone-1.md) | 9 שערים, 88 בדיקות |
 | 2 | Identity & Isolation | **In progress — blocked** | [milestone-2](docs/checkpoints/milestone-2.md) | קוד, migrations, RLS ו־24 בדיקות בידוד; **החלה חסומה** |
-| 3 | Financial Accounts & Opening Picture | **In progress — blocked** | [milestone-3](docs/checkpoints/milestone-3.md) | 7 טבלאות + RLS + חוזים נבדקו; **מיגרציה לא הוחלה** |
-| 4 | Debt Domain | **In progress — blocked** | [milestone-4](docs/checkpoints/milestone-4.md) | 3 טבלאות, טריגר אימות גלגולים; **מיגרציה לא הוחלה** |
-| 5 | Finance Engine | **Complete — evidenced** | [milestone-5](docs/checkpoints/milestone-5.md) | 13 מודולים, 206 unit + 24 property; טהור, ללא תלות במסד |
-| 6 | Dashboard Source of Truth | **In progress** | [milestone-6](docs/checkpoints/milestone-6.md) | 4 מסכים רצים; נתוני הדגמה בלבד; axe/RTL visual לא הורצו |
-| 6b | Product & UX Refinement | **In progress** | [milestone-6b](docs/checkpoints/milestone-6b-product-refinement.md) | שפה פשוטה, מסך יומי, תקציב ואוכל שבועי, עיצוב מחודש; נגישות בדפדפן לא נמדדה |
-| 7 | PWA & Offline | Not started | — | |
-| 8 | Imports & Approval Inbox | Not started | — | |
-| 9 | OCR/Voice/Email Adapters | Not started | — | דורש credentials |
-| 10 | Budget & Sinking Funds | Not started | — | שלבים 8 ו־10 במפל תובעים 0 עד אז |
-| 11 | Business & Safe Transfer | Not started | — | נוסחאות קיימות במנוע; זרימת אישור חסרה |
+| 3 | Financial Accounts & Opening Picture | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | החוזים נבדקו ב־M3; **התמונה הפותחת עובדת בפועל מ־M7** מעל החנות המקומית |
+| 4 | Debt Domain | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | אירועי חוב, גלגולים ומד נטו עובדים על נתונים אמיתיים; **המיגרציה עצמה לא הוחלה** |
+| 5 | Finance Engine | **Complete — evidenced** | [milestone-5](docs/checkpoints/milestone-5.md) | 13 מודולים; טהור, ללא תלות במסד |
+| 6 | Dashboard Source of Truth | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | המסכים קוראים נתונים אמיתיים; fixture הפיתוח נשאר fail-closed |
+| 6b | Product & UX Refinement | **Complete — evidenced** | [milestone-6b](docs/checkpoints/milestone-6b-product-refinement.md) | שפה פשוטה, מסך יומי, עיצוב |
+| **7** | **Local Product** | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | **חנות מקומית, יבוא מסמכים, אישור, דוחות, גיבוי, PWA** |
+| 8 | Imports & Approval Inbox | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | הוקדם ל־M7; `IMP-DRAFT-001` מאומת |
+| 9 | OCR/Voice/Email Adapters | **Blocked** | — | ממשק `OcrProvider` קיים ומסרב; דורש credentials |
+| 10 | Budget & Sinking Funds | **In progress** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | תקציב עובד; קרנות ומטרות (שלבי מפל 8 ו־10) עדיין תובעים 0 |
+| 11 | Business & Safe Transfer | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | חישוב, מסך והעברה שנרשמת בשני צדדים ומתאפסת מאוחד |
 | 12 | Debt Plan & Advisor | Not started | — | דורש AI credentials |
-| 13 | Summaries, Notifications & Reports | Not started | — | |
+| 13 | Summaries, Notifications & Reports | **In progress** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | דוחות וייצוא קיימים; התראות מקומיות בלבד |
 | 14 | Hardening & Production | Not started | — | דורש החלטת אירוח ו־RPO/RTO |
 
 ## שערי איכות — מצב נוכחי
 
-הרצה אחת של `npm run verify`, exit 0 אמיתי, 2026-08-23.
+הרצה אחת של `npm run verify`, exit 0 אמיתי, 2026-09-06.
 
 | שער | סטטוס | ראיה |
 |---|---|---|
 | Install | Active | `npm ci --ignore-scripts`, 0 vulnerabilities |
 | Format | Active | `prettier --check .`, exit 0 |
-| Typecheck | Active | שורש + 4 workspaces |
+| Typecheck | Active | שורש + 6 workspaces |
 | Lint | Active | `--max-warnings=0`, type-aware |
-| Unit | Active | **801/801**, 30 קבצים, 0 מדולגות |
-| **Property** | **Active מ־M5** | **35/35**, seed קבוע 20260823, 300 runs לכל property |
-| Build | Active | 9 routes, כולן prerendered |
-| Built-shell | Active | 8/8 על ה־HTML הבנוי |
-| Client-secret boundary | Active | 16 מודולים + 12 קבצי bundle, 0 ממצאים |
+| **Unit** | Active | **1173/1173**, 39 קבצים, 0 מדולגות (מ־839) |
+| **Property** | Active | **35/35**, seed קבוע, 300 runs לכל property |
+| Build | Active | 21 מסלולים |
+| **Built-shell** | Active | **14/14 מול השרת הרץ** — 5 מסלולים, משק בית מוזרע (`ADR-0027`) |
+| Client-secret boundary | Active | 0 ממצאים |
 | Manual bundle | Active | 10 מיגרציות, תואם למקורות (`ADR-0019`) |
-| Forbidden scan | Active | 108 קבצים, 0 errors |
-| Traceability | Active | 38/38 |
+| Forbidden scan | Active | 177 קבצים, 0 errors |
+| Traceability | Active | 46/46 |
 | Integration / RLS | Defined, **חסום** | דורש `SUPABASE_DB_URL` — 24 בדיקות בידוד ממתינות |
-| E2E / axe / RTL visual | Defined, לא פעיל | Milestone ייעודי; Playwright לא מותקן |
+| E2E / axe אוטומטי | Defined, לא פעיל | Playwright לא מותקן; ביקורת מבנית הורצה במקום ומוצהרת ככזו |
 
 ## פערים פתוחים
 
 | # | פער | השפעה | טיפול |
 |---:|---|---|---|
-| 1 | דרישות ב־`04`, `05`, `07`, `08`, `11` ללא תוויות מזהה | traceability חלקי מחוץ ל־38 המזהים הרשומים | כל milestone רושם מזהים למה שהוא מממש — `ADR-0004` |
+| 1 | דרישות ב־`04`, `05`, `07`, `08`, `11` ללא תוויות מזהה | traceability חלקי מחוץ ל־46 המזהים הרשומים | כל milestone רושם מזהים למה שהוא מממש — `ADR-0004` |
 | 2 | `UX-DEBT-001` אינו מוקצה | אין | המזהה שמור |
 | 3 | אין git remote | CI לא רץ בפועל | אותם שערים רצים מקומית |
-| 4 | overflow לא נמדד בפיקסלים ב־360/390/768/1280 | `UX-RTL-001` מאומת מבנית בלבד | Playwright; מוצהר NOT RUN |
-| 5 | axe ומקלדת לא הורצו על המסכים החדשים | `UX-A11Y-001` חלקי | אותו milestone |
-| 6 | גופני Assistant/Heebo לא מוטמעים | טקסט עברי נופל לגופן מערכת | milestone עיצוב |
-| 7 | `.nvmrc` נועל Node 24.18.1; המכונה מריצה 24.19.0 | CI ירוץ על גרסה אחרת מהמקומית | נדרשת החלטה; לא שונה בלי ADR |
-| 8 | `UX-STATE-001` חלקי | offline/queued/conflict חסרים; empty/incomplete/stale/demo קיימים | Milestone 7 |
-| 9 | שלבים 8 ו־10 במפל תובעים 0 | אין קרנות ומטרות | Milestone 10; השלבים מוצגים ריקים ולא מוסתרים |
-| 10 | כפתורי העדכון המהיר מושבתים | אין שכבת שמירה מאומתת | מופעלים עם המסד; הכפתור אומר למה הוא כבוי |
-| 11 | נגישות לא נמדדה בדפדפן | `UX-A11Y-001` חלקי | axe ומקלדת דורשים Playwright; מוצהר NOT RUN |
+| 4 | axe ומקלדת אוטומטיים לא הורצו | `UX-A11Y-001` חלקי | ביקורת מבנית על 17 מסלולים × 4 רוחבים הורצה; axe דורש Playwright |
+| 5 | גופני Assistant/Heebo לא מוטמעים | טקסט עברי נופל לגופן מערכת | milestone עיצוב; קשור ל־`ADR-0026` |
+| 6 | `.nvmrc` נועל Node 24.18.1; המכונה מריצה 24.19.0 | CI ירוץ על גרסה אחרת מהמקומית | נדרשת החלטה; לא שונה בלי ADR |
+| 7 | `UX-STATE-001` כמעט מלא | offline קיים; queued/conflict אינם רלוונטיים בלי סנכרון | ייפתח כשיהיה שרת משותף |
+| 8 | שלבים 8 ו־10 במפל תובעים 0 | אין קרנות ומטרות | Milestone 10; השלבים מוצגים ריקים ולא מוסתרים |
+| 9 | אין הצפנה במנוחה | הקובץ מוגן בהרשאות מערכת ההפעלה בלבד | נאמר במסך הפרטיות; ייבחן ב־M14 |
+| 10 | תהליך אחד בלבד | התור מגן מפני בקשות מקבילות, לא מפני שני תהליכים | מקובל למוצר מקומי; המסד פותר |
 
 ## חסמים שדורשים פעולה או החלטה שלך
 
 | Milestone | מה נדרש | למה קלוד לא יכול להשיג זאת |
 |---:|---|---|
-| 2–4 | החלת המיגרציות + `SUPABASE_DB_URL` להרצת בדיקות הבידוד | סיסמת מסד. חשבון חיצוני וסודות; Docker אינו זמין במכונה |
-| 9 | Gmail OAuth, ספק OCR | חשבונות חיצוניים |
+| 2–4 | החלת המיגרציות + `SUPABASE_DB_URL` להרצת בדיקות הבידוד | סיסמת מסד. חשבון חיצוני; Docker אינו זמין במכונה |
+| 9 | ספק OCR, Gmail OAuth | חשבונות חיצוניים; שליחת מסמך החוצה היא החלטה שלכם |
 | 12 | מפתח API של ספק AI | סוד חיצוני |
 | 14 | תוכנית אירוח, RPO/RTO, אנשי קשר | החלטה עסקית |
 
-## הצעד הבא
+**המוצר אינו ממתין לאף אחד מאלה.** הוא עובד במלואו ידנית, היום.
 
-שלוש פעולות מקומיות שלך, ללא שיתוף ערכים בצ׳אט:
-
-1. `npm run db:copy:diagnostic` → חלון SQL **חדש וריק** → הרץ פעם אחת → מסור את טבלת EXISTS/missing.
-2. `npm run db:copy:schema` → חלון חדש וריק → הרץ פעם אחת. עשר המיגרציות, טרנזקציה אחת, בטוח להרצה חוזרת.
-3. צור `.env.integration.local` עם `SUPABASE_DB_URL`, הרץ `npm run integration`, ומסור **סיכום בלבד**.
-
-לאחר מכן אתקן כשלים אמיתיים ואסגור את M2–M4 ל־PASS או אדווח מה לא מחזיק.
-
-## לצפייה במוצר המקומי
+## לצפייה במוצר
 
 ```
-npm run dev -- --hostname 127.0.0.1
+npm run dev -- --hostname 127.0.0.1 --port 3100
 ```
 
-עם `NEXT_PUBLIC_DEV_DATA_SOURCE=on` ב־`apps/web/.env.local`. השרת מאזין על 127.0.0.1 בלבד. בלי הדגל המסכים יציגו "אין כרגע מקור נתונים" — וזו התנהגות נכונה, לא תקלה.
+השרת מאזין על 127.0.0.1 בלבד. בכניסה ראשונה המסכים מציעים להקים משק בית; משם הכול נשמר
+ב־`.data/` בשורש הפרויקט.
+
+`NEXT_PUBLIC_DEV_DATA_SOURCE=on` ב־`apps/web/.env.local` מפעיל את fixture הפיתוח — **רק**
+כשאין משק בית, ורק בבנייה שאינה ייצור. משק בית אמיתי גובר עליו תמיד.

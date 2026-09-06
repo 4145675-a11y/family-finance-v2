@@ -36,3 +36,7 @@
 | [0021](0021-daily-dashboard-versus-detail-screens.md) | מסך יומי מול מסכי חקירה | Accepted | 6b |
 | [0022](0022-plain-hebrew-copy-layer.md) | המנוע מחזיר קודים; העברית נמצאת בשכבה אחת | Accepted | 6b |
 | [0023](0023-deterministic-budget-and-food-week.md) | תקציב חודשי והנחיה שבועית לאוכל כדומיין דטרמיניסטי | Accepted | 6b |
+| [0024](0024-local-store-before-the-database.md) | חנות מקומית מבוססת קובץ כמקור האמת עד שיש מסד מאומת | Accepted | 7 |
+| [0025](0025-document-parsers-written-not-installed.md) | קוראי המסמכים נכתבים ולא מותקנים | Accepted | 7 |
+| [0026](0026-pdf-export-through-the-browser.md) | ייצוא PDF דרך הדפסת הדפדפן, לא דרך מחולל בשרת | Accepted | 7 |
+| [0027](0027-shell-gate-runs-against-the-server.md) | שער ה־shell נבדק מול השרת הרץ | Accepted | 7 |

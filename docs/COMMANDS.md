@@ -30,7 +30,7 @@ Package manager: **npm**, נעול לפי `ADR-0001`. אין להחליף בלי
 | 13 | integration | `npm run integration` → `vitest run --config vitest.integration.config.ts` (כולל RLS negative tests) | Integration/RLS | 2 | **Active** — נכשל במכוון ללא `SUPABASE_DB_URL` |
 | 14 | E2E | `npm run e2e` → `playwright test` | E2E | 6 | Defined |
 | 15 | a11y/visual | `npm run a11y` → axe + RTL golden snapshots ב־360/390/768/1280 | Accessibility/RTL | 6 | Defined |
-| 16 | built shell | `npm run check:shell` → `node tools/check-built-shell.mjs` | Hebrew RTL על הפלט הבנוי | 1 | **Active** |
+| 16 | built shell | `npm run check:shell` → `node tools/check-built-shell.mjs` | Hebrew RTL, landmarks ו־manifest **על השרת הרץ** (`ADR-0027`) | 1/7 | **Active** |
 | 17 | client secrets | `npm run check:client-secrets` → `node tools/check-client-secrets.mjs` | גבול service role | 2 | **Active** |
 | 18 | manual bundle | `npm run db:build` / `db:check` → `node tools/build-manual-bundle.mjs [--check]` | חבילת ההחלה תואמת למיגרציות | 3 | **Active** |
 | 19 | copy SQL | `npm run db:copy:diagnostic` · `npm run db:copy:schema` → `node tools/copy-sql.mjs <file>` | — (כלי החלה ידנית) | 2 | **Active** |

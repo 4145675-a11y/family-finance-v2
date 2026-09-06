@@ -44,3 +44,11 @@
 | UX-COPY-001 | UX | copy layer + tone gate | unit | 6b | **Verified in M6b** — 31 בדיקות; כל כלל נורה על fixture |
 | FIN-BUDGET-001 | Financial | calculateBudget + budget tables | unit/property/migration | 6b | **Verified in M6b** — 24 unit + 6 property; **מיגרציה לא הוחלה** |
 | FIN-FOODWEEK-001 | Financial | calculateFoodWeek | unit/property | 6b | **Verified in M6b** — 28 unit + 4 property |
+| LOCAL-STORE-001 | Architecture | packages/local-store | unit/atomicity | 7 | **Verified in M7** — כתיבה ב־rename, תור כתיבות, ולידציה לפני כתיבה, revision ישן נדחה |
+| LOCAL-BACKUP-001 | Operations | packages/local-store/src/backup.ts | unit/negative | 7 | **Verified in M7** — שישה סוגי דחייה בשמם; הסיכום מחושב מהנתונים ולא נקרא מהקובץ |
+| IMP-PARSE-001 | Architecture | packages/document-import | unit/fixture | 7 | **Verified in M7** — 107 בדיקות; גיליון, עמוד ושורה נשמרים לכל הצעה |
+| IMP-SAFETY-001 | Security | document-import/limits + signature + zip | negative/unit | 7 | **Verified in M7** — פצצת דחיסה, מאקרו, XXE, הרצה בשם csv, ‎.xls בינארי — כולם נדחים בשמם |
+| IMP-APPROVE-001 | Architecture | local-store/src/imports.ts | integration/negative | 7 | **Verified in M7** — 30 בדיקות; אישור כפול נדחה, היפוך אינו נוגע במה שהוזן ידנית |
+| ENTRY-MANUAL-001 | Product | apps/web/app/entry + accounts + debts | unit/browser | 7 | **Verified in M7** — אותו מנתח סכומים לטופס ולקובץ; כל שדה נבדק ב־forms.test.ts |
+| REP-EXPORT-001 | Architecture | apps/web/lib/reports + api/export | unit/roundtrip | 7 | **Verified in M7** — יבוא ממתין אינו בשום סכום; ה־workbook נקרא חזרה עם הסכומים במדויק |
+| PWA-INSTALL-001 | Architecture | apps/web/app/manifest + public/service-worker.js | unit/source | 7 | **Verified in M7** — ניווט תמיד לרשת; אין push ואין background sync שאין להם שרת |
