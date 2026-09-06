@@ -14,7 +14,7 @@ import {
   reviewProposal,
   stageExtraction,
 } from './imports';
-import { balanceOf, isRealTransaction } from './projection';
+import { balanceOf, isRealTransaction, pendingImportRowCount } from './projection';
 import { viewOf } from './store';
 
 /**
@@ -93,9 +93,27 @@ describe('nothing crosses into the truth before approval', () => {
     expect(after.budget?.totals.approvedMinor).toBe(before.budget?.totals.approvedMinor);
   });
 
-  test('the pending count does rise, so the picture says it is incomplete', () => {
+  test('the rows are counted as waiting, in their own right', () => {
+    expect(pendingImportRowCount(staged.document)).toBe(3);
+  });
+
+  test('but they are not counted as unapproved transactions', () => {
+    /*
+     * The engine scores the approval backlog against the transaction count. A
+     * staged proposal is not a transaction and is not in that denominator;
+     * counting it there subtracted one population from another, and a household
+     * that uploaded a statement watched the safe-spend answer disappear before
+     * approving anything.
+     */
     const after = viewOf(staged.document, TEST_NOW);
-    expect(after.input.dataQuality.pendingApprovalCount).toBe(3);
+    expect(after.input.dataQuality.pendingApprovalCount).toBe(0);
+  });
+
+  test('and the answer the family already had does not disappear', () => {
+    const before = viewOf(seeded.document, TEST_NOW);
+    const after = viewOf(staged.document, TEST_NOW);
+    expect(after.snapshot.decision.status).toBe(before.snapshot.decision.status);
+    expect(after.snapshot.quality.confidence).toBe(before.snapshot.quality.confidence);
   });
 });
 

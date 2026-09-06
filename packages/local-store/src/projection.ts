@@ -354,14 +354,21 @@ function dataQuality(document: StoreDocument, periodStart: string): DataQualityI
       isRealTransaction(transaction) && transaction.transactionDate >= periodStart,
   );
 
-  const pendingApprovalCount =
-    document.transactions.filter(isPendingTransaction).length +
-    document.importProposals.filter((proposal) => {
-      const batch = document.importBatches.find(
-        (candidate) => candidate.id === proposal.batchId,
-      );
-      return batch !== undefined && batch.status === 'needs_review';
-    }).length;
+  /*
+   * Drafts only, and deliberately.
+   *
+   * The engine scores the approval backlog as a ratio against
+   * `recentTransactionCount` — how many of the household's transactions are still
+   * unapproved. A staged import proposal is not a transaction: it lives outside
+   * the truth entirely and is not in that denominator. Counting it here subtracted
+   * one population from another, and a family who uploaded a statement watched the
+   * safe-spend answer disappear before they had approved anything.
+   *
+   * The import backlog is real information and it is not lost — it is what the
+   * approvals screen is for, and the home screen says when a file is waiting. What
+   * it must not do is pretend to be a proportion of something it is not part of.
+   */
+  const pendingApprovalCount = document.transactions.filter(isPendingTransaction).length;
 
   const unclassifiedCashMinor = recent
     .filter(
@@ -518,6 +525,22 @@ export function toEngineInput(
     debtBaseline: debtBaseline(document, periodStart),
     dataQuality: dataQuality(document, periodStart),
   };
+}
+
+/**
+ * Import rows still waiting for a person.
+ *
+ * Counted as what they are, and reported separately from the transaction backlog,
+ * because the two are different populations and mixing them made the dashboard
+ * refuse to answer.
+ */
+export function pendingImportRowCount(document: StoreDocument): number {
+  const waiting = new Set(
+    document.importBatches
+      .filter((batch) => batch.status === 'needs_review')
+      .map((batch) => batch.id),
+  );
+  return document.importProposals.filter((proposal) => waiting.has(proposal.batchId)).length;
 }
 
 /** The freshest confirmed balance, in days. `null` when nothing was ever confirmed. */

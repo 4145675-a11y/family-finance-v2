@@ -103,6 +103,15 @@ export const copy = {
     businessNone: 'עוד לא הוגדר עסק',
     businessLink: 'לראות את מצב העסק',
 
+    // A staged import changes no figure on this screen, which is exactly why the
+    // screen has to say it is there. Silence would read as "nothing is waiting".
+    waitingTitle: 'יש מה לבדוק',
+    waitingRows: (rows: number) =>
+      rows === 1
+        ? 'שורה אחת מקובץ שהעליתם ממתינה לבדיקה. היא עדיין לא נכנסה לשום חישוב.'
+        : `${count(rows)} שורות מקובץ שהעליתם ממתינות לבדיקה. הן עדיין לא נכנסו לשום חישוב.`,
+    waitingLink: 'לעבור עליהן',
+
     actionTitle: 'מה כדאי לעשות עכשיו',
     updatesTitle: 'עדכון מהיר',
     moreTitle: 'עוד דברים שאפשר לבדוק',

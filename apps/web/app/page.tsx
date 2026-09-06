@@ -9,11 +9,14 @@ import {
   Hero,
   LinkButton,
   Money,
+  Notice,
   ProgressBar,
   SectionTitle,
   StatCard,
   StatRow,
 } from '../components/ui';
+import { pendingImportRowCount } from '@family-finance/local-store';
+
 import { addTaskAction } from '../lib/actions/entries';
 import { ActionForm, HiddenValue, SelectField } from '../components/form';
 import { NoHousehold } from '../components/screen';
@@ -71,6 +74,9 @@ export default async function HomePage() {
   const cannotCalculate = decision.status === 'insufficient_data';
   const hasGap = safeSpend.fundingGapMinor > 0;
   const showsAmount = !cannotCalculate && safeSpend.resultMinor > 0;
+
+  /** Rows from an uploaded file that nobody has decided about yet. */
+  const waitingRows = document === null ? 0 : pendingImportRowCount(document);
 
   /** Nothing recorded is not the same as nothing owed, and it reads differently. */
   const noDebts = input.debts.length === 0;
@@ -274,6 +280,20 @@ export default async function HomePage() {
           )}
         </Card>
       </div>
+
+      {waitingRows === 0 ? null : (
+        <Notice tone="attention" title={copy.home.waitingTitle}>
+          <p>{copy.home.waitingRows(waitingRows)}</p>
+          <p className="mt-2">
+            <Link
+              href="/approvals"
+              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+            >
+              {copy.home.waitingLink}
+            </Link>
+          </p>
+        </Notice>
+      )}
 
       {/* The four compact daily cards. */}
       <div className="grid gap-4 sm:grid-cols-2">

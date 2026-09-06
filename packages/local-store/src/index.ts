@@ -117,6 +117,7 @@ export {
   isRealTransaction,
   periodEndFor,
   periodKey,
+  pendingImportRowCount,
   periodStartFor,
   startOfWeek,
   toBudgetInput,
