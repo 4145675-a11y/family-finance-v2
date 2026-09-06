@@ -1,5 +1,3 @@
-import 'server-only';
-
 import type { BudgetResult, FinancialSnapshot } from '@family-finance/finance-engine';
 import { balanceOf, isRealTransaction, type StoreDocument } from '@family-finance/local-store';
 
@@ -12,6 +10,11 @@ import { formatMoney } from './format';
  * Nothing is recomputed with a second formula: the report and the dashboard have
  * to agree, and the only way to guarantee that is for them to read the same
  * numbers.
+ *
+ * These are pure functions over a stored document — no filesystem, no request,
+ * nothing that has to run on a server. They are not marked `server-only` for that
+ * reason: the marker belongs on the modules that genuinely reach the disk, and
+ * putting it here would only mean the report logic could not be tested directly.
  *
  * A report includes approved records only. A staged import contributes nothing —
  * not a footnote, not a provisional line — and the count of what is waiting is

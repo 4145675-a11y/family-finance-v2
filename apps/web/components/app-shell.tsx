@@ -132,7 +132,7 @@ export function AppShell({
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <Link
           href="/"
-          className="flex items-center gap-2 rounded-control text-primary transition-colors hover:text-primary-hover"
+          className="flex min-h-11 items-center gap-2 rounded-control text-primary transition-colors hover:text-primary-hover"
         >
           <Mark />
           <span className="text-[18px] font-bold text-text-primary">{copy.app.name}</span>
@@ -147,14 +147,31 @@ export function AppShell({
           aria-label={copy.nav.ariaMain}
           className="hidden shrink-0 flex-col gap-3 rounded-card border border-border bg-surface p-2 shadow-card sm:flex sm:w-44"
         >
-          {NAV_GROUPS.map((group) => (
-            <div key={group.title} className="flex flex-col gap-0.5">
-              <h2 className="px-3 pt-1 text-small font-semibold text-text-secondary">
+          {NAV_GROUPS.map((group, index) => (
+            <div
+              key={group.title}
+              className={`flex flex-col gap-0.5 ${index > 0 ? 'border-t border-border pt-2' : ''}`}
+            >
+              {/*
+                A label for a list, not a section of the document — so it is not a
+                heading. The sidebar renders before `main`, and three `h2`s ahead of
+                the page's own `h1` is an outline that starts in the wrong place.
+                It is set smaller, lighter and letter-spaced so a reader scanning
+                the column can still tell in one glance which lines are clickable.
+              */}
+              <p
+                id={`nav-group-${index}`}
+                className="px-3 pt-0.5 pb-1 text-[12px] font-semibold tracking-[0.06em] text-text-secondary/70"
+              >
                 {group.title}
-              </h2>
-              {group.items.map((item) => (
-                <NavLink key={item.href} item={item} active={item.href === active} />
-              ))}
+              </p>
+              <ul aria-labelledby={`nav-group-${index}`} className="flex flex-col gap-0.5">
+                {group.items.map((item) => (
+                  <li key={item.href} className="flex">
+                    <NavLink item={item} active={item.href === active} />
+                  </li>
+                ))}
+              </ul>
             </div>
           ))}
         </nav>

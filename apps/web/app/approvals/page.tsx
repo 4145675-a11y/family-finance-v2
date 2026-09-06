@@ -146,7 +146,10 @@ export default async function ApprovalsPage() {
         />
         <p className="mt-3 text-small text-text-secondary">{screens.reports.approvedOnly}</p>
         <p className="mt-2">
-          <Link href="/activity" className="text-primary underline underline-offset-4">
+          <Link
+            href="/activity"
+            className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+          >
             {screens.activity.title}
           </Link>
         </p>

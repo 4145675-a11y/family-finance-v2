@@ -63,6 +63,9 @@ export default async function HomePage() {
   const hasGap = safeSpend.fundingGapMinor > 0;
   const showsAmount = !cannotCalculate && safeSpend.resultMinor > 0;
 
+  /** Nothing recorded is not the same as nothing owed, and it reads differently. */
+  const noDebts = input.debts.length === 0;
+
   /** Non-essential household payments still to leave this month — what can move. */
   const movablePayments = input.plannedItems.filter(
     (item) => item.scope === 'household' && item.direction === 'outflow' && !item.essential,
@@ -247,7 +250,10 @@ export default async function HomePage() {
               : copy.food.monthProgress(food.monthSpentMinor, food.monthPlannedMinor)
           }
           footer={
-            <Link className="text-primary underline underline-offset-4" href="/budget">
+            <Link
+              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+              href="/budget"
+            >
               {copy.food.budgetLink}
             </Link>
           }
@@ -276,7 +282,7 @@ export default async function HomePage() {
         <StatCard
           title={copy.home.debtTitle}
           tone={
-            trend === null
+            noDebts || trend === null
               ? 'neutral'
               : trend.consumerDirection === 'down'
                 ? 'success'
@@ -285,38 +291,47 @@ export default async function HomePage() {
                   : 'neutral'
           }
           headline={
-            trend === null
-              ? copy.home.debtFlat
-              : trend.consumerDirection === 'down'
-                ? copy.home.debtDown(-trend.netConsumerChangeMinor)
-                : trend.consumerDirection === 'up'
-                  ? copy.home.debtUp(trend.netConsumerChangeMinor)
-                  : copy.home.debtFlat
+            noDebts
+              ? copy.home.debtNone
+              : trend === null
+                ? copy.home.debtFlat
+                : trend.consumerDirection === 'down'
+                  ? copy.home.debtDown(-trend.netConsumerChangeMinor)
+                  : trend.consumerDirection === 'up'
+                    ? copy.home.debtUp(trend.netConsumerChangeMinor)
+                    : copy.home.debtFlat
           }
           meaning={
-            trend === null
-              ? undefined
-              : trend.consumerDirection === 'down'
-                ? copy.home.debtDownNote
-                : trend.consumerDirection === 'up'
-                  ? copy.home.debtUpNote
-                  : copy.home.debtFlatNote
+            noDebts
+              ? copy.home.debtNoneNote
+              : trend === null
+                ? undefined
+                : trend.consumerDirection === 'down'
+                  ? copy.home.debtDownNote
+                  : trend.consumerDirection === 'up'
+                    ? copy.home.debtUpNote
+                    : copy.home.debtFlatNote
           }
           footer={
-            <Link className="text-primary underline underline-offset-4" href="/debts">
+            <Link
+              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+              href="/debts"
+            >
               {copy.home.debtLink}
             </Link>
           }
         >
-          <StatRow
-            label={copy.home.debtTotalNow}
-            value={
-              <Money
-                amountMinor={snapshot.debtTotals.consumerDebtMinor}
-                currency={snapshot.currency}
-              />
-            }
-          />
+          {noDebts ? null : (
+            <StatRow
+              label={copy.home.debtTotalNow}
+              value={
+                <Money
+                  amountMinor={snapshot.debtTotals.consumerDebtMinor}
+                  currency={snapshot.currency}
+                />
+              }
+            />
+          )}
         </StatCard>
 
         <StatCard
@@ -331,7 +346,10 @@ export default async function HomePage() {
               : copy.home.runsOutOn(forecast.firstFailureDate)
           }
           footer={
-            <Link className="text-primary underline underline-offset-4" href="/forecast">
+            <Link
+              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+              href="/forecast"
+            >
               {copy.home.forecastLink}
             </Link>
           }
@@ -369,7 +387,10 @@ export default async function HomePage() {
                 : undefined
           }
           footer={
-            <Link className="text-primary underline underline-offset-4" href="/business">
+            <Link
+              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+              href="/business"
+            >
               {copy.home.businessLink}
             </Link>
           }
@@ -444,7 +465,10 @@ export default async function HomePage() {
         </Disclosure>
 
         <p className="mt-3 px-1 text-small text-text-secondary">
-          <Link className="text-primary underline underline-offset-4" href="/more">
+          <Link
+            className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+            href="/more"
+          >
             {copy.home.moreLink}
           </Link>
         </p>

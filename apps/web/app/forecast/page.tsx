@@ -2,6 +2,7 @@ import { AppShell } from '../../components/app-shell';
 import {
   Badge,
   Card,
+  DataTable,
   Disclosure,
   EmptyState,
   Figure,
@@ -116,58 +117,45 @@ export default async function ForecastPage() {
         {movingDays.length === 0 ? (
           <p className="text-text-secondary">אין תנועות צפויות עד סוף החודש.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[30rem] border-collapse">
-              <thead>
-                <tr className="border-b border-border text-small text-text-secondary">
-                  <th scope="col" className="py-2 text-start font-medium">
-                    {copy.forecast.dayColumn}
-                  </th>
-                  <th scope="col" className="py-2 text-start font-medium">
-                    {copy.forecast.inColumn}
-                  </th>
-                  <th scope="col" className="py-2 text-start font-medium">
-                    {copy.forecast.outColumn}
-                  </th>
-                  <th scope="col" className="py-2 text-start font-medium">
-                    {copy.forecast.balanceColumn}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {movingDays.map((day) => (
-                  <tr key={day.date} className="border-b border-border last:border-b-0">
-                    <th scope="row" className="py-2.5 text-start font-normal">
-                      <Figure>{formatBusinessDate(day.date)}</Figure>
-                    </th>
-                    <td className="py-2.5">
-                      {day.inflowMinor > 0 ? (
-                        <Money amountMinor={day.inflowMinor} currency={snapshot.currency} />
-                      ) : (
-                        <span className="text-text-secondary">—</span>
-                      )}
-                    </td>
-                    <td className="py-2.5">
-                      {day.outflowMinor > 0 ? (
-                        <Money amountMinor={day.outflowMinor} currency={snapshot.currency} />
-                      ) : (
-                        <span className="text-text-secondary">—</span>
-                      )}
-                    </td>
-                    <td
-                      className={`py-2.5 font-medium ${day.closingMinor < 0 ? 'text-danger' : ''}`}
-                    >
-                      <Money
-                        amountMinor={day.closingMinor}
-                        currency={snapshot.currency}
-                        signed
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            caption={copy.forecast.dayTable}
+            columns={[
+              copy.forecast.dayColumn,
+              copy.forecast.inColumn,
+              copy.forecast.outColumn,
+              copy.forecast.balanceColumn,
+            ]}
+            rows={movingDays.map((day) => ({
+              key: day.date,
+              cells: [
+                <Figure key="date">{formatBusinessDate(day.date)}</Figure>,
+                day.inflowMinor > 0 ? (
+                  <Money key="in" amountMinor={day.inflowMinor} currency={snapshot.currency} />
+                ) : (
+                  <span key="in" className="text-text-secondary">
+                    {'—'}
+                  </span>
+                ),
+                day.outflowMinor > 0 ? (
+                  <Money
+                    key="out"
+                    amountMinor={day.outflowMinor}
+                    currency={snapshot.currency}
+                  />
+                ) : (
+                  <span key="out" className="text-text-secondary">
+                    {'—'}
+                  </span>
+                ),
+                <span
+                  key="closing"
+                  className={`font-medium ${day.closingMinor < 0 ? 'text-danger' : ''}`}
+                >
+                  <Money amountMinor={day.closingMinor} currency={snapshot.currency} signed />
+                </span>,
+              ],
+            }))}
+          />
         )}
       </Card>
 

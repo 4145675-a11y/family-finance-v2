@@ -347,18 +347,24 @@ export function CheckboxField({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex min-h-11 items-center gap-2.5">
+      {/*
+        The box itself is 20px, which is as large as a checkbox is allowed to look.
+        The label is what makes the target 44px: it is tied to the input by id, it
+        fills the row, and clicking anywhere on it toggles the box.
+      */}
+      <label
+        htmlFor={id}
+        className="flex min-h-11 cursor-pointer items-center gap-2.5 font-medium"
+      >
         <input
           id={id}
           name={name}
           type="checkbox"
           defaultChecked={defaultChecked}
-          className="h-5 w-5 rounded border-border-interactive accent-primary"
+          className="h-5 w-5 shrink-0 rounded border-border-interactive accent-primary"
         />
-        <label htmlFor={id} className="font-medium">
-          {label}
-        </label>
-      </div>
+        {label}
+      </label>
       {hint === undefined ? null : <p className="text-small text-text-secondary">{hint}</p>}
     </div>
   );

@@ -6,6 +6,7 @@ import { todayInJerusalem } from '../../lib/forms';
 import {
   Badge,
   Card,
+  DataTable,
   SectionTitle,
   Disclosure,
   EmptyState,
@@ -221,79 +222,71 @@ export default async function DebtsPage() {
       </Card>
 
       <Card title={copy.debts.allTitle} subtitle={copy.debts.unknownCostNote}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[34rem] border-collapse">
-            <thead>
-              <tr className="border-b border-border text-small text-text-secondary">
-                <th scope="col" className="py-2 text-start font-medium">
-                  {copy.debts.creditor}
-                </th>
-                <th scope="col" className="py-2 text-start font-medium">
-                  {copy.debts.balance}
-                </th>
-                <th scope="col" className="py-2 text-start font-medium">
-                  {copy.debts.monthly}
-                </th>
-                <th scope="col" className="py-2 text-start font-medium">
-                  {copy.debts.cost}
-                </th>
-                <th scope="col" className="py-2 text-start font-medium">
-                  &nbsp;
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeDebts.map((debt) => (
-                <tr key={debt.id} className="border-b border-border last:border-b-0">
-                  <th scope="row" className="py-2.5 text-start font-normal">
-                    {debt.creditorName}
-                    {debt.kind === 'mortgage' ? (
-                      <span className="text-small text-text-secondary">
-                        {' '}
-                        · {copy.debts.mortgageTag}
-                      </span>
-                    ) : null}
-                  </th>
-                  <td className="py-2.5 font-medium">
-                    <Money amountMinor={balanceOf(debt.id)} currency={snapshot.currency} />
-                  </td>
-                  <td className="py-2.5">
-                    {debt.minimumPaymentMinor === null ? (
-                      <span className="text-text-secondary">—</span>
-                    ) : (
-                      <Money
-                        amountMinor={debt.minimumPaymentMinor}
-                        currency={snapshot.currency}
-                      />
-                    )}
-                  </td>
-                  <td className="py-2.5">
-                    {debt.effectiveAnnualRateBp === null ? (
-                      <span className="text-attention">{copy.debts.unknownCost}</span>
-                    ) : (
-                      <Figure>{formatBasisPoints(debt.effectiveAnnualRateBp)}</Figure>
-                    )}
-                  </td>
-                  <td className="py-2.5">
-                    {debt.urgency === 'none' ? null : (
-                      <Badge
-                        tone={
-                          debt.urgency === 'legal'
-                            ? 'danger'
-                            : debt.urgency === 'demanded'
-                              ? 'attention'
-                              : 'neutral'
-                        }
-                      >
-                        {copy.debts.urgency[debt.urgency] ?? debt.urgency}
-                      </Badge>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          caption={copy.debts.allTitle}
+          columns={[
+            copy.debts.creditor,
+            copy.debts.balance,
+            copy.debts.monthly,
+            copy.debts.cost,
+            copy.debts.urgentTitle,
+          ]}
+          rows={activeDebts.map((debt) => ({
+            key: debt.id,
+            cells: [
+              <span key="creditor">
+                {debt.creditorName}
+                {debt.kind === 'mortgage' ? (
+                  <span className="text-small text-text-secondary">
+                    {' '}
+                    · {copy.debts.mortgageTag}
+                  </span>
+                ) : null}
+              </span>,
+              <Money
+                key="balance"
+                amountMinor={balanceOf(debt.id)}
+                currency={snapshot.currency}
+              />,
+              debt.minimumPaymentMinor === null ? (
+                <span key="monthly" className="text-text-secondary">
+                  {'—'}
+                </span>
+              ) : (
+                <Money
+                  key="monthly"
+                  amountMinor={debt.minimumPaymentMinor}
+                  currency={snapshot.currency}
+                />
+              ),
+              debt.effectiveAnnualRateBp === null ? (
+                <span key="cost" className="text-attention">
+                  {copy.debts.unknownCost}
+                </span>
+              ) : (
+                <Figure key="cost">{formatBasisPoints(debt.effectiveAnnualRateBp)}</Figure>
+              ),
+              debt.urgency === 'none' ? (
+                <span key="urgency" className="text-text-secondary">
+                  {copy.debts.urgency['none'] ?? ''}
+                </span>
+              ) : (
+                <Badge
+                  key="urgency"
+                  tone={
+                    debt.urgency === 'legal'
+                      ? 'danger'
+                      : debt.urgency === 'demanded'
+                        ? 'attention'
+                        : 'neutral'
+                  }
+                >
+                  {copy.debts.urgency[debt.urgency] ?? debt.urgency}
+                </Badge>
+              ),
+            ],
+          }))}
+        />
       </Card>
 
       <SectionTitle>{screens.entry.debtTitle}</SectionTitle>

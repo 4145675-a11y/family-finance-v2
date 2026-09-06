@@ -19,7 +19,9 @@ export const metadata = {
 export default function OfflinePage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-4 p-6">
-      <Card title={screens.offline.title} tone="attention">
+      {/* The page's own heading. A document with no h1 has no top level. */}
+      <h1 className="px-1 text-[24px] leading-tight font-bold">{screens.offline.title}</h1>
+      <Card tone="attention">
         <p className="text-text-secondary">{screens.offline.body}</p>
         <p className="mt-3 text-text-secondary">{screens.setup.privacyBody}</p>
         <div className="mt-5">

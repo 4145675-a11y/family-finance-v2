@@ -547,8 +547,16 @@ export function toBudgetInput(
   );
   if (budget === undefined) return null;
 
+  /*
+   * A budget with no categories yet is still a budget.
+   *
+   * Returning null here made the screen tell a family to start a budget they had
+   * just started, because "no budget for this month" and "a budget nobody has put
+   * a category in" looked identical from the outside. The engine reports the
+   * empty case honestly — it adds a `budget.no_lines` note and lowers its own
+   * confidence — so the right answer is to let it.
+   */
   const lines = document.budgetLines.filter((line) => line.budgetId === budget.id);
-  if (lines.length === 0) return null;
 
   const periodStart = periodStartFor(document, today);
   const periodEnd = periodEndFor(document, today);

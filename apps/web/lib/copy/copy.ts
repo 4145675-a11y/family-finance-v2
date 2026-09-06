@@ -78,6 +78,9 @@ export const copy = {
     debtDown: (amountMinor: number) => `החוב ירד החודש ב־${money(amountMinor)}`,
     debtUp: (amountMinor: number) => `החוב גדל החודש ב־${money(amountMinor)}`,
     debtFlat: 'סך החוב כמעט לא השתנה',
+    // A household with no debts is not a household whose debt did not move.
+    debtNone: 'אין חובות רשומים',
+    debtNoneNote: 'אם יש הלוואה, מינוס או חוב לאדם קרוב — כדאי לרשום אותם כאן.',
     debtDownNote: 'זו התקדמות אמיתית.',
     debtFlatNote: 'שולם חוב אחד ונפתח חוב חדש, ולכן הסכום הכולל כמעט לא זז.',
     debtUpNote: 'נלקח החודש יותר ממה שהוחזר.',

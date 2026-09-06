@@ -56,7 +56,7 @@ export default async function SettingsPage() {
             />
 
             <div className="mt-2 border-t border-border pt-4">
-              <h3 className="font-semibold">{screens.settings.reserveTitle}</h3>
+              <p className="font-semibold">{screens.settings.reserveTitle}</p>
               <p className="mt-1 mb-4 text-small text-text-secondary">
                 {screens.settings.reserveHint}
               </p>
@@ -92,7 +92,7 @@ export default async function SettingsPage() {
             </div>
 
             <div className="mt-2 border-t border-border pt-4">
-              <h3 className="font-semibold">{screens.settings.notificationsTitle}</h3>
+              <p className="font-semibold">{screens.settings.notificationsTitle}</p>
               <p className="mt-1 mb-3 text-small text-text-secondary">
                 {screens.settings.notificationsHint}
               </p>

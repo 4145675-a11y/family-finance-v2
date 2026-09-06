@@ -8,19 +8,22 @@ import {
   recordBalance,
   recordRollover,
   recordTransaction,
+  setBudgetLine,
+  startBudget,
   transferToHousehold,
   updateTask,
   voidTransaction,
 } from './commands';
 import {
   apply,
+  blankHousehold,
   contextFor,
   seededHousehold,
   spend,
   TEST_NOW,
   TEST_TODAY,
 } from './fixtures/household';
-import { balanceOf, isRealTransaction, toEngineInput } from './projection';
+import { balanceOf, isRealTransaction, toBudgetInput, toEngineInput } from './projection';
 import { viewOf } from './store';
 
 /**
@@ -532,5 +535,57 @@ describe('the household view is built from the engine, never from the screen', (
     const view = viewOf(added.document, TEST_NOW);
     const account = view.input.accounts.find((candidate) => candidate.name === 'חיסכון');
     expect(account?.verifiedAt).toBeNull();
+  });
+});
+
+describe('a budget that has been started but not filled in', () => {
+  test('is still a budget, so the screen does not ask for it again', () => {
+    const seeded = blankHousehold();
+    const withBudget = startBudget(
+      seeded,
+      { period: '2026-09', lines: [] },
+      contextFor(seeded),
+    );
+
+    const input = toBudgetInput(withBudget.document, { asOf: TEST_NOW });
+    expect(input).not.toBeNull();
+    expect(input?.lines).toEqual([]);
+    expect(input?.period).toBe('2026-09');
+  });
+
+  test('the engine says the categories are missing rather than pretending', () => {
+    const seeded = blankHousehold();
+    const withBudget = startBudget(
+      seeded,
+      { period: '2026-09', lines: [] },
+      contextFor(seeded),
+    );
+
+    const view = viewOf(withBudget.document, TEST_NOW);
+    expect(view.budget).not.toBeNull();
+    expect(view.budget?.totals.plannedMinor).toBe(0);
+    expect(view.budget?.missingData.map((notice) => notice.code)).toContain('budget.no_lines');
+  });
+
+  test('adding the first category fills it in without a second budget appearing', () => {
+    const seeded = blankHousehold();
+    const withBudget = startBudget(
+      seeded,
+      { period: '2026-09', lines: [] },
+      contextFor(seeded),
+    );
+    const budgetId = withBudget.value;
+
+    const withFood = setBudgetLine(
+      withBudget.document,
+      { budgetId, categoryKey: 'food', plannedMinor: 320_000 },
+      contextFor(withBudget.document),
+    );
+
+    expect(withFood.document.budgets).toHaveLength(1);
+    const input = toBudgetInput(withFood.document, { asOf: TEST_NOW });
+    expect(input?.lines).toHaveLength(1);
+    expect(input?.lines[0]?.plannedMinor).toBe(320_000);
+    expect(input?.lines[0]?.weeklyGuidance).toBe(true);
   });
 });

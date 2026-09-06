@@ -112,7 +112,10 @@ export default async function ImportReviewPage({
         <Card title={screens.entry.title}>
           <p className="text-text-secondary">{screens.entry.subtitle}</p>
           <div className="mt-3">
-            <a href="/entry" className="text-primary underline underline-offset-4">
+            <a
+              href="/entry"
+              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+            >
               {screens.entry.title}
             </a>
           </div>
