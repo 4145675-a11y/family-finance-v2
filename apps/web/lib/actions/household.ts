@@ -1,7 +1,6 @@
 'use server';
 
 import {
-  CommandError,
   addAccount,
   addBusiness,
   addMember,
@@ -13,6 +12,7 @@ import { revalidatePath } from 'next/cache';
 
 import { FieldReader, failed, succeeded, type FormState } from '../forms';
 import { householdStore } from '../store/server';
+import { describe, refreshMoneyScreens } from './errors';
 
 /**
  * Setting the household up, and changing the few decisions that shape every
@@ -23,69 +23,6 @@ import { householdStore } from '../store/server';
  * family adds an account and the home screen keeps showing the old picture, which
  * is exactly the kind of quiet staleness this product exists to avoid.
  */
-
-const MESSAGES: Readonly<Record<string, string>> = {
-  unknown_account: 'החשבון שנבחר כבר לא קיים.',
-  unknown_debt: 'החוב שנבחר כבר לא קיים.',
-  unknown_transaction: 'הרשומה הזו כבר לא קיימת.',
-  unknown_planned_item: 'הפריט הצפוי הזה כבר לא קיים.',
-  unknown_task: 'המשימה הזו כבר לא קיימת.',
-  unknown_budget: 'לחודש הזה עוד אין תקציב.',
-  unknown_batch: 'הקובץ הזה כבר לא נמצא ברשימת ההעלאות.',
-  unknown_proposal: 'השורה הזו כבר לא חלק מהיבוא.',
-  no_business: 'צריך להגדיר עסק לפני שמוסיפים חשבון עסקי.',
-  business_exists: 'כבר מוגדר עסק אחד למשק הבית.',
-  budget_exists: 'לחודש הזה כבר יש תקציב.',
-  transfer_needs_counterpart: 'להעברה יש שני צדדים. צריך לבחור גם את החשבון השני.',
-  counterpart_not_allowed: 'להוצאה או להכנסה רגילה אין חשבון שני.',
-  amount_required: 'הסכום חייב להיות גדול מאפס.',
-  same_debt: 'חוב לא יכול לפרוע את עצמו.',
-  not_a_business_account: 'הכסף צריך לצאת מחשבון של העסק.',
-  not_a_household_account: 'הכסף צריך להגיע לחשבון של הבית.',
-  nothing_to_reconcile: 'אין הפרש לסגור.',
-  correction_needs_direction: 'צריך לציין אם התיקון מגדיל או מקטין את החוב.',
-  correction_effect_not_allowed: 'רק תיקון יתרה נושא כיוון משלו.',
-  batch_not_open: 'היבוא הזה כבר הוכרע ואי אפשר לשנות אותו.',
-  already_approved: 'היבוא הזה כבר אושר.',
-  not_approved: 'אפשר לבטל רק יבוא שאושר.',
-  not_ready: 'עוד לא כל השורות הוכרעו.',
-  needs_account: 'צריך לבחור לאיזה חשבון השורה שייכת.',
-  needs_debt: 'צריך לבחור לאיזה חוב התשלום שייך.',
-  correction_changes_kind: 'אפשר לתקן שורה, אבל לא לשנות את סוג הרשומה.',
-};
-
-/** Turns a thrown command error into a sentence a family can act on. */
-export async function describe(error: unknown): Promise<FormState> {
-  if (error instanceof CommandError) {
-    return failed(MESSAGES[error.code] ?? 'לא הצלחנו לשמור את השינוי.');
-  }
-  if (error instanceof Error && error.name === 'StoreNotInitialisedError') {
-    return failed('עוד לא הוקם משק בית. אפשר להתחיל בהגדרה.');
-  }
-  if (error instanceof Error && error.name === 'ConcurrentModificationError') {
-    return failed('משהו השתנה בזמן שמילאתם את הטופס. כדאי לרענן ולנסות שוב.');
-  }
-  return failed('משהו השתבש בשמירה. אפשר לנסות שוב.');
-}
-
-/** Every screen whose numbers can move when the truth changes. */
-const MONEY_PATHS = [
-  '/',
-  '/accounts',
-  '/budget',
-  '/debts',
-  '/forecast',
-  '/business',
-  '/reports',
-  '/activity',
-  '/approvals',
-  '/entry',
-  '/tasks',
-];
-
-export async function refreshMoneyScreens(): Promise<void> {
-  for (const path of MONEY_PATHS) revalidatePath(path);
-}
 
 export async function createHouseholdAction(
   _previous: FormState,
@@ -108,7 +45,7 @@ export async function createHouseholdAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   revalidatePath('/setup');
   return succeeded('משק הבית נוצר. אפשר להמשיך ולהוסיף חשבונות.');
 }
@@ -129,7 +66,7 @@ export async function renameHouseholdAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   revalidatePath('/setup');
   return succeeded('השם עודכן.');
 }
@@ -200,7 +137,7 @@ export async function updateSettingsAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   revalidatePath('/settings');
   return succeeded('ההגדרות נשמרו.');
 }
@@ -242,14 +179,14 @@ export async function addBusinessAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   revalidatePath('/setup');
   return succeeded('העסק נוסף. אפשר להוסיף לו חשבון.');
 }
 
 export async function declareNoBusinessAction(): Promise<void> {
   await householdStore().run((document, context) => declareNoBusiness(document, context));
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   revalidatePath('/setup');
 }
 
@@ -307,7 +244,7 @@ export async function addAccountAction(
         context,
       ),
     );
-    await refreshMoneyScreens();
+    refreshMoneyScreens();
     revalidatePath('/setup');
     return succeeded(`${name} נוסף.`, id);
   } catch (error) {

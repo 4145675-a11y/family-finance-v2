@@ -11,7 +11,7 @@ import {
 
 import { failed, succeeded, type FormState } from '../forms';
 import { householdStore } from '../store/server';
-import { refreshMoneyScreens } from './household';
+import { refreshMoneyScreens } from './errors';
 
 /**
  * Carrying the data out and bringing it back.
@@ -151,6 +151,6 @@ export async function applyRestoreAction(
     return failed('השחזור לא הושלם. שום דבר לא הוחלף.');
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('השחזור הושלם. הנתונים הקודמים נשמרו בהיסטוריה המקומית.');
 }

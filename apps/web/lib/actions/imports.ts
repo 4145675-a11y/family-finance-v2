@@ -22,7 +22,7 @@ import { revalidatePath } from 'next/cache';
 
 import { FieldReader, failed, succeeded, type FormState } from '../forms';
 import { householdStore } from '../store/server';
-import { describe, refreshMoneyScreens } from './household';
+import { describe, refreshImportScreens, refreshMoneyScreens } from './errors';
 
 /**
  * Uploading a document, reviewing what it said, and deciding.
@@ -39,12 +39,6 @@ import { describe, refreshMoneyScreens } from './household';
  * A failure at any step is recorded as a failed batch rather than swallowed, so a
  * family who uploaded something and saw nothing happen has somewhere to look.
  */
-
-const IMPORT_PATHS = ['/upload', '/imports', '/approvals', '/activity'];
-
-function refreshImportScreens(): void {
-  for (const path of IMPORT_PATHS) revalidatePath(path);
-}
 
 /** Maps a parser failure onto the batch's failure code and a Hebrew sentence. */
 function failureOf(error: unknown): {
@@ -391,7 +385,7 @@ export async function approveBatchAction(
   // The file has been read and the decision made; the bytes are not kept.
   await removeStoredFile(batchId);
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   refreshImportScreens();
   revalidatePath(`/imports/${batchId}`);
   return succeeded(`אושר. ${created} רשומות נכנסו לתמונה.`);
@@ -441,7 +435,7 @@ export async function reverseBatchAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   refreshImportScreens();
   revalidatePath(`/imports/${batchId}`);
   return succeeded(`היבוא בוטל. ${voided} רשומות כבר לא נספרות.`);

@@ -22,7 +22,7 @@ import { revalidatePath } from 'next/cache';
 
 import { FieldReader, failed, succeeded, type FormState } from '../forms';
 import { householdStore } from '../store/server';
-import { describe, refreshMoneyScreens } from './household';
+import { describe, refreshMoneyScreens } from './errors';
 
 /**
  * The manual entry surface: everything a family can record by hand.
@@ -83,7 +83,7 @@ export async function recordExpenseAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('ההוצאה נרשמה.');
 }
 
@@ -132,7 +132,7 @@ export async function recordIncomeAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('ההכנסה נרשמה.');
 }
 
@@ -189,7 +189,7 @@ export async function recordMovementAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded(kind === 'settlement' ? 'תשלום הכרטיס נרשם.' : 'ההעברה נרשמה.');
 }
 
@@ -232,7 +232,7 @@ export async function recordBalanceAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('היתרה עודכנה. התמונה מעודכנת יותר עכשיו.');
 }
 
@@ -267,7 +267,7 @@ export async function acceptGapAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('ההפרש נסגר ונרשם כתיקון, לא כהוצאה.');
 }
 
@@ -287,7 +287,7 @@ export async function closeAccountAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('החשבון נסגר. ההיסטוריה שלו נשמרה.');
 }
 
@@ -311,7 +311,7 @@ export async function voidTransactionAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('הרשומה בוטלה. היא נשארת בהיסטוריה, מסומנת.');
 }
 
@@ -371,7 +371,7 @@ export async function addPlannedItemAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded(
     direction === 'inflow' ? 'נרשם ככסף שצפוי להיכנס.' : 'נרשם כתשלום שצפוי לרדת.',
   );
@@ -432,7 +432,7 @@ export async function settlePlannedItemAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('סומן כבוצע, והכסף נרשם.');
 }
 
@@ -452,7 +452,7 @@ export async function removePlannedItemAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('הפריט הוסר מהתחזית.');
 }
 
@@ -526,7 +526,7 @@ export async function addDebtAction(_previous: FormState, data: FormData): Promi
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('החוב נרשם.');
 }
 
@@ -619,7 +619,7 @@ export async function recordDebtPaymentAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded(
     interestMinor > 0
       ? 'התשלום נרשם. הריבית נרשמה בנפרד — היא לא מקטינה את הקרן.'
@@ -658,7 +658,7 @@ export async function recordNewDebtAmountAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('החוב החדש נרשם.');
 }
 
@@ -689,7 +689,7 @@ export async function recordRolloverAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('נרשם: חוב אחד נפרע, חוב אחר נפתח. סך החובות לא ירד.');
 }
 
@@ -720,7 +720,7 @@ export async function transferToHouseholdAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('ההעברה נרשמה. אל תשכחו לבצע אותה גם בבנק.');
 }
 
@@ -743,7 +743,7 @@ export async function startBudgetAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('התחלנו תקציב לחודש. אפשר לקבוע סכומים.');
 }
 
@@ -784,7 +784,7 @@ export async function setBudgetLineAction(
     return describe(error);
   }
 
-  await refreshMoneyScreens();
+  refreshMoneyScreens();
   return succeeded('הסכום נשמר.');
 }
 

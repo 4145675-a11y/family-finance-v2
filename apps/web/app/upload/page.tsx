@@ -6,6 +6,7 @@ import { Badge, Card, DataTable, Figure, Notice } from '../../components/ui';
 import { UploadForm } from '../../components/upload-form';
 import { screens } from '../../lib/copy/screens';
 import { loadDashboardView } from '../../lib/dashboard/load';
+import { sweepExpiredUploads } from '../../lib/store/retention';
 
 /**
  * Uploading a financial document.
@@ -24,6 +25,11 @@ import { loadDashboardView } from '../../lib/dashboard/load';
 export const dynamic = 'force-dynamic';
 
 export default async function UploadPage() {
+  // 05-ARCHITECTURE-DATA.md § Imports gives an undecided upload 24 hours. The
+  // immediate deletions happen where the decision is made; this is the file
+  // somebody uploaded and then closed the tab on.
+  await sweepExpiredUploads();
+
   const view = await loadDashboardView();
 
   if (view.document === null || view.snapshot === null) {
