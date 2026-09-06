@@ -14,9 +14,18 @@ import {
   StatCard,
   StatRow,
 } from '../components/ui';
+import { addTaskAction } from '../lib/actions/entries';
+import { ActionForm, HiddenValue, SelectField } from '../components/form';
 import { NoHousehold } from '../components/screen';
+import { screens } from '../lib/copy/screens';
 import { copy } from '../lib/copy/copy';
-import { breakdownLabel, qualityLabel, sayNotice } from '../lib/copy/notices';
+import {
+  ACTION_COPY,
+  ACTION_WHY,
+  breakdownLabel,
+  qualityLabel,
+  sayNotice,
+} from '../lib/copy/notices';
 import { loadDashboardView } from '../lib/dashboard/load';
 import { formatBusinessDate } from '../lib/format';
 
@@ -46,7 +55,7 @@ import { formatBusinessDate } from '../lib/format';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const { descriptor, snapshot, input, food } = await loadDashboardView();
+  const { descriptor, snapshot, input, food, document } = await loadDashboardView();
 
   if (snapshot === null || input === null) {
     return <NoHousehold active="/" title={copy.home.title} reason={descriptor.reason} />;
@@ -65,6 +74,16 @@ export default async function HomePage() {
 
   /** Nothing recorded is not the same as nothing owed, and it reads differently. */
   const noDebts = input.debts.length === 0;
+
+  /** The recommendation, in the words the task list will carry. */
+  const actionTitle =
+    ACTION_COPY[snapshot.nextAction.key]?.(snapshot.nextAction.params) ?? copy.home.actionTitle;
+  const actionReason = ACTION_WHY[snapshot.nextAction.key]?.(snapshot.nextAction.params) ?? '';
+
+  const members = (document?.profiles ?? []).map((profile) => ({
+    value: profile.id,
+    label: profile.displayName,
+  }));
 
   /** Non-essential household payments still to leave this month — what can move. */
   const movablePayments = input.plannedItems.filter(
@@ -224,6 +243,34 @@ export default async function HomePage() {
               <p className="font-medium">{copy.plan.holdTitle}</p>
               <p className="mt-1.5 text-text-secondary">{copy.plan.holdIntro}</p>
             </>
+          )}
+
+          {/*
+            The recommendation becomes something with a name against it. Creating
+            the task changes no figure — the money moves when the money moves, and
+            this is a note the two of you leave each other.
+          */}
+          {snapshot.nextAction.key === 'hold_position' ? null : (
+            <div className="mt-4 border-t border-border pt-4">
+              <ActionForm
+                action={addTaskAction}
+                submitLabel={screens.tasks.addFromAction}
+                tone="secondary"
+              >
+                <HiddenValue name="title" value={actionTitle} />
+                <HiddenValue name="reason" value={actionReason} />
+                <HiddenValue name="recommendationKey" value={snapshot.nextAction.key} />
+                {members.length === 0 ? null : (
+                  <SelectField
+                    name="assignedMemberId"
+                    label={screens.tasks.who}
+                    required={false}
+                    emptyLabel={screens.tasks.whoNobody}
+                    options={members}
+                  />
+                )}
+              </ActionForm>
+            </div>
           )}
         </Card>
       </div>

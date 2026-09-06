@@ -308,3 +308,82 @@ describe('duplicate judgement never decides on its own', () => {
     expect(assessDuplicate({ ...base, date: '2026-09-20' }, existing).verdict).toBe('new');
   });
 });
+
+describe('a signed value in a column named for charges', () => {
+  const bytes = buildCsv({
+    header: ['תאריך', 'תיאור', 'סכום חיוב'],
+    rows: [
+      ['02/09/2026', 'מכולת', '318.40'],
+      ['05/09/2026', 'זיכוי', '-150.00'],
+    ],
+  });
+
+  const result = extractDocument(bytes, options);
+
+  test('the positive row goes out', () => {
+    expect(result.proposals[0]?.proposed).toMatchObject({
+      kind: 'transaction',
+      value: { amountMinor: 31_840, direction: 'outflow' },
+    });
+  });
+
+  test('the minus is believed over the column name', () => {
+    // A file that writes a minus inside a charge column is telling us the column
+    // is really a signed amount. Forcing every row outward would turn a refund
+    // into a purchase.
+    expect(result.proposals[1]?.proposed).toMatchObject({
+      kind: 'transaction',
+      value: { amountMinor: 15_000, direction: 'inflow' },
+    });
+  });
+
+  test('and it says the reading was not obvious', () => {
+    expect(result.proposals[1]?.warnings).toContain('ambiguous_direction');
+    expect(result.proposals[0]?.warnings).not.toContain('ambiguous_direction');
+  });
+});
+
+describe('a PDF row with an empty cell', () => {
+  /*
+   * The failure this exists to prevent, found by uploading a statement and
+   * reading the screen: a PDF draws nothing for an empty cell, so on a salary row
+   * — where the debit column is empty — every figure after it shifted one column
+   * left, the credit landed under "חובה", and an income of 12,400 was recorded as
+   * an expense of 12,400. The direction was inverted silently and every total
+   * after it was wrong by twice the amount.
+   */
+  const result = extractDocument(bankStatementPdf(), {
+    ...options,
+    fileName: 'statement.pdf',
+  });
+
+  const valueOf = (description: string) => {
+    const found = result.proposals.find(
+      (proposal) =>
+        proposal.proposed.kind === 'transaction' &&
+        proposal.proposed.value.description.includes(description),
+    );
+    return found?.proposed.kind === 'transaction' ? found.proposed.value : null;
+  };
+
+  test('the three movements are read', () => {
+    expect(result.proposals).toHaveLength(3);
+  });
+
+  test('a row with money in the debit column goes out', () => {
+    expect(valueOf('סופרמרקט')).toMatchObject({ amountMinor: 41_230, direction: 'outflow' });
+  });
+
+  test('a row whose debit cell is empty comes in', () => {
+    expect(valueOf('משכורת')).toMatchObject({ amountMinor: 1_240_000, direction: 'inflow' });
+  });
+
+  test('the row after the empty cell is still read correctly', () => {
+    expect(valueOf('חשמל')).toMatchObject({ amountMinor: 31_800, direction: 'outflow' });
+  });
+
+  test('the running balance is read from the balance column, not the credit column', () => {
+    expect(valueOf('סופרמרקט')?.balanceAfterMinor).toBe(812_040);
+    expect(valueOf('משכורת')?.balanceAfterMinor).toBe(2_052_040);
+  });
+});

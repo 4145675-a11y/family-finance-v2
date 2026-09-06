@@ -210,9 +210,11 @@ function sourcesFromPdf(bytes: Uint8Array, deadline: Deadline) {
     label: `עמוד ${page.pageNumber}`,
     sheetName: null,
     page: page.pageNumber,
-    // A tab in a reconstructed line is a column boundary; see `runsToLines`.
-    rows: page.lines.map((line) => line.split('\t').map(textCell)),
-    rowNumbers: page.lines.map((_line, index) => index + 1),
+    // Placed into the page's own columns rather than split from a joined line: an
+    // empty cell has to stay an empty cell, or every figure after it shifts one
+    // column left and a credit is read as a debit.
+    rows: page.rows.map((row) => row.map(textCell)),
+    rowNumbers: page.rows.map((_row, index) => index + 1),
     context: page.lines.slice(0, 8),
   }));
 
@@ -610,12 +612,17 @@ function buildTransaction(input: {
 
   if (debit !== null && debit.amountMinor > 0) {
     amountMinor = debit.amountMinor;
-    direction = 'outflow';
+    // A debit column normally holds positive figures. An explicit minus inside one
+    // means the column is really a signed amount that happens to be named for
+    // charges — and the sign the file wrote is better evidence than the header.
+    direction = debit.negative ? 'inflow' : 'outflow';
     if (debit.ambiguousSeparator) warnings.push('unparsed_amount');
+    if (debit.negative) warnings.push('ambiguous_direction');
   } else if (credit !== null && credit.amountMinor > 0) {
     amountMinor = credit.amountMinor;
-    direction = 'inflow';
+    direction = credit.negative ? 'outflow' : 'inflow';
     if (credit.ambiguousSeparator) warnings.push('unparsed_amount');
+    if (credit.negative) warnings.push('ambiguous_direction');
   } else if (single !== null && single.amountMinor > 0) {
     amountMinor = single.amountMinor;
     if (single.negative) {

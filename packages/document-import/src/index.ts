@@ -49,6 +49,14 @@ export {
 } from './csv';
 
 export {
+  findColumns,
+  toColumnGrid,
+  toPositionedLines,
+  type PositionedCell,
+  type PositionedLine,
+} from './pdf-columns';
+
+export {
   readPdf,
   unavailableOcrProvider,
   type OcrProvider,

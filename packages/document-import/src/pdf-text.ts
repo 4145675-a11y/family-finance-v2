@@ -1,4 +1,5 @@
 import { LIMITS, type Deadline } from './limits';
+import { toColumnGrid, toPositionedLines } from './pdf-columns';
 import {
   PdfLexer,
   dictOf,
@@ -43,6 +44,14 @@ export interface PdfPageText {
   readonly runs: readonly TextRun[];
   /** The page's text in reading order, one line per row of runs. */
   readonly lines: readonly string[];
+  /**
+   * The same content placed into the page's columns.
+   *
+   * This is what the table reader uses. `lines` collapses a row to a string and
+   * loses the position of an empty cell; `rows` keeps the column, empty, which is
+   * the difference between reading a salary as income and reading it as a charge.
+   */
+  readonly rows: readonly (readonly string[])[];
   /** True when the page carried no text-drawing operators at all. */
   readonly imageOnly: boolean;
 }
@@ -635,10 +644,13 @@ export function extractPages(document: PdfDocument, deadline: Deadline): PdfPage
     const merged = concat(streams);
     const { runs, sawTextOperator } = extractRuns(merged, fonts, deadline);
 
+    const positioned = toPositionedLines(runs);
+
     out.push({
       pageNumber: index + 1,
       runs,
       lines: runsToLines(runs),
+      rows: toColumnGrid(positioned),
       imageOnly: !sawTextOperator || runs.length === 0,
     });
   });
