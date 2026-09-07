@@ -214,17 +214,19 @@ describe('what can match', () => {
   });
 
   test('a cleared check is never offered again', () => {
+    // Dated behind us, because a check can only be honoured on a day that has
+    // happened — which is also the only way a statement could carry the debit.
     const base = scene();
     const written = withCheck(base.document, {
       debtId: base.debtId,
       accountId: base.bankAccountId,
       checkNumber: '1043',
       amountMinor: 150_000,
-      dueDate: '2026-10-12',
+      dueDate: '2026-06-12',
     });
     const cleared = clearCheck(
       written.document,
-      { checkId: written.checkId, clearedOn: '2026-10-13' },
+      { checkId: written.checkId, clearedOn: '2026-06-13' },
       contextFor(written.document),
     );
 
@@ -232,7 +234,7 @@ describe('what can match', () => {
       matchesForDebit(cleared.document, {
         accountId: base.bankAccountId,
         amountMinor: 150_000,
-        transactionDate: '2026-10-13',
+        transactionDate: '2026-06-13',
         reference: "צ'ק 1043",
       }),
     ).toHaveLength(0);

@@ -131,10 +131,21 @@ function CheckActions({ view }: { view: CheckView }) {
         </ActionForm>
       ) : null}
 
+      {/*
+        Recording a clearing is the ordinary thing that happens to a check, and
+        it is not hidden behind a disclosure. That is not only a matter of
+        prominence: a form inside a `details` collapses when the page re-renders,
+        so a refusal — "that date has not arrived" — was rendered where nobody
+        could see it, and the button appeared simply to do nothing.
+
+        The date cannot be in the future either, which the browser now enforces
+        as well as the server, so the common mistake is caught before the submit
+        rather than explained after it.
+      */}
       {check.status === 'delivered' || check.status === 'deposited' ? (
-        <Disclosure summary={gemach.markCleared}>
-          <p className="text-text-secondary">{gemach.clearNote}</p>
-          <div className="mt-4">
+        <div className="rounded-control border border-border bg-surface-muted/40 p-3">
+          <p className="text-small text-text-secondary">{gemach.clearNote}</p>
+          <div className="mt-3">
             <ActionForm action={clearCheckAction} submitLabel={gemach.markCleared}>
               <>
                 <HiddenValue name="checkId" value={check.id} />
@@ -143,11 +154,12 @@ function CheckActions({ view }: { view: CheckView }) {
                   label={gemach.clearedOn}
                   type="date"
                   defaultValue={today}
+                  max={today}
                 />
               </>
             </ActionForm>
           </div>
-        </Disclosure>
+        </div>
       ) : null}
 
       {check.status === 'delivered' || check.status === 'deposited' ? (
@@ -164,6 +176,7 @@ function CheckActions({ view }: { view: CheckView }) {
                 label={gemach.returnedOn}
                 type="date"
                 defaultValue={today}
+                max={today}
               />
               <TextField name="reason" label={gemach.reason} hint={gemach.reasonHint} />
             </>

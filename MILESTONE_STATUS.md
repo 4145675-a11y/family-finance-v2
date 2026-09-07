@@ -2,11 +2,13 @@
 
 מצב הפרויקט מול `09-MILESTONES.md`. מתעדכן בסוף כל milestone, לפני העצירה לאישור.
 
-- **תאריך עדכון אחרון**: 2026-09-06
-- **Milestone פעיל**: 7 — Local Product
-- **סטטוס**: **מוצר מקומי שלם ושמיש.** משפחה יכולה להקים משק בית, להזין הכול ידנית, להעלות
-  קובץ בנק, לעבור עליו ולאשר, לראות תמונה יומית, לנהל תקציב וחובות, להפיק דוחות, לייצא
-  ולגבות — הכול על המחשב הזה, בלי שום חשבון חיצוני. **המיגרציות עדיין לא הוחלו על שום מסד**
+- **תאריך עדכון אחרון**: 2026-09-07
+- **Milestone פעיל**: 8 — Local Access and Gemach
+- **סטטוס**: **מוצר מקומי שלם ושמיש, עם נעילה אמיתית.** משפחה יכולה להקים משק בית, להזין
+  הכול ידנית, להעלות קובץ בנק, לעבור עליו ולאשר, לראות תמונה יומית, לנהל תקציב וחובות,
+  לנהל הלוואת גמ״ח שנפרעת בצ׳קים דחויים, להפיק דוחות, לייצא ולגבות — הכול על המחשב הזה,
+  בלי שום חשבון חיצוני. הכניסה מוגנת ב־WebAuthn מול Windows Hello, בכתובת `http://localhost:3100`
+  (ולא ב־`127.0.0.1` — ראה ADR-0029). **המיגרציות עדיין לא הוחלו על שום מסד**
   ובדיקות הבידוד עדיין לא הורצו — ראה חסמים.
 - **Branch**: `milestone-2-identity-isolation` — **השם מיושן.** M2 עד M7 נבנו עליו. אין
   remote ולא בוצע push.
@@ -38,21 +40,22 @@
 | 11 | Business & Safe Transfer | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | חישוב, מסך והעברה שנרשמת בשני צדדים ומתאפסת מאוחד |
 | 12 | Debt Plan & Advisor | Not started | — | דורש AI credentials |
 | 13 | Summaries, Notifications & Reports | **In progress** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | דוחות וייצוא קיימים; התראות מקומיות בלבד |
-| 14 | Hardening & Production | Not started | — | דורש החלטת אירוח ו־RPO/RTO |
+| 14 | Hardening & Production | **In progress** | [milestone-8](docs/checkpoints/milestone-8-access-and-gemach.md) | נעילת גישה מקומית עובדת; אירוח, TLS ו־RPO/RTO עדיין פתוחים |
+| — | **Local Access & Gemach** | **Complete — evidenced** | [milestone-8](docs/checkpoints/milestone-8-access-and-gemach.md) | **WebAuthn מול Windows Hello; גמ״ח וצ׳קים דחויים** |
 
 ## שערי איכות — מצב נוכחי
 
-הרצה אחת של `npm run verify`, exit 0 אמיתי, 2026-09-06.
+הרצה אחת של `npm run verify`, exit 0 אמיתי, 2026-09-07.
 
 | שער | סטטוס | ראיה |
 |---|---|---|
 | Install | Active | `npm ci --ignore-scripts`, 0 vulnerabilities |
 | Format | Active | `prettier --check .`, exit 0 |
-| Typecheck | Active | שורש + 6 workspaces |
+| Typecheck | Active | שורש + 7 workspaces |
 | Lint | Active | `--max-warnings=0`, type-aware |
-| **Unit** | Active | **1173/1173**, 39 קבצים, 0 מדולגות (מ־839) |
-| **Property** | Active | **35/35**, seed קבוע, 300 runs לכל property |
-| Build | Active | 21 מסלולים |
+| **Unit** | Active | **1513/1513**, 48 קבצים, 0 מדולגות (מ־1228) |
+| **Property** | Active | **41/41**, כולל אינווריאנטים של צ׳קים תחת רצפי פעולות שרירותיים |
+| Build | Active | 26 מסלולים |
 | **Built-shell** | Active | **14/14 מול השרת הרץ** — 5 מסלולים, משק בית מוזרע (`ADR-0027`) |
 | Client-secret boundary | Active | 0 ממצאים |
 | Manual bundle | Active | 10 מיגרציות, תואם למקורות (`ADR-0019`) |

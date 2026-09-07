@@ -40,3 +40,6 @@
 | [0025](0025-document-parsers-written-not-installed.md) | קוראי המסמכים נכתבים ולא מותקנים | Accepted | 7 |
 | [0026](0026-pdf-export-through-the-browser.md) | ייצוא PDF דרך הדפסת הדפדפן, לא דרך מחולל בשרת | Accepted | 7 |
 | [0027](0027-shell-gate-runs-against-the-server.md) | שער ה־shell נבדק מול השרת הרץ | Accepted | 7 |
+| [0028](0028-authentication-state-outside-the-household-document.md) | מצב הכניסה נשמר בקובץ נפרד ממסמך משק הבית | Accepted | 8 |
+| [0029](0029-passkeys-live-at-localhost-not-at-an-address.md) | מפתחות הכניסה חיים ב־localhost, לא בכתובת IP | Accepted | 8 |
+| [0030](0030-a-check-is-not-a-payment.md) | צ׳ק שנמסר אינו תשלום | Accepted | 8 |

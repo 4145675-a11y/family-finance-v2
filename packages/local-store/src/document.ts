@@ -239,11 +239,17 @@ export function emptyDocument(input: EmptyDocumentInput): StoreDocument {
 /**
  * Brings an older document up to the shape this build reads.
  *
- * Version 2 added post-dated checks and repayment plans. A version 1 document —
- * a file written before this feature existed, or a backup taken then — is
- * complete and correct; it simply has no checks. So the migration adds the empty
- * collections and nothing else, and it is written as a step rather than a special
- * case so the next one has somewhere to go.
+ * Version 2 added post-dated checks and repayment plans, and gave every import
+ * proposal a `targetCheckId`. A version 1 document — a file written before this
+ * feature existed, or a backup taken then — is complete and correct; it simply
+ * has no checks and no proposal ever pointed at one.
+ *
+ * Both halves matter, and the second one is easy to forget: a new *collection* is
+ * obviously missing, but a new *field on an existing row* is not, and leaving it
+ * out means every household that used the previous build meets an unreadable file
+ * on the first page load. This was found by running the application against a
+ * real document rather than by reading the code, which is why the test below it
+ * now starts from a document whose proposals predate the field.
  *
  * Migrating on read rather than rewriting the file on start-up means a document
  * is only ever upgraded by an action a person took, and a build that turns out to
@@ -258,6 +264,16 @@ export function migrateDocument(value: unknown): unknown {
     document['repaymentPlans'] = Array.isArray(document['repaymentPlans'])
       ? document['repaymentPlans']
       : [];
+
+    // Every proposal predates the ability to name a check, so none of them does.
+    if (Array.isArray(document['importProposals'])) {
+      document['importProposals'] = document['importProposals'].map((proposal) =>
+        proposal !== null && typeof proposal === 'object' && !('targetCheckId' in proposal)
+          ? { ...(proposal as Record<string, unknown>), targetCheckId: null }
+          : proposal,
+      );
+    }
+
     document['formatVersion'] = 2;
   }
 

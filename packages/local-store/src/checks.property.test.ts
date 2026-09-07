@@ -110,7 +110,9 @@ function startingWorld(): World {
       count: CHECK_COUNT,
       amountPerCheckMinor: CHECK_AMOUNT_MINOR,
       finalCheckAmountMinor: null,
-      firstDueDate: '2026-09-12',
+      // Behind TEST_TODAY, so clearing is something the model actually permits
+      // and these properties are not quietly testing a sequence of refusals.
+      firstDueDate: '2026-03-12',
       firstCheckNumber: '3001',
       intendedTotalMinor: CHECK_COUNT * CHECK_AMOUNT_MINOR,
       note: null,
@@ -154,23 +156,23 @@ function step(
       case 'deposit':
         return markCheckDeposited(document, { checkId }, context).document;
       case 'clear':
-        return clearCheck(document, { checkId, clearedOn: '2026-09-13' }, context).document;
+        return clearCheck(document, { checkId, clearedOn: '2026-06-13' }, context).document;
       case 'return':
         return markCheckReturned(
           document,
-          { checkId, occurredOn: '2026-09-14', reason: 'חזר' },
+          { checkId, occurredOn: '2026-06-14', reason: 'חזר' },
           context,
         ).document;
       case 'cancel':
         return cancelCheck(
           document,
-          { checkId, occurredOn: '2026-09-15', reason: 'בוטל בהסכמה' },
+          { checkId, occurredOn: '2026-06-15', reason: 'בוטל בהסכמה' },
           context,
         ).document;
       case 'revert':
         return revertCheckStatus(
           document,
-          { checkId, reason: 'תיקון', occurredOn: '2026-09-16' },
+          { checkId, reason: 'תיקון', occurredOn: '2026-06-16' },
           context,
         ).document;
     }
@@ -197,6 +199,32 @@ function debtBalance(document: StoreDocument, debtId: string): number {
 }
 
 describe('whatever happens to the checks', () => {
+  test('the operations under test are actually reachable', () => {
+    /*
+     * A guard on the guards.
+     *
+     * Every property below tolerates a refused transition, which is correct —
+     * the model refusing an illegal move is the model working. But it means a
+     * scenario where *nothing* is ever permitted would pass all of them while
+     * testing nothing at all. That is not hypothetical: these properties were
+     * briefly vacuous when clearing became impossible on a future date, and
+     * they still reported five passes.
+     *
+     * So one sequence is spelled out and its effect asserted directly.
+     */
+    const world = startingWorld();
+    const before = balanceOf(world.document, world.bankAccountId).computedMinor;
+
+    let document = world.document;
+    document = step(document, world.checkIds, { kind: 'deliver', index: 0 });
+    document = step(document, world.checkIds, { kind: 'clear', index: 0 });
+
+    expect(balanceOf(document, world.bankAccountId).computedMinor).toBe(
+      before - CHECK_AMOUNT_MINOR,
+    );
+    expect(document.checks[0]?.status).toBe('cleared');
+  });
+
   test('cash only ever moves by whole checks', () => {
     fc.assert(
       fc.property(fc.array(operationArbitrary, { maxLength: 24 }), (operations) => {

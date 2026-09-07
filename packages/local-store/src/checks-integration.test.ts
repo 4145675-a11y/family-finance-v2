@@ -27,8 +27,16 @@ import { contextFor, seededHousehold, TEST_NOW, TEST_TODAY } from './fixtures/ho
 const NOW = TEST_NOW;
 const TODAY = TEST_TODAY;
 
+/**
+ * A gemach loan with three monthly checks.
+ *
+ * `firstDueDate` defaults to a month ahead, which is what the forecast tests are
+ * about. The clearing and import tests pass a date behind us instead: a check
+ * cannot be honoured before its printed date, and a statement cannot carry a
+ * debit that has not happened.
+ */
 function gemachWithChecks(
-  options: { deliveredOn: string | null } = { deliveredOn: '2026-09-01' },
+  options: { deliveredOn?: string | null; firstDueDate?: string } = {},
 ) {
   const seeded = seededHousehold();
   const debt = addDebt(
@@ -60,11 +68,11 @@ function gemachWithChecks(
       count: 3,
       amountPerCheckMinor: 150_000,
       finalCheckAmountMinor: null,
-      firstDueDate: '2026-09-12',
+      firstDueDate: options.firstDueDate ?? '2026-09-12',
       firstCheckNumber: '1001',
       intendedTotalMinor: 450_000,
       note: null,
-      deliveredOn: options.deliveredOn,
+      deliveredOn: options.deliveredOn === undefined ? '2026-09-01' : options.deliveredOn,
     },
     contextFor(debt.document),
   );
@@ -133,10 +141,10 @@ describe('the forecast counts a delivered check once', () => {
   });
 
   test('a cleared check leaves the forecast entirely', () => {
-    const world = gemachWithChecks();
+    const world = gemachWithChecks({ firstDueDate: '2026-06-12' });
     const cleared = clearCheck(
       world.document,
-      { checkId: world.checkIds[0]!, clearedOn: '2026-09-13' },
+      { checkId: world.checkIds[0]!, clearedOn: '2026-06-13' },
       contextFor(world.document),
     );
 
@@ -261,7 +269,7 @@ describe('importing the clearing of a check', () => {
       delimiter: ';',
       preamble: ['בנק לדוגמה - תנועות בחשבון'],
       header: ['תאריך', 'תיאור', 'חובה', 'זכות', 'יתרה'],
-      rows: [['13/09/2026', "צ'ק 1001", '1,500.00', '', '10,000.00']],
+      rows: [['13/06/2026', "צ'ק 1001", '1,500.00', '', '10,000.00']],
     });
 
     return stageExtraction(
@@ -284,11 +292,11 @@ describe('importing the clearing of a check', () => {
   }
 
   test('the matcher finds the check behind the debit', () => {
-    const world = gemachWithChecks();
+    const world = gemachWithChecks({ firstDueDate: '2026-06-12' });
     const proposal = proposeCheckMatch(world.document, {
       accountId: world.bankAccountId,
       amountMinor: 150_000,
-      transactionDate: '2026-09-13',
+      transactionDate: '2026-06-13',
       reference: "צ'ק 1001",
     });
 
@@ -298,7 +306,7 @@ describe('importing the clearing of a check', () => {
   test('a staged import moves nothing at all until it is approved', () => {
     // The approval boundary, restated for checks: uploading a statement that
     // clears three checks must not clear anything.
-    const world = gemachWithChecks();
+    const world = gemachWithChecks({ firstDueDate: '2026-06-12' });
     const staged = importedDebit(world);
 
     const before = summariseChecks(toEngineInput(world.document, { asOf: NOW }).checks, TODAY);
@@ -311,7 +319,7 @@ describe('importing the clearing of a check', () => {
   });
 
   test('approving a matched row clears the check exactly once', () => {
-    const world = gemachWithChecks();
+    const world = gemachWithChecks({ firstDueDate: '2026-06-12' });
     const staged = importedDebit(world);
     const proposalId = staged.document.importProposals[0]!.id;
 
@@ -347,7 +355,7 @@ describe('importing the clearing of a check', () => {
   });
 
   test('the repayment is linked to the check and to the movement', () => {
-    const world = gemachWithChecks();
+    const world = gemachWithChecks({ firstDueDate: '2026-06-12' });
     const staged = importedDebit(world);
     const proposalId = staged.document.importProposals[0]!.id;
 
@@ -382,7 +390,7 @@ describe('importing the clearing of a check', () => {
   test('importing the same statement again cannot clear the check twice', () => {
     // The idempotency that matters. The second attempt is refused by the check's
     // own state rather than caught by a duplicate heuristic.
-    const world = gemachWithChecks();
+    const world = gemachWithChecks({ firstDueDate: '2026-06-12' });
     const first = importedDebit(world);
     const reviewedFirst = reviewProposal(
       first.document,
@@ -429,7 +437,7 @@ describe('importing the clearing of a check', () => {
   test('a row with no check attached imports as an ordinary expense', () => {
     // Not everything is a check, and a family who does not match the row should
     // still get their statement imported.
-    const world = gemachWithChecks();
+    const world = gemachWithChecks({ firstDueDate: '2026-06-12' });
     const staged = importedDebit(world);
     const reviewed = reviewProposal(
       staged.document,
@@ -458,7 +466,7 @@ describe('importing the clearing of a check', () => {
 
 describe('backup and restore carry the checks', () => {
   test('a round trip preserves every check and its links', () => {
-    const world = gemachWithChecks();
+    const world = gemachWithChecks({ firstDueDate: '2026-06-12' });
     const planned = setRepaymentPlan(
       world.document,
       {
@@ -467,13 +475,13 @@ describe('backup and restore carry the checks', () => {
         installmentCount: 3,
         installmentAmountMinor: 150_000,
         finalInstallmentAmountMinor: null,
-        firstDueDate: '2026-09-12',
+        firstDueDate: '2026-06-12',
       },
       contextFor(world.document),
     );
     const cleared = clearCheck(
       planned.document,
-      { checkId: world.checkIds[0]!, clearedOn: '2026-09-13' },
+      { checkId: world.checkIds[0]!, clearedOn: '2026-06-13' },
       contextFor(planned.document),
     );
 
@@ -564,6 +572,67 @@ describe('the migration itself', () => {
   test('does not invent collections for something that is not a document', () => {
     expect(migrateDocument(null)).toBeNull();
     expect(migrateDocument('nonsense')).toBe('nonsense');
+  });
+
+  test('a document whose proposals predate the check field still parses', () => {
+    /*
+     * The case the first version of this migration missed, and that a browser
+     * found within a minute of the code being right in every test.
+     *
+     * Version 2 added a collection *and* a field on an existing row. The
+     * collection is obviously absent from an older file; the field is not, and
+     * omitting it meant every household that had ever imported a statement met
+     * an unreadable document on their next page load.
+     */
+    const world = gemachWithChecks();
+    const older = JSON.parse(JSON.stringify(world.document)) as Record<string, unknown>;
+    older['formatVersion'] = 1;
+    delete older['checks'];
+    delete older['repaymentPlans'];
+    older['importProposals'] = [
+      {
+        id: crypto.randomUUID(),
+        batchId: crypto.randomUUID(),
+        kind: 'transaction',
+        location: { sheetName: null, page: null, row: 2, snippet: null },
+        raw: [{ column: 'תיאור', text: 'סופרמרקט' }],
+        proposed: {
+          kind: 'transaction',
+          value: {
+            transactionDate: '2026-09-02',
+            postingDate: null,
+            description: 'סופרמרקט',
+            amountMinor: 41_230,
+            direction: 'outflow',
+            currency: 'ILS',
+            scope: 'household',
+            categoryKey: null,
+            reference: null,
+            installmentNumber: null,
+            installmentTotal: null,
+            balanceAfterMinor: null,
+            balanceAfterDirection: null,
+          },
+        },
+        correction: null,
+        confidenceBp: 9_000,
+        warnings: [],
+        duplicateVerdict: 'new',
+        duplicateOfId: null,
+        reviewState: 'pending',
+        targetAccountId: world.bankAccountId,
+        targetDebtId: null,
+        // No `targetCheckId`: this row was written before the field existed.
+        committedRecordId: null,
+        createdAt: NOW,
+        updatedAt: NOW,
+        version: 1,
+      },
+    ];
+
+    const parsed = parseStoreDocument(older);
+    expect(parsed.formatVersion).toBe(CURRENT_FORMAT_VERSION);
+    expect(parsed.importProposals[0]?.targetCheckId).toBeNull();
   });
 
   test('a migrated document parses', () => {

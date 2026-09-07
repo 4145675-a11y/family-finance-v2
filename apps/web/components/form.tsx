@@ -196,6 +196,7 @@ export function TextField({
   inputMode,
   autoComplete = 'off',
   maxLength,
+  max,
 }: BaseFieldProps & {
   type?: 'text' | 'date' | 'number' | 'month';
   defaultValue?: string | undefined;
@@ -203,6 +204,14 @@ export function TextField({
   inputMode?: 'text' | 'decimal' | 'numeric';
   autoComplete?: string;
   maxLength?: number;
+  /**
+   * The latest value the field will accept.
+   *
+   * Used for a date that cannot be in the future — a check honoured tomorrow, a
+   * balance confirmed next week. The server refuses these anyway; stopping the
+   * browser first means a person is told before they submit rather than after.
+   */
+  max?: string;
 }) {
   const id = useId();
   const error = useFieldError(name);
@@ -225,6 +234,7 @@ export function TextField({
         inputMode={inputMode ?? 'text'}
         autoComplete={autoComplete}
         maxLength={maxLength ?? undefined}
+        max={max ?? undefined}
         required={required}
         aria-invalid={error !== undefined}
         aria-describedby={describedBy(id, hint, error)}

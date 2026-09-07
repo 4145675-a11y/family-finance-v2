@@ -634,6 +634,13 @@ describe('handing checks over changes no figure', () => {
 // ---------------------------------------------------------------------------
 
 describe('clearing a check moves money exactly once', () => {
+  /*
+   * A loan whose checks have already come round.
+   *
+   * The dates run March to August, all behind TEST_TODAY, because a check can
+   * only be honoured on a day that has happened. A scenario dated into next year
+   * would be testing something the product refuses.
+   */
   function sceneWithDelivered() {
     const scene = gemachScene();
     const created = run(scene.document, (document, context) =>
@@ -646,11 +653,11 @@ describe('clearing a check moves money exactly once', () => {
           count: 6,
           amountPerCheckMinor: 150_000,
           finalCheckAmountMinor: null,
-          firstDueDate: '2026-10-12',
+          firstDueDate: '2026-03-12',
           firstCheckNumber: '1001',
           intendedTotalMinor: 900_000,
           note: null,
-          deliveredOn: '2026-09-06',
+          deliveredOn: '2026-03-01',
         },
         context,
       ),
@@ -663,7 +670,7 @@ describe('clearing a check moves money exactly once', () => {
     const before = balanceOf(scene.document, scene.bankAccountId).computedMinor;
 
     const cleared = run(scene.document, (document, context) =>
-      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-10-13' }, context),
+      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-03-13' }, context),
     );
 
     expect(balanceOf(cleared.document, scene.bankAccountId).computedMinor).toBe(
@@ -674,10 +681,10 @@ describe('clearing a check moves money exactly once', () => {
   test('the debt falls by the face value, once', () => {
     const scene = sceneWithDelivered();
     const cleared = run(scene.document, (document, context) =>
-      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-10-13' }, context),
+      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-03-13' }, context),
     );
 
-    expect(debtBalanceOf(cleared.document, scene.gemachDebtId, '2026-10-31')).toBe(750_000);
+    expect(debtBalanceOf(cleared.document, scene.gemachDebtId)).toBe(750_000);
   });
 
   test('exactly one transaction and one debt event are created', () => {
@@ -686,7 +693,7 @@ describe('clearing a check moves money exactly once', () => {
     const eventsBefore = scene.document.debtEvents.length;
 
     const cleared = run(scene.document, (document, context) =>
-      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-10-13' }, context),
+      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-03-13' }, context),
     );
 
     expect(cleared.document.transactions).toHaveLength(transactionsBefore + 1);
@@ -698,7 +705,7 @@ describe('clearing a check moves money exactly once', () => {
     // anything else would understate what the family has achieved.
     const scene = sceneWithDelivered();
     const cleared = run(scene.document, (document, context) =>
-      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-10-13' }, context),
+      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-03-13' }, context),
     );
 
     const event = cleared.document.debtEvents.find(
@@ -711,14 +718,14 @@ describe('clearing a check moves money exactly once', () => {
   test('the check links to both records it created', () => {
     const scene = sceneWithDelivered();
     const cleared = run(scene.document, (document, context) =>
-      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-10-13' }, context),
+      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-03-13' }, context),
     );
 
     const check = cleared.document.checks.find(
       (candidate) => candidate.id === scene.checkIds[0],
     );
     expect(check?.status).toBe('cleared');
-    expect(check?.clearedOn).toBe('2026-10-13');
+    expect(check?.clearedOn).toBe('2026-03-13');
     expect(check?.clearedTransactionId).toBe(cleared.value.transactionId);
     expect(check?.debtEventId).toBe(cleared.value.debtEventId);
   });
@@ -726,7 +733,7 @@ describe('clearing a check moves money exactly once', () => {
   test('a cleared check leaves the outstanding total', () => {
     const scene = sceneWithDelivered();
     const cleared = run(scene.document, (document, context) =>
-      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-10-13' }, context),
+      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-03-13' }, context),
     );
 
     const exposure = summariseChecks(
@@ -743,7 +750,7 @@ describe('clearing a check moves money exactly once', () => {
     // refusal, by the record's own state.
     const scene = sceneWithDelivered();
     const once = run(scene.document, (document, context) =>
-      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-10-13' }, context),
+      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-03-13' }, context),
     );
 
     expect(
@@ -762,12 +769,12 @@ describe('clearing a check moves money exactly once', () => {
   test('after a refused second clearing the figures are unchanged', () => {
     const scene = sceneWithDelivered();
     const once = run(scene.document, (document, context) =>
-      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-10-13' }, context),
+      clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-03-13' }, context),
     );
 
     try {
       run(once.document, (document, context) =>
-        clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-10-14' }, context),
+        clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-03-14' }, context),
       );
     } catch {
       // Expected; the assertion below is the point.
@@ -776,7 +783,48 @@ describe('clearing a check moves money exactly once', () => {
     expect(balanceOf(once.document, scene.bankAccountId).computedMinor).toBe(
       balanceOf(scene.document, scene.bankAccountId).computedMinor - 150_000,
     );
-    expect(debtBalanceOf(once.document, scene.gemachDebtId, '2026-10-31')).toBe(750_000);
+    expect(debtBalanceOf(once.document, scene.gemachDebtId)).toBe(750_000);
+  });
+
+  test('a check cannot be recorded as honoured on a date that has not arrived', () => {
+    /*
+     * Found by using the product, not by reading it.
+     *
+     * A cash movement counts from the moment it is written; a debt balance is
+     * replayed only as far as today. A clearing dated next month therefore took
+     * the money out and left the debt untouched, and the screen showed a family
+     * who had paid and still owed the whole amount.
+     */
+    const scene = sceneWithDelivered();
+    expect(
+      codeOf(() =>
+        run(scene.document, (document, context) =>
+          clearCheck(
+            document,
+            { checkId: scene.checkIds[0]!, clearedOn: '2026-12-01' },
+            context,
+          ),
+        ),
+      ),
+    ).toBe('clear_date_in_future');
+  });
+
+  test('today is the household calendar, not the server clock', () => {
+    // Late on a Jerusalem evening the UTC date is still yesterday. A clearing
+    // dated today must not be refused for being in a UTC tomorrow.
+    const scene = sceneWithDelivered();
+    const lateEvening = '2026-09-06T21:30:00.000Z';
+
+    const cleared = run(
+      scene.document,
+      (document, context) =>
+        clearCheck(document, { checkId: scene.checkIds[0]!, clearedOn: '2026-09-07' }, context),
+      lateEvening,
+    );
+
+    expect(
+      cleared.document.checks.find((check) => check.id === scene.checkIds[0])?.status,
+    ).toBe('cleared');
   });
 
   test('a prepared check cannot clear, because nobody has it', () => {
@@ -802,7 +850,7 @@ describe('clearing a check moves money exactly once', () => {
     expect(
       codeOf(() =>
         run(added.document, (document, context) =>
-          clearCheck(document, { checkId: added.value, clearedOn: '2026-10-13' }, context),
+          clearCheck(document, { checkId: added.value, clearedOn: '2026-03-13' }, context),
         ),
       ),
     ).toBe('check_transition_not_allowed');
@@ -813,12 +861,12 @@ describe('clearing a check moves money exactly once', () => {
     let document = scene.document;
 
     const clearingDates = [
-      '2026-10-13',
-      '2026-11-13',
-      '2026-12-13',
-      '2027-01-13',
-      '2027-02-13',
-      '2027-03-13',
+      '2026-03-13',
+      '2026-04-13',
+      '2026-05-13',
+      '2026-06-13',
+      '2026-07-13',
+      '2026-08-13',
     ];
 
     for (const [index, checkId] of scene.checkIds.entries()) {
@@ -827,7 +875,7 @@ describe('clearing a check moves money exactly once', () => {
       ).document;
     }
 
-    expect(debtBalanceOf(document, scene.gemachDebtId, '2027-04-01')).toBe(0);
+    expect(debtBalanceOf(document, scene.gemachDebtId)).toBe(0);
     const exposure = summariseChecks(
       toEngineInput(document, { asOf: TEST_NOW }).checks,
       TEST_TODAY,
@@ -862,11 +910,11 @@ describe('the unhappy paths', () => {
           accountId: scene.bankAccountId,
           checkNumber: '1001',
           amountMinor: 150_000,
-          dueDate: '2026-10-12',
+          dueDate: '2026-08-12',
           payeeName: 'גמ״ח שכונתי',
           installmentNumber: 1,
           note: null,
-          deliveredOn: '2026-09-06',
+          deliveredOn: '2026-08-01',
         },
         context,
       ),
@@ -879,12 +927,12 @@ describe('the unhappy paths', () => {
     const returned = run(scene.document, (document, context) =>
       markCheckReturned(
         document,
-        { checkId: scene.checkId, occurredOn: '2026-10-14', reason: 'אין כיסוי מספיק' },
+        { checkId: scene.checkId, occurredOn: '2026-08-14', reason: 'אין כיסוי מספיק' },
         context,
       ),
     );
 
-    expect(debtBalanceOf(returned.document, scene.gemachDebtId, '2026-10-31')).toBe(900_000);
+    expect(debtBalanceOf(returned.document, scene.gemachDebtId)).toBe(900_000);
     expect(balanceOf(returned.document, scene.bankAccountId).computedMinor).toBe(
       balanceOf(scene.document, scene.bankAccountId).computedMinor,
     );
@@ -895,7 +943,7 @@ describe('the unhappy paths', () => {
     const returned = run(scene.document, (document, context) =>
       markCheckReturned(
         document,
-        { checkId: scene.checkId, occurredOn: '2026-10-14', reason: 'אין כיסוי' },
+        { checkId: scene.checkId, occurredOn: '2026-08-14', reason: 'אין כיסוי' },
         context,
       ),
     );
@@ -915,7 +963,7 @@ describe('the unhappy paths', () => {
         run(scene.document, (document, context) =>
           markCheckReturned(
             document,
-            { checkId: scene.checkId, occurredOn: '2026-10-14', reason: '   ' },
+            { checkId: scene.checkId, occurredOn: '2026-08-14', reason: '   ' },
             context,
           ),
         ),
@@ -928,7 +976,7 @@ describe('the unhappy paths', () => {
     const cancelled = run(scene.document, (document, context) =>
       cancelCheck(
         document,
-        { checkId: scene.checkId, occurredOn: '2026-09-20', reason: 'סוכם על העברה בנקאית' },
+        { checkId: scene.checkId, occurredOn: '2026-08-20', reason: 'סוכם על העברה בנקאית' },
         context,
       ),
     );
@@ -942,7 +990,7 @@ describe('the unhappy paths', () => {
   test('a cleared check cannot be cancelled behind the money', () => {
     const scene = delivered();
     const cleared = run(scene.document, (document, context) =>
-      clearCheck(document, { checkId: scene.checkId, clearedOn: '2026-10-13' }, context),
+      clearCheck(document, { checkId: scene.checkId, clearedOn: '2026-03-13' }, context),
     );
 
     expect(
@@ -950,7 +998,7 @@ describe('the unhappy paths', () => {
         run(cleared.document, (document, context) =>
           cancelCheck(
             document,
-            { checkId: scene.checkId, occurredOn: '2026-10-20', reason: 'טעות' },
+            { checkId: scene.checkId, occurredOn: '2026-08-20', reason: 'טעות' },
             context,
           ),
         ),
@@ -1023,7 +1071,7 @@ describe('the unhappy paths', () => {
     const returned = run(scene.document, (document, context) =>
       markCheckReturned(
         document,
-        { checkId: scene.checkId, occurredOn: '2026-10-14', reason: 'חזר' },
+        { checkId: scene.checkId, occurredOn: '2026-08-14', reason: 'חזר' },
         context,
       ),
     );
@@ -1061,34 +1109,34 @@ describe('correcting a mistake', () => {
           accountId: scene.bankAccountId,
           checkNumber: '1001',
           amountMinor: 150_000,
-          dueDate: '2026-10-12',
+          dueDate: '2026-08-12',
           payeeName: 'גמ״ח',
           installmentNumber: 1,
           note: null,
-          deliveredOn: '2026-09-06',
+          deliveredOn: '2026-08-01',
         },
         context,
       ),
     );
     const cleared = run(added.document, (document, context) =>
-      clearCheck(document, { checkId: added.value, clearedOn: '2026-10-13' }, context),
+      clearCheck(document, { checkId: added.value, clearedOn: '2026-03-13' }, context),
     );
     return { ...scene, document: cleared.document, checkId: added.value, cleared };
   }
 
   test('undoing a clearing puts the debt back', () => {
     const scene = clearedByMistake();
-    expect(debtBalanceOf(scene.document, scene.gemachDebtId, '2026-10-31')).toBe(750_000);
+    expect(debtBalanceOf(scene.document, scene.gemachDebtId)).toBe(750_000);
 
     const reverted = run(scene.document, (document, context) =>
       revertCheckStatus(
         document,
-        { checkId: scene.checkId, reason: 'זוהה בטעות בדף החשבון', occurredOn: '2026-10-20' },
+        { checkId: scene.checkId, reason: 'זוהה בטעות בדף החשבון', occurredOn: '2026-08-20' },
         context,
       ),
     );
 
-    expect(debtBalanceOf(reverted.document, scene.gemachDebtId, '2026-10-31')).toBe(900_000);
+    expect(debtBalanceOf(reverted.document, scene.gemachDebtId)).toBe(900_000);
   });
 
   test('and puts the money back', () => {
@@ -1130,6 +1178,28 @@ describe('correcting a mistake', () => {
     expect(check?.debtEventId).toBeNull();
   });
 
+  test('the debt is right on every date, not only after the correction', () => {
+    /*
+     * A reversal dated on the day the mistake was noticed, rather than the day
+     * the repayment claimed, leaves the balance wrong for every date in
+     * between — and the gemach screen showed a household owing more than they
+     * had ever borrowed. Found by correcting a record in the browser.
+     */
+    const scene = clearedByMistake();
+    const reverted = run(scene.document, (document, context) =>
+      revertCheckStatus(
+        document,
+        { checkId: scene.checkId, reason: 'טעות', occurredOn: '2026-09-01' },
+        context,
+      ),
+    );
+
+    // The clearing claimed 2026-08-13; the correction was made on 2026-09-01.
+    for (const date of ['2026-08-12', '2026-08-13', '2026-08-20', '2026-09-01', '2026-09-06']) {
+      expect(debtBalanceOf(reverted.document, scene.gemachDebtId, date)).toBe(900_000);
+    }
+  });
+
   test('nothing is erased: history says what happened and then says it was wrong', () => {
     const scene = clearedByMistake();
     const eventsBefore = scene.document.debtEvents.length;
@@ -1157,7 +1227,7 @@ describe('correcting a mistake', () => {
     const reverted = run(scene.document, (document, context) =>
       revertCheckStatus(
         document,
-        { checkId: scene.checkId, reason: 'טעות בקריאת הדף', occurredOn: '2026-10-20' },
+        { checkId: scene.checkId, reason: 'טעות בקריאת הדף', occurredOn: '2026-08-20' },
         context,
       ),
     );
@@ -1176,7 +1246,7 @@ describe('correcting a mistake', () => {
         run(scene.document, (document, context) =>
           revertCheckStatus(
             document,
-            { checkId: scene.checkId, reason: '', occurredOn: '2026-10-20' },
+            { checkId: scene.checkId, reason: '', occurredOn: '2026-08-20' },
             context,
           ),
         ),
@@ -1206,14 +1276,14 @@ describe('correcting a mistake', () => {
     const returned = run(added.document, (document, context) =>
       markCheckReturned(
         document,
-        { checkId: added.value, occurredOn: '2026-10-14', reason: 'חזר' },
+        { checkId: added.value, occurredOn: '2026-08-14', reason: 'חזר' },
         context,
       ),
     );
     const reverted = run(returned.document, (document, context) =>
       revertCheckStatus(
         document,
-        { checkId: added.value, reason: 'לא באמת חזר', occurredOn: '2026-10-15' },
+        { checkId: added.value, reason: 'לא באמת חזר', occurredOn: '2026-08-15' },
         context,
       ),
     );
@@ -1251,7 +1321,7 @@ describe('correcting a mistake', () => {
           amountMinor: 150_000,
           dueDate: '2026-11-12',
           note: null,
-          deliveredOn: '2026-10-01',
+          deliveredOn: '2026-08-01',
         },
         context,
       ),
@@ -1262,7 +1332,7 @@ describe('correcting a mistake', () => {
         run(replaced.document, (document, context) =>
           revertCheckStatus(
             document,
-            { checkId: added.value, reason: 'שיניתי דעתי', occurredOn: '2026-10-20' },
+            { checkId: added.value, reason: 'שיניתי דעתי', occurredOn: '2026-08-20' },
             context,
           ),
         ),
@@ -1287,11 +1357,11 @@ describe('the document stays valid throughout', () => {
           count: 5,
           amountPerCheckMinor: 150_000,
           finalCheckAmountMinor: null,
-          firstDueDate: '2026-10-12',
+          firstDueDate: '2026-03-12',
           firstCheckNumber: '2001',
           intendedTotalMinor: 750_000,
           note: null,
-          deliveredOn: '2026-09-06',
+          deliveredOn: '2026-03-01',
         },
         context,
       ),
@@ -1300,7 +1370,7 @@ describe('the document stays valid throughout', () => {
     const ids = document.checks.map((check) => check.id);
 
     document = run(document, (current, context) =>
-      clearCheck(current, { checkId: ids[0]!, clearedOn: '2026-10-13' }, context),
+      clearCheck(current, { checkId: ids[0]!, clearedOn: '2026-03-13' }, context),
     ).document;
     document = run(document, (current, context) =>
       markCheckDeposited(current, { checkId: ids[1]! }, context),
@@ -1308,14 +1378,14 @@ describe('the document stays valid throughout', () => {
     document = run(document, (current, context) =>
       markCheckReturned(
         current,
-        { checkId: ids[2]!, occurredOn: '2026-12-14', reason: 'חזר' },
+        { checkId: ids[2]!, occurredOn: '2026-06-14', reason: 'חזר' },
         context,
       ),
     ).document;
     document = run(document, (current, context) =>
       cancelCheck(
         current,
-        { checkId: ids[3]!, occurredOn: '2026-12-20', reason: 'סוכם אחרת' },
+        { checkId: ids[3]!, occurredOn: '2026-07-20', reason: 'סוכם אחרת' },
         context,
       ),
     ).document;
@@ -1327,9 +1397,9 @@ describe('the document stays valid throughout', () => {
           reason: 'אבד',
           checkNumber: '2099',
           amountMinor: 150_000,
-          dueDate: '2027-03-12',
+          dueDate: '2026-11-12',
           note: null,
-          deliveredOn: '2027-01-05',
+          deliveredOn: '2026-08-05',
         },
         context,
       ),

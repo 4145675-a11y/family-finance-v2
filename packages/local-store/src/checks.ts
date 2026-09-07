@@ -7,7 +7,11 @@ import {
   type PostDatedCheck,
   type RepaymentPlan,
 } from '@family-finance/contracts';
-import { planCheckSeries, type CheckSeriesPlan } from '@family-finance/finance-engine';
+import {
+  businessDateOf,
+  planCheckSeries,
+  type CheckSeriesPlan,
+} from '@family-finance/finance-engine';
 
 import { auditEvent, withAudit } from './audit';
 import {
@@ -494,6 +498,28 @@ export function clearCheck(
     // and answering "fine" would be how the same debit becomes two repayments.
     throw new CommandError('check_already_cleared', 'this check has already been cleared');
   }
+
+  /*
+   * A check cannot have been honoured tomorrow.
+   *
+   * This looks like pedantry and is not. The cash movement counts from the
+   * moment it is written, while a debt balance is replayed only up to today —
+   * so a clearing dated next month takes the money out immediately and leaves
+   * the debt where it was, and the screen shows a household that has paid 1,500
+   * shekels and still owes every agora of it. Running the product is what
+   * surfaced this; the arithmetic was right in every test.
+   *
+   * The household's own calendar decides what "today" is, not the server's, so
+   * a clearing recorded late on a Jerusalem evening is not refused for being in
+   * a UTC tomorrow.
+   */
+  const today = businessDateOf(context.now, document.settings.timeZone);
+  if (input.clearedOn > today) {
+    throw new CommandError(
+      'clear_date_in_future',
+      'a check cannot be recorded as honoured on a date that has not happened',
+    );
+  }
   if (!canTransition(before.status, 'cleared')) {
     throw new CommandError(
       'check_transition_not_allowed',
@@ -779,15 +805,25 @@ export function revertCheckStatus(
       };
     }
 
-    // The repayment is undone by its opposite, so the debt returns to what it
-    // was without either event being erased.
+    /*
+     * The repayment is undone by its opposite, on the day the repayment claimed.
+     *
+     * Not on the day of the correction — that was the first attempt, and it was
+     * wrong. A debt balance is replayed up to a date, so a reversal dated later
+     * than the event it reverses leaves every date in between showing a
+     * repayment that has been retracted. Same date, and the pair cancels
+     * whenever the ledger is replayed.
+     *
+     * The correction's own date is not lost: it is on the audit entry, which is
+     * where "when did we notice" belongs.
+     */
     const reversal = recordDebtEvent(
       working,
       {
         debtId: before.debtId,
         kind: 'new_principal',
         amountMinor: before.amountMinor,
-        occurredOn: input.occurredOn,
+        occurredOn: before.clearedOn ?? input.occurredOn,
         correctionEffect: null,
         transactionId: null,
         note: input.reason.trim(),

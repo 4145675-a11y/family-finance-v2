@@ -214,6 +214,8 @@ export const gemach = {
   errors: {
     unknown_check: 'הצ׳ק הזה כבר לא קיים.',
     check_already_cleared: 'הצ׳ק הזה כבר סומן כנפרע.',
+    clear_date_in_future:
+      'אי אפשר לרשום פירעון בתאריך שעוד לא הגיע. אם הצ׳ק ירד, בחרו את היום שבו ירד.',
     check_transition_not_allowed: 'אי אפשר לעשות את זה למצב הנוכחי של הצ׳ק.',
     check_cannot_be_reverted: 'את המצב הזה אי אפשר לתקן ככה.',
     duplicate_check_number: 'מספר הצ׳ק הזה כבר רשום בחשבון הזה.',
