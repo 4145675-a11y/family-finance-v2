@@ -1,4 +1,5 @@
 import { AppShell } from '../../components/app-shell';
+import { ReauthGate } from '../../components/reauth-gate';
 import { NoHousehold, StatusChips } from '../../components/screen';
 import {
   Card,
@@ -83,13 +84,20 @@ export default async function ReportsPage() {
       </Notice>
 
       <Card title={screens.reports.exportTitle}>
-        <div className="flex flex-wrap gap-3">
-          <LinkButton href="/api/export/workbook" tone="secondary">
-            {screens.reports.exportExcel}
-          </LinkButton>
-          <LinkButton href="/api/export/transactions.csv" tone="secondary">
-            {screens.reports.exportCsv}
-          </LinkButton>
+        {/* Printing renders a screen this person is already looking at, so it is
+            outside the gate. The two file exports carry every figure out of the
+            application, so they are inside it. */}
+        <ReauthGate actionKey="export_all">
+          <div className="flex flex-wrap gap-3">
+            <LinkButton href="/api/export/workbook" tone="secondary">
+              {screens.reports.exportExcel}
+            </LinkButton>
+            <LinkButton href="/api/export/transactions.csv" tone="secondary">
+              {screens.reports.exportCsv}
+            </LinkButton>
+          </div>
+        </ReauthGate>
+        <div className="mt-4 flex flex-wrap gap-3">
           <LinkButton href="/reports/print" tone="secondary">
             {screens.reports.exportPdf}
           </LinkButton>

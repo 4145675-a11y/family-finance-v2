@@ -152,6 +152,20 @@ export function formatWeekday(date: string): string {
 }
 
 /**
+ * An instant, as a person reads it: `15/08/26, 14:32`.
+ *
+ * Used where the exact moment is the point — an audit line, a sign-in record —
+ * rather than for the dates on money, which are business dates and are formatted
+ * without a time because they do not have one.
+ */
+export function formatDateTime(instant: string): string {
+  return new Date(instant).toLocaleString('he-IL', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
+}
+
+/**
  * "מעודכן להיום" / "עודכן לפני 3 ימים".
  *
  * Freshness is the first thing on the home screen, so it is phrased the way a

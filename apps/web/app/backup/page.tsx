@@ -1,4 +1,5 @@
 import { AppShell } from '../../components/app-shell';
+import { ReauthGate } from '../../components/reauth-gate';
 import { RestorePanel } from '../../components/restore-panel';
 import { NoHousehold } from '../../components/screen';
 import { Card, Figure, Notice, SectionTitle, StatRow } from '../../components/ui';
@@ -69,16 +70,20 @@ export default async function BackupPage() {
           <bdi dir="ltr">{dataDirectory()}</bdi>
         </p>
         <div className="mt-4">
-          <ActionForm action={createBackupAction} submitLabel={screens.backup.create}>
-            <></>
-          </ActionForm>
+          <ReauthGate actionKey="backup_create">
+            <ActionForm action={createBackupAction} submitLabel={screens.backup.create}>
+              <></>
+            </ActionForm>
+          </ReauthGate>
         </div>
       </Card>
 
       <SectionTitle>{screens.backup.restoreTitle}</SectionTitle>
       <Notice tone="attention">{screens.backup.restoreWarning}</Notice>
       <Card>
-        <RestorePanel />
+        <ReauthGate actionKey="backup_restore">
+          <RestorePanel />
+        </ReauthGate>
       </Card>
     </AppShell>
   );

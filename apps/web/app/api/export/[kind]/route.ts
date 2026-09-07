@@ -1,6 +1,8 @@
 import { cell, writeWorkbook, type WriteSheet } from '@family-finance/document-import';
 import { balanceOf, isRealTransaction } from '@family-finance/local-store';
 
+import { assertRecentlyVerified } from '../../../../lib/auth/session';
+import { authScreen } from '../../../../lib/copy/security';
 import { allReports } from '../../../../lib/reports';
 import { loadDashboardView } from '../../../../lib/dashboard/load';
 
@@ -42,6 +44,22 @@ export async function GET(
   { params }: { params: Promise<{ kind: string }> },
 ): Promise<Response> {
   const { kind } = await params;
+
+  /*
+   * An export is every figure the household has, in a file. The screen asks for
+   * Windows Hello before it offers the link, and this refuses the request when
+   * the check is stale — because a link can be followed directly, and a check
+   * that only exists on the page that offers it is not a check.
+   */
+  try {
+    await assertRecentlyVerified('export_all');
+  } catch {
+    return new Response(authScreen.reauthNeeded, {
+      status: 403,
+      headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' },
+    });
+  }
+
   const view = await loadDashboardView();
 
   if (

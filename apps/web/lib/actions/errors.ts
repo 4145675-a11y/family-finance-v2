@@ -1,6 +1,8 @@
 import { CommandError } from '@family-finance/local-store';
 import { revalidatePath } from 'next/cache';
 
+import { AuthError } from '../auth/model';
+import { authScreen } from '../copy/security';
 import { failed, type FormState } from '../forms';
 
 /**
@@ -44,6 +46,12 @@ const MESSAGES: Readonly<Record<string, string>> = {
 
 /** Turns a thrown command error into a sentence a family can act on. */
 export function describe(error: unknown): FormState {
+  // The lock, first. A locked session reaching an action is not a saving
+  // failure, and telling a family "something went wrong" when the answer is
+  // "sign in again" is the difference between a fix and a mystery.
+  if (error instanceof AuthError) {
+    return failed(authScreen.errors[error.code] ?? authScreen.errors['locked'] ?? '');
+  }
   if (error instanceof CommandError) {
     return failed(MESSAGES[error.code] ?? 'לא הצלחנו לשמור את השינוי.');
   }

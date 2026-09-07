@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     '@family-finance/finance-engine',
     '@family-finance/document-import',
     '@family-finance/local-store',
+    '@family-finance/webauthn',
   ],
   // 07-SECURITY-PRIVACY.md requires the framework not to advertise itself.
   poweredByHeader: false,

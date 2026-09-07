@@ -34,6 +34,18 @@ export interface StorePaths {
   readonly uploads: string;
   /** Backups the family asked for. */
   readonly backups: string;
+  /**
+   * Passkey credentials, sessions and the authentication log.
+   *
+   * Deliberately a separate file from the household document. A passkey is bound
+   * to this device and this origin, while the household document is the thing
+   * that gets backed up and carried elsewhere — keeping credentials inside it
+   * would mean a restore could remove the family's passkey or install somebody
+   * else's. See ADR-0028.
+   */
+  readonly auth: string;
+  /** Where the authentication file is written before it replaces the live one. */
+  readonly authStaging: string;
 }
 
 /** The directory name, relative to the project root. Gitignored. */
@@ -60,6 +72,8 @@ export function resolveStorePaths(projectRoot: string, override?: string): Store
     history: join(root, 'history'),
     uploads: join(root, 'uploads'),
     backups: join(root, 'backups'),
+    auth: join(root, 'auth.json'),
+    authStaging: join(root, 'auth.json.writing'),
   };
 }
 

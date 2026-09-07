@@ -45,6 +45,16 @@ export interface HouseholdView {
   readonly asOf: string;
 }
 
+/**
+ * A check that runs before the household's truth is read or written.
+ *
+ * The store does not know what a passkey is and must not: it is given a
+ * function that throws when the application is locked, and calls it at every
+ * door. Keeping the policy outside and the enforcement inside is what stops a
+ * screen added next month from quietly reading a balance without one.
+ */
+export type StoreGuard = () => Promise<void>;
+
 export interface CreateHouseholdInput {
   readonly householdName: string;
   readonly profileName: string;
@@ -54,9 +64,23 @@ export interface CreateHouseholdInput {
 
 export class HouseholdStore {
   private readonly files: FileStore;
+  private readonly guard: StoreGuard | null;
 
-  constructor(paths: StorePaths) {
+  constructor(paths: StorePaths, guard: StoreGuard | null = null) {
     this.files = new FileStore(paths);
+    this.guard = guard;
+  }
+
+  /**
+   * Refuses the operation when the application is locked.
+   *
+   * Called first in every method that touches the household's records. Creating
+   * the household and asking whether one exists are exempt: there is nothing to
+   * protect before there is a household, and refusing to say whether a file
+   * exists would only mean a first-run screen that cannot decide what to show.
+   */
+  private async allow(): Promise<void> {
+    if (this.guard !== null) await this.guard();
   }
 
   get paths(): StorePaths {
@@ -91,11 +115,13 @@ export class HouseholdStore {
   }
 
   async readDocument(): Promise<StoreDocument> {
+    await this.allow();
     const snapshot = await this.files.read();
     return snapshot.document;
   }
 
   async readDocumentOrNull(): Promise<StoreDocument | null> {
+    await this.allow();
     const snapshot = await this.files.readOrNull();
     return snapshot?.document ?? null;
   }
@@ -108,6 +134,7 @@ export class HouseholdStore {
    * trail depends on.
    */
   async view(asOf = new Date().toISOString()): Promise<HouseholdView | null> {
+    await this.allow();
     const document = await this.readDocumentOrNull();
     if (document === null) return null;
     return viewOf(document, asOf);
@@ -115,6 +142,7 @@ export class HouseholdStore {
 
   /** The identity every command is attributed to: the household's first profile. */
   async context(now = new Date().toISOString()): Promise<CommandContext> {
+    await this.allow();
     const document = await this.readDocument();
     const profile = document.profiles[0];
     if (profile === undefined) {
@@ -134,6 +162,7 @@ export class HouseholdStore {
     command: (document: StoreDocument, context: CommandContext) => CommandResult<T>,
     options: { readonly now?: string; readonly expectedRevision?: string } = {},
   ): Promise<T> {
+    await this.allow();
     const now = options.now ?? new Date().toISOString();
 
     const { result } = await this.files.mutate<T>(
@@ -155,6 +184,7 @@ export class HouseholdStore {
 
   /** Replaces everything. Restore only. */
   async replaceDocument(document: StoreDocument): Promise<void> {
+    await this.allow();
     await this.files.replace(document);
   }
 }

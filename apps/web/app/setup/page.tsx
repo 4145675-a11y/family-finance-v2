@@ -12,6 +12,7 @@ import { AppShell } from '../../components/app-shell';
 import { ActionForm, MoneyField, TextField } from '../../components/form';
 import { Card, LinkButton, Meter, Notice, StatRow } from '../../components/ui';
 import { screens } from '../../lib/copy/screens';
+import { requireUnlocked } from '../../lib/auth/guard';
 import { householdStore } from '../../lib/store/server';
 import { SimpleAction } from '../../components/simple-action';
 
@@ -30,6 +31,7 @@ import { SimpleAction } from '../../components/simple-action';
 export const dynamic = 'force-dynamic';
 
 export default async function SetupPage() {
+  await requireUnlocked();
   const store = householdStore();
   const document = await store.readDocumentOrNull();
 

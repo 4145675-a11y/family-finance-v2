@@ -15,6 +15,7 @@
     "@family-finance/document-import": "*",
     "@family-finance/finance-engine": "*",
     "@family-finance/local-store": "*",
+    "@family-finance/webauthn": "*",
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.112.3",
     "next": "16.3.1",

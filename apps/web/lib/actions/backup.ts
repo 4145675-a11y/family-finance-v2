@@ -9,9 +9,10 @@ import {
   serialiseBackup,
 } from '@family-finance/local-store';
 
+import { assertRecentlyVerified } from '../auth/session';
 import { failed, succeeded, type FormState } from '../forms';
 import { householdStore } from '../store/server';
-import { refreshMoneyScreens } from './errors';
+import { describe, refreshMoneyScreens } from './errors';
 
 /**
  * Carrying the data out and bringing it back.
@@ -50,6 +51,14 @@ export async function createBackupAction(
   _previous: FormState,
   _data: FormData,
 ): Promise<FormState> {
+  /* A backup is every figure the household has, in one file that leaves the
+     application. Being signed in an hour ago is not authorisation for that. */
+  try {
+    await assertRecentlyVerified('backup_create');
+  } catch (error) {
+    return describe(error);
+  }
+
   const store = householdStore();
 
   try {
@@ -138,6 +147,14 @@ export async function applyRestoreAction(
   }
   if (confirmation !== 'שחזור') {
     return failed('כדי לאשר, יש להקליד את המילה "שחזור" בשדה האישור.');
+  }
+
+  /* Restoring overwrites everything. The typed confirmation proves intent; this
+     proves it is still the same person at the keyboard. */
+  try {
+    await assertRecentlyVerified('backup_restore');
+  } catch (error) {
+    return describe(error);
   }
 
   const store = householdStore();

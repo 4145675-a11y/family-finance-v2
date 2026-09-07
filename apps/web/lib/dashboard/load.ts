@@ -11,6 +11,7 @@ import {
 } from '@family-finance/finance-engine';
 import type { StoreDocument } from '@family-finance/local-store';
 
+import { requireUnlocked } from '../auth/guard';
 import { householdStore } from '../store/server';
 import {
   currentEnvironment,
@@ -56,6 +57,11 @@ export interface DashboardView {
 export async function loadDashboardView(
   asOf = new Date().toISOString(),
 ): Promise<DashboardView> {
+  // Before anything is read. The store refuses a locked caller as well, but by
+  // then the only honest answer is an error page; here it is the lock screen,
+  // which is what a person should actually see.
+  await requireUnlocked();
+
   const store = householdStore();
   const view = await store.view(asOf);
 
