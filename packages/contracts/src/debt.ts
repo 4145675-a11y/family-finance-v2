@@ -28,6 +28,15 @@ export const debtKindSchema = z.enum([
   'revolving_credit',
   'overdraft',
   'private_person',
+  /**
+   * A gemach: a free-loan fund. Its own kind rather than an institution or a
+   * private person, because neither describes it. It charges no interest, which
+   * changes what "progress" means — every shekel repaid reduces the principal, so
+   * a repayment schedule that looks alarming beside a bank loan is not — and it is
+   * repaid through post-dated checks handed over in advance, which no other kind
+   * of debt here does.
+   */
+  'gemach',
   'institution',
   'other',
 ]);
@@ -39,6 +48,7 @@ export const CONSUMER_DEBT_KINDS: readonly DebtKind[] = [
   'revolving_credit',
   'overdraft',
   'private_person',
+  'gemach',
   'institution',
   'other',
 ];

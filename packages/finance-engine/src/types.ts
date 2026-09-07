@@ -11,6 +11,7 @@ import type {
   RecordScope,
 } from '@family-finance/contracts';
 
+import type { CheckRecord } from './checks';
 import type { DirectedAmount } from './money';
 
 /**
@@ -148,6 +149,14 @@ export interface EngineInput {
   readonly debts: readonly DebtRecord[];
   readonly debtEvents: readonly DebtEventRecord[];
   readonly rollovers: readonly RolloverLink[];
+  /**
+   * Post-dated checks the household has written.
+   *
+   * Passed in alongside the debts rather than derived from them, because a check
+   * is a fact about a piece of paper and a debt event is a fact about money. The
+   * engine needs both and must never infer one from the other.
+   */
+  readonly checks: readonly CheckRecord[];
   readonly reserve: ReserveInputs;
   readonly business: BusinessInputs | null;
   /**

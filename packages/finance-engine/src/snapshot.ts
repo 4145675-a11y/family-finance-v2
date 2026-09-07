@@ -1,3 +1,4 @@
+import { summariseChecks, type CheckExposure } from './checks';
 import type { BusinessDate, Currency } from '@family-finance/contracts';
 
 import {
@@ -83,6 +84,14 @@ export interface FinancialSnapshot {
   readonly waterfall: WaterfallResult;
   readonly mode: ModeAssessment;
   readonly stressTests: readonly StressScenarioResult[];
+  /**
+   * Post-dated checks: what is still out there, and what has already gone.
+   *
+   * Carried on the snapshot rather than computed by a screen so that the home
+   * screen, the gemach screen and the reports cannot arrive at three different
+   * answers to "how much of our paper is still outstanding".
+   */
+  readonly checkExposure: CheckExposure;
   readonly nextAction: NextAction;
 }
 
@@ -213,6 +222,7 @@ export function buildFinancialSnapshot(input: EngineInput): FinancialSnapshot {
   const totals = debtTotals(input.debts, balances);
   const metrics = debtPeriodMetrics(input.debtEvents, input.rollovers, periodStart, today);
   const risk = callRisk(input.debts, balances, today);
+  const checkExposure = summariseChecks(input.checks, today);
 
   const safeSpend = safeHouseholdSpend(input, today);
   const householdLiquidMinor = liquidCashMinor(input.accounts, 'household');
@@ -327,6 +337,7 @@ export function buildFinancialSnapshot(input: EngineInput): FinancialSnapshot {
     waterfall,
     mode,
     stressTests,
+    checkExposure,
     nextAction: chooseNextAction(
       mode,
       safeSpend,

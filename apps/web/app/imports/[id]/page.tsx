@@ -1,9 +1,11 @@
-import { checkApproval } from '@family-finance/local-store';
+import { maskCheckNumber } from '@family-finance/contracts';
+import { checkApproval, proposeCheckMatch } from '@family-finance/local-store';
 import { notFound } from 'next/navigation';
 
 import {
   approveBatchAction,
   correctRowAction,
+  matchCheckAction,
   rejectBatchAction,
   reverseBatchAction,
   reviewAllAction,
@@ -28,9 +30,10 @@ import {
   SectionTitle,
   StatRow,
 } from '../../../components/ui';
+import { gemach } from '../../../lib/copy/gemach';
 import { screens } from '../../../lib/copy/screens';
 import { loadDashboardView } from '../../../lib/dashboard/load';
-import { formatBusinessDate, toAmountInput } from '../../../lib/format';
+import { formatBasisPoints, formatBusinessDate, toAmountInput } from '../../../lib/format';
 
 /**
  * The review workspace: what the document said, what we read it as, and what you
@@ -90,6 +93,30 @@ export default async function ImportReviewPage({
 
   const accountName = (accountId: string | null): string =>
     accounts.find((account) => account.value === accountId)?.label ?? screens.common.none;
+
+  /**
+   * The checks a row could be the clearing of.
+   *
+   * Computed once per row and only for outgoing movements attached to an
+   * account: an income row is not a check coming out, and a row with no account
+   * has nothing to match against. Returns null when there is nothing to offer,
+   * so the block does not appear on the ninety rows that are ordinary shopping.
+   */
+  const matchFor = (proposal: (typeof proposals)[number]) => {
+    const payload = proposal.correction ?? proposal.proposed;
+    if (payload.kind !== 'transaction') return null;
+    if (payload.value.direction !== 'outflow') return null;
+    if (proposal.targetAccountId === null) return null;
+
+    const proposal_ = proposeCheckMatch(document, {
+      accountId: proposal.targetAccountId,
+      amountMinor: payload.value.amountMinor,
+      transactionDate: payload.value.transactionDate,
+      reference: payload.value.description,
+    });
+
+    return proposal_.candidates.length === 0 ? null : proposal_;
+  };
 
   if (batch.status === 'failed') {
     return (
@@ -332,6 +359,85 @@ export default async function ImportReviewPage({
               )}
             </Disclosure>
 
+            {/*
+              A bank debit that looks like one of the family's own checks.
+              
+              Offered, never applied. Two checks that a statement cannot tell
+              apart stay ambiguous and both are listed, because the family knows
+              which check they wrote and we do not — and choosing for them would
+              reduce the wrong month's obligation while looking competent.
+            */}
+            {matchFor(proposal) === null ? null : (
+              <div className="mt-4 rounded-control border border-border bg-surface-muted/50 p-3">
+                <p className="font-medium">{gemach.matchTitle}</p>
+                <p className="mt-1 text-small text-text-secondary">{gemach.matchIntro}</p>
+
+                {proposal.targetCheckId === null ? null : (
+                  <p className="mt-2 text-small font-medium">{gemach.matchChosen}</p>
+                )}
+
+                {matchFor(proposal)?.ambiguous === true ? (
+                  <p className="mt-2 text-small text-attention">{gemach.matchAmbiguous}</p>
+                ) : null}
+
+                <ul className="mt-3 flex flex-col gap-3">
+                  {(matchFor(proposal)?.candidates ?? []).map((candidate) => (
+                    <li
+                      key={candidate.checkId}
+                      className="border-t border-border pt-3 first:border-t-0 first:pt-0"
+                    >
+                      <p>
+                        <Money amountMinor={candidate.check.amountMinor} currency={currency} />
+                        {' · '}
+                        <Figure>{formatBusinessDate(candidate.check.dueDate)}</Figure>
+                        {candidate.check.checkNumber === null ? null : (
+                          <>
+                            {' · '}
+                            <Figure>{maskCheckNumber(candidate.check.checkNumber)}</Figure>
+                          </>
+                        )}
+                      </p>
+                      <p className="mt-1 text-small text-text-secondary">
+                        {gemach.matchConfidence}:{' '}
+                        <Figure>{formatBasisPoints(candidate.confidenceBp)}</Figure> ·{' '}
+                        {candidate.reasons
+                          .map((reason) => gemach.matchReasons[reason] ?? reason)
+                          .join(' · ')}
+                      </p>
+                      {proposal.targetCheckId === candidate.checkId ? (
+                        <div className="mt-2">
+                          <ActionForm
+                            action={matchCheckAction}
+                            submitLabel={gemach.matchClear}
+                            tone="secondary"
+                          >
+                            <>
+                              <HiddenValue name="proposalId" value={proposal.id} />
+                              <HiddenValue name="batchId" value={batch.id} />
+                            </>
+                          </ActionForm>
+                        </div>
+                      ) : (
+                        <div className="mt-2">
+                          <ActionForm
+                            action={matchCheckAction}
+                            submitLabel={gemach.matchChoose}
+                            tone="secondary"
+                          >
+                            <>
+                              <HiddenValue name="proposalId" value={proposal.id} />
+                              <HiddenValue name="batchId" value={batch.id} />
+                              <HiddenValue name="checkId" value={candidate.checkId} />
+                            </>
+                          </ActionForm>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {decided ? null : (
               <div className="mt-3 flex flex-wrap gap-3">
                 <ActionForm
@@ -345,6 +451,9 @@ export default async function ImportReviewPage({
                     <HiddenValue name="reviewState" value="included" />
                     {proposal.targetAccountId === null ? null : (
                       <HiddenValue name="targetAccountId" value={proposal.targetAccountId} />
+                    )}
+                    {proposal.targetCheckId === null ? null : (
+                      <HiddenValue name="checkId" value={proposal.targetCheckId} />
                     )}
                   </>
                 </ActionForm>

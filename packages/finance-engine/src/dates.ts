@@ -123,6 +123,33 @@ export function startOfMonth(date: BusinessDate): BusinessDate {
 }
 
 /**
+ * The same day of the month, `months` later, clamped to a month that has it.
+ *
+ * A series of post-dated checks written on the 31st has no 31st in February, and
+ * the bank's answer is the 28th rather than the 3rd of March. Clamping keeps each
+ * check in the month it was meant for, which is what the borrower and the gemach
+ * both counted.
+ */
+export function addMonths(date: BusinessDate, months: number): BusinessDate {
+  assertBusinessDate(date);
+  if (!Number.isInteger(months)) {
+    throw new DateError(`months must be a whole number, got ${months}`);
+  }
+
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  const day = Number(date.slice(8, 10));
+
+  const target = month - 1 + months;
+  const targetYear = year + Math.floor(target / 12);
+  const targetMonth = ((target % 12) + 12) % 12;
+
+  // Day 0 of the next month is the last day of this one.
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  return fromUtcMidnight(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)));
+}
+
+/**
  * The day a monthly obligation falls due in the month of `reference`.
  *
  * A debt due on the 31st has no 31st in February. Clamping to the last day of the

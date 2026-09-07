@@ -270,6 +270,16 @@ export const importProposalSchema = z
     /** Which account, debt or business the row should attach to once approved. */
     targetAccountId: uuidSchema.nullable(),
     targetDebtId: uuidSchema.nullable(),
+    /**
+     * The post-dated check this row is the clearing of, once a person says so.
+     *
+     * Null until a reviewer picks one, and never filled in automatically however
+     * confident the match: a statement row and a check are joined by a decision,
+     * not by an amount happening to agree. When it is set, approval clears that
+     * check — one cash movement and one repayment — instead of recording a second
+     * unrelated expense.
+     */
+    targetCheckId: uuidSchema.nullable(),
     /** The record created when the batch was approved. Null until then. */
     committedRecordId: uuidSchema.nullable(),
     createdAt: timestampSchema,

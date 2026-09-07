@@ -52,3 +52,11 @@
 | ENTRY-MANUAL-001 | Product | apps/web/app/entry + accounts + debts | unit/browser | 7 | **Verified in M7** — אותו מנתח סכומים לטופס ולקובץ; כל שדה נבדק ב־forms.test.ts |
 | REP-EXPORT-001 | Architecture | apps/web/lib/reports + api/export | unit/roundtrip | 7 | **Verified in M7** — יבוא ממתין אינו בשום סכום; ה־workbook נקרא חזרה עם הסכומים במדויק |
 | PWA-INSTALL-001 | Architecture | apps/web/app/manifest + public/service-worker.js | unit/source | 7 | **Verified in M7** — ניווט תמיד לרשת; אין push ואין background sync שאין להם שרת |
+| AUTH-PASSKEY-001 | Security | packages/webauthn + apps/web/lib/auth | unit/negative | 8 | **Verified in M8** — origin, RP ID, אתגר, UV, חתימה ומונה — כל בדיקה נבדקת גם בכישלונה |
+| AUTH-NOBIO-001 | Security | apps/web/lib/auth/model.ts | unit/schema | 8 | **Verified in M8** — אין שדה שיכול להחזיק תבנית ביומטרית |
+| AUTH-SESSION-001 | Security | apps/web/lib/auth/session.ts | unit | 8 | **Verified in M8** — אתגר חוזר נדחה; פעילות אינה מאריכה מעבר ל־12 שעות |
+| AUTH-REAUTH-001 | Security | apps/web/lib/auth/session.ts + api/export | unit/route | 8 | **Verified in M8** — "מחובר" אינו "אומת עכשיו" |
+| GEM-MODEL-001 | Financial | packages/contracts/src/checks.ts + local-store/src/checks.ts | unit/property | 8 | **Verified in M8** — כל מצב שאפשר להגיע אליו הוא מסמך תקין |
+| GEM-DELIVERY-001 | Financial | local-store/src/checks.ts | unit/property | 8 | **Verified in M8** — מסירה אינה יוצרת תנועה ואינה יוצרת אירוע חוב |
+| GEM-FORECAST-001 | Financial | local-store/src/projection.ts | integration | 8 | **Verified in M8** — פריט אחד לכל צ׳ק, לפי מזהה הצ׳ק |
+| GEM-MATCH-001 | Architecture | local-store/src/check-match.ts | unit/integration | 8 | **Verified in M8** — יבוא חוזר של אותו דף אינו פורע צ׳ק פעמיים |

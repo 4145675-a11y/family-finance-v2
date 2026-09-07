@@ -23,6 +23,7 @@ export {
   businessDateOf,
   compareDates,
   daysBetween,
+  addMonths,
   dueDateInMonth,
   eachDay,
   endOfMonth,
@@ -30,6 +31,25 @@ export {
   isOnOrBefore,
   startOfMonth,
 } from './dates';
+
+export {
+  DUE_SOON_DAYS,
+  coverageOf,
+  derivedCheckState,
+  evenSeriesFor,
+  isAtLarge,
+  isOutstanding,
+  planCheckSeries,
+  summariseChecks,
+  type CheckCoverage,
+  type CheckExposure,
+  type CheckRecord,
+  type CheckSeriesPlan,
+  type DerivedCheckState,
+  type PlannedCheck,
+  type SeriesRequest,
+  type SeriesWarning,
+} from './checks';
 
 export type {
   AccountPosition,

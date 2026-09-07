@@ -5,6 +5,9 @@ import { Card, Figure, LinkList, StatRow } from '../../components/ui';
 import { copy } from '../../lib/copy/copy';
 import { screens } from '../../lib/copy/screens';
 import { householdExists } from '../../lib/dashboard/load';
+import { requireUnlocked } from '../../lib/auth/guard';
+import { authScreen } from '../../lib/copy/security';
+import { gemach } from '../../lib/copy/gemach';
 
 /**
  * "עוד" — everything the home screen deliberately does not carry.
@@ -18,11 +21,13 @@ import { householdExists } from '../../lib/dashboard/load';
 export const dynamic = 'force-dynamic';
 
 export default async function MorePage() {
+  await requireUnlocked();
   const exists = await householdExists();
 
   const picture = [
     { href: '/forecast', title: copy.forecast.title, description: copy.forecast.endQuestion },
     { href: '/debts', title: copy.debts.title, description: copy.debts.realStoryTitle },
+    { href: '/gemach', title: gemach.title, description: gemach.subtitle },
     { href: '/business', title: copy.business.title, description: copy.business.safeToMove },
     { href: '/budget', title: copy.budget.title, description: copy.budget.subtitle },
     {
@@ -56,6 +61,7 @@ export default async function MorePage() {
       description: screens.settings.subtitle,
     },
     { href: '/backup', title: screens.backup.title, description: screens.backup.subtitle },
+    { href: '/security', title: authScreen.title, description: authScreen.setupIntro },
   ];
 
   return (

@@ -27,6 +27,13 @@ function dayThisMonth(asOf: string, day: number): string {
   return `${asOf.slice(0, 7)}-${String(day).padStart(2, '0')}`;
 }
 
+/** The same day, `months` in the future: where the remaining checks fall. */
+function monthsAfter(asOf: string, months: number, day: number): string {
+  const [year, month] = [Number(asOf.slice(0, 4)), Number(asOf.slice(5, 7))];
+  const shifted = new Date(Date.UTC(year, month - 1 + months, 1));
+  return `${shifted.toISOString().slice(0, 7)}-${String(day).padStart(2, '0')}`;
+}
+
 function monthsBefore(asOf: string, months: number): string {
   const [year, month] = [Number(asOf.slice(0, 4)), Number(asOf.slice(5, 7))];
   const shifted = new Date(Date.UTC(year, month - 1 - months, 1));
@@ -201,6 +208,28 @@ export function demoHouseholdInput(asOf: string = new Date().toISOString()): Eng
     ],
 
     debts: [
+      /*
+       * A gemach loan, repaid with post-dated checks.
+       *
+       * Present in the demonstration household because it is the case the
+       * screens most easily get wrong: four checks are sitting in somebody
+       * else's drawer, the bank balance knows nothing about them, and a
+       * dashboard that reports only the balance is telling this family they
+       * have money they have already promised away.
+       */
+      {
+        id: 'debt-gemach',
+        creditorName: 'גמ״ח שכונתי',
+        kind: 'gemach',
+        status: 'active',
+        minimumPaymentMinor: ils(1_500),
+        paymentDueDay: 12,
+        // Not null and not unknown: a gemach genuinely charges nothing, and
+        // saying so is different from not knowing.
+        effectiveAnnualRateBp: 0,
+        urgency: 'none',
+        expectedCallDate: null,
+      },
       {
         id: 'debt-revolving',
         creditorName: 'אשראי מתגלגל',
@@ -293,6 +322,38 @@ export function demoHouseholdInput(asOf: string = new Date().toISOString()): Eng
     ],
 
     debtEvents: [
+      {
+        id: 'ev-gemach-open',
+        debtId: 'debt-gemach',
+        kind: 'opening_balance',
+        amountMinor: ils(9_000),
+        occurredOn: monthsBefore(asOf, 4),
+        correctionEffect: null,
+      },
+      {
+        id: 'ev-gemach-1',
+        debtId: 'debt-gemach',
+        kind: 'principal_payment',
+        amountMinor: ils(1_500),
+        occurredOn: monthsAfter(asOf, -3, 13),
+        correctionEffect: null,
+      },
+      {
+        id: 'ev-gemach-2',
+        debtId: 'debt-gemach',
+        kind: 'principal_payment',
+        amountMinor: ils(1_500),
+        occurredOn: monthsAfter(asOf, -2, 12),
+        correctionEffect: null,
+      },
+      {
+        id: 'ev-gemach-3',
+        debtId: 'debt-gemach',
+        kind: 'principal_payment',
+        amountMinor: ils(1_500),
+        occurredOn: monthsAfter(asOf, -1, 14),
+        correctionEffect: null,
+      },
       {
         id: 'ev-rev-open',
         debtId: 'debt-revolving',
@@ -402,6 +463,88 @@ export function demoHouseholdInput(asOf: string = new Date().toISOString()): Eng
         amountMinor: ils(5_000),
         occurredOn: dayThisMonth(asOf, 6),
         status: 'confirmed',
+      },
+    ],
+
+    /*
+     * Six checks written, three honoured, three still out there.
+     *
+     * The three outstanding ones total 4,500 and none of them has touched the
+     * bank balance. That is the number the home screen has to warn about, and
+     * the number that must never be added to the money already spent.
+     */
+    checks: [
+      {
+        id: 'check-gemach-1',
+        debtId: 'debt-gemach',
+        accountId: 'acc-main',
+        amountMinor: ils(1_500),
+        dueDate: monthsAfter(asOf, -3, 12),
+        status: 'cleared',
+        installmentNumber: 1,
+        payeeName: 'גמ״ח שכונתי',
+        deliveredOn: monthsBefore(asOf, 4),
+        clearedOn: monthsAfter(asOf, -3, 13),
+      },
+      {
+        id: 'check-gemach-2',
+        debtId: 'debt-gemach',
+        accountId: 'acc-main',
+        amountMinor: ils(1_500),
+        dueDate: monthsAfter(asOf, -2, 12),
+        status: 'cleared',
+        installmentNumber: 2,
+        payeeName: 'גמ״ח שכונתי',
+        deliveredOn: monthsBefore(asOf, 4),
+        clearedOn: monthsAfter(asOf, -2, 12),
+      },
+      {
+        id: 'check-gemach-3',
+        debtId: 'debt-gemach',
+        accountId: 'acc-main',
+        amountMinor: ils(1_500),
+        dueDate: monthsAfter(asOf, -1, 12),
+        status: 'cleared',
+        installmentNumber: 3,
+        payeeName: 'גמ״ח שכונתי',
+        deliveredOn: monthsBefore(asOf, 4),
+        clearedOn: monthsAfter(asOf, -1, 14),
+      },
+      {
+        id: 'check-gemach-4',
+        debtId: 'debt-gemach',
+        accountId: 'acc-main',
+        amountMinor: ils(1_500),
+        dueDate: dayThisMonth(asOf, 12),
+        status: 'delivered',
+        installmentNumber: 4,
+        payeeName: 'גמ״ח שכונתי',
+        deliveredOn: monthsBefore(asOf, 4),
+        clearedOn: null,
+      },
+      {
+        id: 'check-gemach-5',
+        debtId: 'debt-gemach',
+        accountId: 'acc-main',
+        amountMinor: ils(1_500),
+        dueDate: monthsAfter(asOf, 1, 12),
+        status: 'delivered',
+        installmentNumber: 5,
+        payeeName: 'גמ״ח שכונתי',
+        deliveredOn: monthsBefore(asOf, 4),
+        clearedOn: null,
+      },
+      {
+        id: 'check-gemach-6',
+        debtId: 'debt-gemach',
+        accountId: 'acc-main',
+        amountMinor: ils(1_500),
+        dueDate: monthsAfter(asOf, 2, 12),
+        status: 'delivered',
+        installmentNumber: 6,
+        payeeName: 'גמ״ח שכונתי',
+        deliveredOn: monthsBefore(asOf, 4),
+        clearedOn: null,
       },
     ],
 

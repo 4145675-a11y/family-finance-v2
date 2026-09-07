@@ -115,6 +115,29 @@ export {
 } from './debt';
 
 export {
+  AT_LARGE_CHECK_STATUSES,
+  CHECK_TRANSITIONS,
+  OUTSTANDING_CHECK_STATUSES,
+  TERMINAL_CHECK_STATUSES,
+  addCheckInputSchema,
+  canTransition,
+  checkNumberSchema,
+  checkSeriesInputSchema,
+  checkSourceSchema,
+  checkStatusSchema,
+  maskCheckNumber,
+  plannedTotalMinor,
+  postDatedCheckSchema,
+  repaymentPlanSchema,
+  type AddCheckInput,
+  type CheckSeriesInput,
+  type CheckSource,
+  type CheckStatus,
+  type PostDatedCheck,
+  type RepaymentPlan,
+} from './checks';
+
+export {
   documentTypeSchema,
   duplicateVerdictSchema,
   extractionSummarySchema,

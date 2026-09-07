@@ -6,13 +6,15 @@ import {
   Disclosure,
   EmptyState,
   Figure,
+  LinkButton,
   Money,
   StatRow,
 } from '../../components/ui';
 import { copy } from '../../lib/copy/copy';
 import { scenarioLabel } from '../../lib/copy/notices';
 import { loadDashboardView } from '../../lib/dashboard/load';
-import { formatBusinessDate } from '../../lib/format';
+import { gemach } from '../../lib/copy/gemach';
+import { formatBusinessDate, money } from '../../lib/format';
 
 /**
  * What is expected for the rest of the month.
@@ -64,6 +66,38 @@ export default async function ForecastPage() {
         </p>
         <p className="mt-2 text-text-secondary">{copy.forecast.onlyFirstTwoCount}</p>
       </Card>
+
+      {/*
+        The checks are inside the figures above, and it is worth saying so.
+        A family looking at a low point and knowing four checks are out has no
+        way to tell whether the forecast already knows — and if they assume it
+        does not, they subtract the checks a second time and act on a number
+        that is wrong by four thousand shekels.
+      */}
+      {snapshot.checkExposure.outstandingCount === 0 ? null : (
+        <Card title={gemach.checksOutstanding}>
+          <p className="text-text-secondary">
+            {gemach.outstandingCount(
+              snapshot.checkExposure.outstandingCount,
+              money(snapshot.checkExposure.outstandingTotalMinor, snapshot.currency),
+            )}
+          </p>
+          <p className="mt-2">{gemach.forecastIncluded}</p>
+          {snapshot.checkExposure.nextCheck === null ? null : (
+            <p className="mt-2 text-text-secondary">
+              {gemach.nextCheckLine(
+                formatBusinessDate(snapshot.checkExposure.nextCheck.dueDate),
+                money(snapshot.checkExposure.nextCheck.amountMinor, snapshot.currency),
+              )}
+            </p>
+          )}
+          <div className="mt-4">
+            <LinkButton href="/gemach" tone="secondary">
+              {gemach.details}
+            </LinkButton>
+          </div>
+        </Card>
+      )}
 
       <Card
         title={copy.forecast.tightQuestion}

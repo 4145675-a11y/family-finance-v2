@@ -20,6 +20,7 @@ import {
 import type { ProposedPayload } from '@family-finance/contracts';
 import { revalidatePath } from 'next/cache';
 
+import { gemach } from '../copy/gemach';
 import { FieldReader, failed, succeeded, type FormState } from '../forms';
 import { householdStore } from '../store/server';
 import { describe, refreshImportScreens, refreshMoneyScreens } from './errors';
@@ -249,6 +250,43 @@ export async function reviewRowAction(
 
   revalidatePath(`/imports/${batchId}`);
   return succeeded('נשמר.');
+}
+
+/**
+ * Joining an imported bank debit to the check it was.
+ *
+ * A separate action from including the row, because they are separate decisions
+ * and one is much heavier than the other: including a row records an expense,
+ * while matching it to a check also closes that check and reduces a debt. The
+ * reviewer says which check; nothing here guesses, however confident the
+ * proposal was.
+ *
+ * Sending an empty `checkId` clears the match, so a person who picked the wrong
+ * check can take it back before approving.
+ */
+export async function matchCheckAction(
+  _previous: FormState,
+  data: FormData,
+): Promise<FormState> {
+  const reader = new FieldReader(data);
+  const proposalId = reader.id('proposalId', 'שורה', { required: true });
+  const batchId = reader.id('batchId', 'יבוא', { required: true });
+  const checkId = reader.id('checkId', 'צ׳ק');
+
+  if (!reader.ok || proposalId === null || batchId === null) {
+    return failed('בואו נשלים כמה פרטים.', reader.errors);
+  }
+
+  try {
+    await householdStore().run((document, context) =>
+      reviewProposal(document, { proposalId, targetCheckId: checkId }, context),
+    );
+  } catch (error) {
+    return describe(error);
+  }
+
+  revalidatePath(`/imports/${batchId}`);
+  return succeeded(checkId === null ? 'השיוך בוטל.' : gemach.matchChosen);
 }
 
 /**

@@ -4,8 +4,10 @@ import {
   type BudgetCategoryKey,
   type Direction,
 } from '@family-finance/contracts';
+import { OUTSTANDING_CHECK_STATUSES } from '@family-finance/contracts';
 import type {
   AccountPosition,
+  CheckRecord,
   BudgetInput,
   BusinessInputs,
   DataQualityInputs,
@@ -184,8 +186,8 @@ function accountPositions(document: StoreDocument): AccountPosition[] {
     });
 }
 
-function plannedItems(document: StoreDocument): PlannedItem[] {
-  return document.cashflowItems
+function plannedItems(document: StoreDocument, today: string): PlannedItem[] {
+  const fromCashflow = document.cashflowItems
     .filter((item) => item.settledTransactionId === null)
     .map((item) => ({
       id: item.id,
@@ -198,6 +200,84 @@ function plannedItems(document: StoreDocument): PlannedItem[] {
       dueDate: item.dueDate,
       essential: item.essential,
     }));
+
+  return [...fromCashflow, ...checksAsPlannedItems(document, today)];
+}
+
+/**
+ * Outstanding checks, as money that is going to leave.
+ *
+ * The forecast has to know about a check the gemach is holding, or a household
+ * with four thousand shekels of paper out there is told it can safely spend four
+ * thousand shekels. So each outstanding check becomes one planned item — and
+ * exactly one, keyed by the check's own id, which is what stops it appearing
+ * twice however many times this runs.
+ *
+ * The repayment plan deliberately produces nothing here. An installment and the
+ * check written for it are one obligation seen from two sides, and adding both
+ * would charge the family twice for the same month. The checks win because a
+ * check is a real instrument with a real date; the plan is an intention, and it
+ * is shown on the gemach screen as a plan.
+ *
+ * Two details that are not obvious:
+ *
+ *   - An overdue check moves to *today*. The forecast walks forward from today,
+ *     so an item dated last week would simply vanish — and a check that is late
+ *     and uncleared is not gone, it is the most likely thing to come out of the
+ *     account this morning.
+ *   - A prepared check is `probable` rather than `certain`; a delivered one is
+ *     `certain`, because it can be presented without anybody asking us. Both are
+ *     counted in full as outflows either way: the forecast is pessimistic about
+ *     spending by design, and the certainty is carried for the screens that
+ *     explain the difference.
+ */
+function checksAsPlannedItems(document: StoreDocument, today: string): PlannedItem[] {
+  return document.checks
+    .filter((check) => OUTSTANDING_CHECK_STATUSES.includes(check.status))
+    .map((check) => {
+      /*
+       * An overdue check moves to today, on both dates.
+       *
+       * The forecast walks forward from today and settles an item on its due date
+       * in preference to its expected one, so a check dated last week would fall
+       * outside the walk entirely and vanish — when it is in fact the most likely
+       * thing to come out of the account this morning. Both fields move together
+       * because leaving the due date in the past would put the item back outside
+       * the walk through the very rule this is working around.
+       *
+       * The date printed on the paper is not lost: it lives on the check, which is
+       * what every screen reads.
+       */
+      const effectiveDate = check.dueDate < today ? today : check.dueDate;
+
+      return {
+        id: check.id,
+        label: `צ׳ק ל${check.payeeName}`,
+        scope: 'household' as const,
+        direction: 'outflow' as const,
+        amountMinor: check.amountMinor,
+        certainty: check.status === 'prepared' ? ('probable' as const) : ('certain' as const),
+        expectedDate: effectiveDate,
+        dueDate: effectiveDate,
+        // A bounced check costs a fee and a conversation with the gemach.
+        essential: true,
+      };
+    });
+}
+
+function checkRecords(document: StoreDocument): CheckRecord[] {
+  return document.checks.map((check) => ({
+    id: check.id,
+    debtId: check.debtId,
+    accountId: check.accountId,
+    amountMinor: check.amountMinor,
+    dueDate: check.dueDate,
+    status: check.status,
+    installmentNumber: check.installmentNumber,
+    payeeName: check.payeeName,
+    deliveredOn: check.deliveredOn,
+    clearedOn: check.clearedOn,
+  }));
 }
 
 function debtRecords(document: StoreDocument): DebtRecord[] {
@@ -515,10 +595,11 @@ export function toEngineInput(
     timeZone: document.settings.timeZone,
     currency: document.settings.currency,
     accounts: accountPositions(document),
-    plannedItems: plannedItems(document),
+    plannedItems: plannedItems(document, today),
     debts: debtRecords(document),
     debtEvents: debtEvents(document),
     rollovers: rollovers(document),
+    checks: checkRecords(document),
     reserve: reserveInputs(document),
     business: businessInputs(document, periodStart, periodEnd),
     approvedSafeTransferMinor,

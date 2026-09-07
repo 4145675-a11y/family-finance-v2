@@ -30,7 +30,9 @@ import {
   sayNotice,
 } from '../lib/copy/notices';
 import { loadDashboardView } from '../lib/dashboard/load';
-import { formatBusinessDate } from '../lib/format';
+import { formatBusinessDate, money } from '../lib/format';
+import { checkAlert } from '../lib/gemach';
+import { gemach } from '../lib/copy/gemach';
 
 /**
  * The home screen.
@@ -80,6 +82,9 @@ export default async function HomePage() {
 
   /** Nothing recorded is not the same as nothing owed, and it reads differently. */
   const noDebts = input.debts.length === 0;
+
+  /** The one thing worth saying about post-dated checks today, or nothing. */
+  const alert = checkAlert(snapshot);
 
   /** The recommendation, in the words the task list will carry. */
   const actionTitle =
@@ -463,6 +468,52 @@ export default async function HomePage() {
           }
         />
       </div>
+
+      {/*
+        Post-dated checks, and only when there is something to do about them.
+        A household with no gemach never sees this; a household whose checks are
+        all still in the chequebook never sees it either, because paper nobody
+        else holds is a plan rather than an exposure. What it says when it does
+        appear is a number and a date — no adjectives, because the fact is
+        alarming enough on its own and dressing it up would make it easier to
+        stop reading.
+      */}
+      {alert === null ? null : (
+        <Card
+          title={gemach.checksOutstanding}
+          tone={
+            alert.kind === 'returned'
+              ? 'danger'
+              : alert.kind === 'overdue'
+                ? 'attention'
+                : 'neutral'
+          }
+        >
+          <p className="font-medium">
+            {alert.kind === 'returned'
+              ? gemach.returnedLine(alert.count)
+              : alert.kind === 'overdue'
+                ? gemach.overdueLine(alert.count, money(alert.amountMinor, snapshot.currency))
+                : gemach.outstandingCount(
+                    alert.count,
+                    money(alert.amountMinor, snapshot.currency),
+                  )}
+          </p>
+          {alert.next === null ? null : (
+            <p className="mt-2 text-text-secondary">
+              {gemach.nextCheckLine(
+                formatBusinessDate(alert.next.dueDate),
+                money(alert.next.amountMinor, snapshot.currency),
+              )}
+            </p>
+          )}
+          <div className="mt-4">
+            <LinkButton href="/gemach" tone="secondary">
+              {gemach.details}
+            </LinkButton>
+          </div>
+        </Card>
+      )}
 
       {/* Quick updates. Every one of these opens a working screen. */}
       <Card title={copy.home.updatesTitle}>

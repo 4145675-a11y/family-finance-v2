@@ -16,7 +16,9 @@ import {
   householdSettingsSchema,
   importBatchSchema,
   importProposalSchema,
+  postDatedCheckSchema,
   profileSchema,
+  repaymentPlanSchema,
   setupProgressSchema,
   transactionSchema,
 } from '@family-finance/contracts';
@@ -44,10 +46,10 @@ import { z } from 'zod';
  */
 
 /** The only format version this build writes. */
-export const CURRENT_FORMAT_VERSION = 1;
+export const CURRENT_FORMAT_VERSION = 2;
 
 /** Versions this build can read. Older ones are migrated on load. */
-export const READABLE_FORMAT_VERSIONS: readonly number[] = [1];
+export const READABLE_FORMAT_VERSIONS: readonly number[] = [1, 2];
 
 /**
  * A transaction, plus where it came from.
@@ -99,6 +101,17 @@ export const storeDocumentSchema = z.object({
   debts: z.array(debtSchema).max(500),
   debtEvents: z.array(storedDebtEventSchema).max(50_000),
   rollovers: z.array(debtRolloverSchema).max(5_000),
+  /**
+   * Post-dated checks, and the agreements they repay.
+   *
+   * Their own collections rather than fields on a debt, because a check has a
+   * life of its own: it is written, handed over, presented, honoured or returned,
+   * and each of those is a fact with a date. Folding them into the debt would
+   * make "the gemach is holding four of our checks" unrepresentable, which is the
+   * single most important thing this data has to say.
+   */
+  checks: z.array(postDatedCheckSchema).max(10_000),
+  repaymentPlans: z.array(repaymentPlanSchema).max(500),
   budgets: z.array(budgetSchema).max(600),
   budgetLines: z.array(budgetLineSchema).max(10_000),
   tasks: z.array(familyTaskSchema).max(5_000),
@@ -205,6 +218,8 @@ export function emptyDocument(input: EmptyDocumentInput): StoreDocument {
     debts: [],
     debtEvents: [],
     rollovers: [],
+    checks: [],
+    repaymentPlans: [],
     budgets: [],
     budgetLines: [],
     tasks: [],
@@ -221,8 +236,36 @@ export function emptyDocument(input: EmptyDocumentInput): StoreDocument {
  * turns that into a Hebrew message; what matters here is that an invalid document
  * never becomes a partially-loaded one.
  */
+/**
+ * Brings an older document up to the shape this build reads.
+ *
+ * Version 2 added post-dated checks and repayment plans. A version 1 document —
+ * a file written before this feature existed, or a backup taken then — is
+ * complete and correct; it simply has no checks. So the migration adds the empty
+ * collections and nothing else, and it is written as a step rather than a special
+ * case so the next one has somewhere to go.
+ *
+ * Migrating on read rather than rewriting the file on start-up means a document
+ * is only ever upgraded by an action a person took, and a build that turns out to
+ * be wrong has not already converted the family's history.
+ */
+export function migrateDocument(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  const document = { ...(value as Record<string, unknown>) };
+
+  if (document['formatVersion'] === 1) {
+    document['checks'] = Array.isArray(document['checks']) ? document['checks'] : [];
+    document['repaymentPlans'] = Array.isArray(document['repaymentPlans'])
+      ? document['repaymentPlans']
+      : [];
+    document['formatVersion'] = 2;
+  }
+
+  return document;
+}
+
 export function parseStoreDocument(value: unknown): StoreDocument {
-  const result = storeDocumentSchema.safeParse(value);
+  const result = storeDocumentSchema.safeParse(migrateDocument(value));
   if (result.success) return result.data;
 
   const first = result.error.issues[0];

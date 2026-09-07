@@ -1,7 +1,9 @@
 import type { BudgetResult, FinancialSnapshot } from '@family-finance/finance-engine';
 import { balanceOf, isRealTransaction, type StoreDocument } from '@family-finance/local-store';
 
-import { formatMoney } from './format';
+import { gemach } from './copy/gemach';
+import { formatBusinessDate, formatMoney, money } from './format';
+import { gemachLoans } from './gemach';
 
 /**
  * The reports, as data.
@@ -372,12 +374,102 @@ function toBusinessFacts(snapshot: FinancialSnapshot): {
 }
 
 /** Every report the product produces, in the order the screen lists them. */
+/**
+ * Post-dated checks: exposure kept apart from payments already made.
+ *
+ * Two sections, deliberately never totalled together. "Already paid" is history
+ * and belongs in the same column as any other expense. "Still outstanding" is
+ * paper in somebody else's hands, and adding it to what has been paid produces a
+ * number that describes nothing — not what the family has spent, and not what
+ * they still owe.
+ *
+ * Check numbers appear masked. A report gets printed and left on a table, and a
+ * check number beside an account number is most of what somebody needs to write
+ * a check that is not theirs. The full number stays on the screen where a person
+ * is working with that one check.
+ */
+export function checkExposureReport(input: ReportInput): Report | null {
+  const { document, snapshot, periodStart, periodEnd } = input;
+
+  const loans = gemachLoans(document, snapshot, snapshot.today);
+  if (loans.length === 0) return null;
+
+  const outstanding: ReportRow[] = [];
+  const settled: ReportRow[] = [];
+  const attention: ReportRow[] = [];
+
+  for (const loan of loans) {
+    for (const view of loan.checks) {
+      const label = `${loan.creditorName} · ${view.maskedNumber ?? formatBusinessDate(view.check.dueDate)}`;
+      const row: ReportRow = {
+        label,
+        amountMinor: view.check.amountMinor,
+        note: `${gemach.states[view.state] ?? view.state} · ${formatBusinessDate(view.check.dueDate)}`,
+      };
+
+      if (view.check.status === 'cleared') settled.push(row);
+      else if (view.check.status === 'returned') attention.push(row);
+      else if (view.outstanding) outstanding.push(row);
+    }
+  }
+
+  const sections: ReportSection[] = [
+    {
+      key: 'outstanding',
+      title: gemach.checksOutstanding,
+      rows: outstanding,
+      totalMinor: snapshot.checkExposure.outstandingTotalMinor,
+    },
+    {
+      key: 'cleared',
+      title: gemach.cleared,
+      rows: settled,
+      totalMinor: snapshot.checkExposure.clearedTotalMinor,
+    },
+  ];
+
+  if (attention.length > 0) {
+    sections.push({
+      key: 'returned',
+      title: gemach.returned,
+      rows: attention,
+      totalMinor: snapshot.checkExposure.returnedTotalMinor,
+    });
+  }
+
+  sections.push({
+    key: 'loans',
+    title: gemach.outstandingDebt,
+    rows: loans.map((loan) => ({
+      label: loan.creditorName,
+      amountMinor: loan.outstandingDebtMinor,
+      note: loan.coverage.fullyCovered
+        ? gemach.coverageFull
+        : gemach.coverageShort(money(loan.coverage.shortfallMinor, snapshot.currency)),
+    })),
+  });
+
+  return {
+    key: 'checks',
+    title: gemach.title,
+    periodLabel: periodLabel(periodStart, periodEnd),
+    generatedAt: input.generatedAt,
+    currency: snapshot.currency,
+    pendingCount: pendingCountOf(document),
+    sections,
+  };
+}
+
 export function allReports(input: ReportInput): readonly Report[] {
   const business = businessSummary(input);
+  const checks = checkExposureReport(input);
   return [
     monthlySummary(input),
     budgetVersusActual(input),
     debtMap(input),
+    // Immediately after the debt map, because it is the half of the debt picture
+    // the debt map cannot show: what is already written and not yet honoured.
+    ...(checks === null ? [] : [checks]),
     ...(business === null ? [] : [business]),
     completeness(input),
     importHistory(input),

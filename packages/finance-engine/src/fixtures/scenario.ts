@@ -108,6 +108,7 @@ export function baseInput(overrides: Partial<EngineInput> = {}): EngineInput {
     debts: [debt()],
     debtEvents: [debtEvent()],
     rollovers: [],
+    checks: [],
     reserve: {
       manualFloorMinor: 200_000,
       incidentBufferMinor: null,

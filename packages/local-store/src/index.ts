@@ -3,6 +3,7 @@ export {
   READABLE_FORMAT_VERSIONS,
   StoreFormatError,
   emptyDocument,
+  migrateDocument,
   parseStoreDocument,
   storeDocumentSchema,
   type StoreDocument,
@@ -29,6 +30,48 @@ export {
 } from './file-store';
 
 export { auditEvent, reduce, withAudit, type AuditInput } from './audit';
+
+export {
+  addCheck,
+  addCheckSeries,
+  cancelCheck,
+  checksForDebt,
+  clearCheck,
+  closeLoan,
+  closeLoanBlockers,
+  deliverChecks,
+  markCheckDeposited,
+  markCheckReturned,
+  plannedRepaymentTotal,
+  previewCheckSeries,
+  replaceCheck,
+  requireCheck,
+  revertCheckStatus,
+  setRepaymentPlan,
+  type AddCheckInput,
+  type AddCheckSeriesInput,
+  type ClearCheckInput,
+  type CloseLoanBlockers,
+  type ClearCheckOutcome,
+  type DeliverChecksInput,
+  type ReplaceCheckInput,
+  type ResolveCheckInput,
+  type RevertCheckInput,
+  type SetRepaymentPlanInput,
+} from './checks';
+
+export {
+  MATCH_WINDOW_AFTER_DAYS,
+  MATCH_WINDOW_BEFORE_DAYS,
+  digitRunsIn,
+  looksLikeCheckDebit,
+  matchesForDebit,
+  proposeCheckMatch,
+  type CheckMatch,
+  type CheckMatchProposal,
+  type CheckMatchReason,
+  type DebitCandidate,
+} from './check-match';
 
 export {
   ALL_BUDGET_CATEGORY_KEYS,

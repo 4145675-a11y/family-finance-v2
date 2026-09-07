@@ -122,6 +122,16 @@ export function checksumOf(document: StoreDocument): string {
   return createHash('sha256').update(payloadText(document), 'utf8').digest('hex');
 }
 
+/**
+ * The same checksum, over a document that has not been validated yet.
+ *
+ * Used on the way in, where the payload is whatever the file said and the point
+ * is to find out whether it is intact before anything else is believed about it.
+ */
+export function rawChecksumOf(document: unknown): string {
+  return createHash('sha256').update(canonicalJson(document), 'utf8').digest('hex');
+}
+
 export function createBackup(document: StoreDocument, now: string): BackupEnvelope {
   return {
     kind: 'family-finance-backup',
@@ -199,6 +209,23 @@ export function previewRestore(text: string, current: StoreDocument | null): Res
     );
   }
 
+  /*
+   * The checksum is verified against the file as written, before any migration.
+   *
+   * An older backup is checksummed over the document as it was then; upgrading it
+   * first and comparing afterwards would fail every backup taken before the
+   * format changed, and the failure would read as "your file is corrupt".
+   */
+  if (
+    typeof envelope.checksum !== 'string' ||
+    envelope.checksum !== rawChecksumOf(envelope.document)
+  ) {
+    throw new BackupError(
+      'checksum_mismatch',
+      'the backup does not match its own checksum, so it was changed or truncated',
+    );
+  }
+
   let document: StoreDocument;
   try {
     document = parseStoreDocument(envelope.document);
@@ -206,13 +233,6 @@ export function previewRestore(text: string, current: StoreDocument | null): Res
     throw new BackupError(
       'invalid_document',
       error instanceof Error ? error.message : 'the data inside the backup is not valid',
-    );
-  }
-
-  if (typeof envelope.checksum !== 'string' || envelope.checksum !== checksumOf(document)) {
-    throw new BackupError(
-      'checksum_mismatch',
-      'the backup does not match its own checksum, so it was changed or truncated',
     );
   }
 

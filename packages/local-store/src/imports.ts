@@ -13,6 +13,7 @@ import {
 } from '@family-finance/document-import';
 
 import { auditEvent, withAudit } from './audit';
+import { clearCheck } from './checks';
 import {
   CommandError,
   recordBalance,
@@ -99,6 +100,7 @@ export function stageExtraction(
       reviewState: 'pending' as ReviewState,
       targetAccountId: input.targetAccountId,
       targetDebtId: null,
+      targetCheckId: null,
       committedRecordId: null,
       createdAt: context.now,
       updatedAt: context.now,
@@ -248,6 +250,7 @@ export interface ReviewProposalInput {
   readonly correction?: ProposedPayload | null;
   readonly targetAccountId?: string | null;
   readonly targetDebtId?: string | null;
+  readonly targetCheckId?: string | null;
 }
 
 /**
@@ -293,6 +296,8 @@ export function reviewProposal(
     targetAccountId:
       input.targetAccountId === undefined ? before.targetAccountId : input.targetAccountId,
     targetDebtId: input.targetDebtId === undefined ? before.targetDebtId : input.targetDebtId,
+    targetCheckId:
+      input.targetCheckId === undefined ? before.targetCheckId : input.targetCheckId,
     updatedAt: context.now,
     version: before.version + 1,
   };
@@ -487,6 +492,36 @@ export function approveBatch(
       const account = working.accounts.find((candidate) => candidate.id === accountId);
       if (account === undefined) {
         throw new CommandError('unknown_account', 'the account this row points at is gone');
+      }
+
+      /*
+       * The row a reviewer joined to a post-dated check.
+       *
+       * Clearing writes the cash movement *and* the repayment together and links
+       * both to the check, so the debit is recorded once and only once. Taking
+       * the ordinary path instead would create an expense with no link, and the
+       * check would still be sitting there waiting to be cleared a second time.
+       *
+       * `clearCheck` refuses a check that is already cleared, which is what makes
+       * re-approving the same file — or importing it twice — idempotent by
+       * construction rather than by a duplicate heuristic.
+       */
+      if (proposal.targetCheckId !== null) {
+        const cleared = clearCheck(
+          working,
+          {
+            checkId: proposal.targetCheckId,
+            clearedOn: payload.value.transactionDate,
+            importBatchId: batch.id,
+          },
+          context,
+        );
+        working = cleared.document;
+        committed.set(proposal.id, cleared.value.transactionId);
+        outcome.transactionsCreated += 1;
+        outcome.debtEventsCreated += 1;
+        deltas.set(accountId, (deltas.get(accountId) ?? 0) - payload.value.amountMinor);
+        continue;
       }
 
       const created = recordTransaction(
