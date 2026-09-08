@@ -60,3 +60,6 @@
 | GEM-DELIVERY-001 | Financial | local-store/src/checks.ts | unit/property | 8 | **Verified in M8** — מסירה אינה יוצרת תנועה ואינה יוצרת אירוע חוב |
 | GEM-FORECAST-001 | Financial | local-store/src/projection.ts | integration | 8 | **Verified in M8** — פריט אחד לכל צ׳ק, לפי מזהה הצ׳ק |
 | GEM-MATCH-001 | Architecture | local-store/src/check-match.ts | unit/integration | 8 | **Verified in M8** — יבוא חוזר של אותו דף אינו פורע צ׳ק פעמיים |
+| PROD-FAILCLOSED-001 | Architecture | apps/web/lib/config/deployment.ts + instrumentation.ts | unit/gate | 9 | **Verified in M9** — השרת הבנוי מסרב לעלות; התצורה התקינה כן עולה |
+| PROD-HEALTH-001 | Operations | apps/web/app/api/health/route.ts | gate | 9 | **Verified in M9** — שמות הגדרות בלבד, לעולם לא ערכים |
+| PROD-NOENV-001 | Security | tools/check-no-env-files.mjs | gate | 9 | **Verified in M9** — נמצא כש־.env.local סיפק תצורה בשקט לשער אחר |

@@ -74,6 +74,9 @@
 | `ENTRY-MANUAL-001` | הזנה ידנית מלאה: חשבון, יתרה, הוצאה, הכנסה, העברה, פריט צפוי, חוב, תשלום חוב, גלגול, תקציב, משימה | 01-PRODUCT-SPEC.md § Must | 7 | Verified (M7) |
 | `REP-EXPORT-001` | דוחות מקומיים עם תקופה, חותמת זמן והפרדה בין מאושר לממתין; ייצוא xlsx ו־CSV | 05-ARCHITECTURE-DATA.md § Reports | 7 | Verified (M7) — ADR-0026; PDF דרך הדפסת הדפדפן |
 | `PWA-INSTALL-001` | manifest, אייקונים ו־service worker שאינו מגיש מסך פיננסי מהמטמון | 05-ARCHITECTURE-DATA.md § Offline | 7 | Verified (M7) |
+| `PROD-FAILCLOSED-001` | build של ייצור שמוגדר לחנות המקומית מסרב לעלות; אין דגל שפותח את הדלת | 05-ARCHITECTURE-DATA.md § גבולות | 9 | Verified (M9) — ADR-0031; 37 בדיקות יחידה + 7 בדיקות מול שרת שרץ |
+| `PROD-HEALTH-001` | נקודת בריאות ציבורית שמדווחת תצורה בלבד — בלי מידע פיננסי, בלי סודות, בלי ערכים | 07-SECURITY-PRIVACY.md § Operations | 9 | Verified (M9) — נבדק שהתשובה נקייה מאוצר מילים פיננסי |
+| `PROD-NOENV-001` | אף קובץ סביבה אינו במעקב git ואינו בתוך תוצר ה־build | 07-SECURITY-PRIVACY.md § Secrets | 9 | Verified (M9) — שער check:no-env-files |
 | `AUTH-PASSKEY-001` | כניסה לאפליקציה מאומתת ב־WebAuthn מול Windows Hello; אימות משתמש נדרש, לא רק נוכחות | 07-SECURITY-PRIVACY.md § Access | 8 | Verified (M8) — ADR-0029; 70 בדיקות פרוטוקול מול מאמת תוכנה אמיתי |
 | `AUTH-NOBIO-001` | האפליקציה אינה מקבלת, שומרת, רושמת או מייצאת טביעת אצבע או תבנית ביומטרית | 07-SECURITY-PRIVACY.md § Privacy | 8 | Verified (M8) — הסכימה מכילה מפתח ציבורי ומזהה בלבד |
 | `AUTH-SESSION-001` | עוגיית סשן httpOnly עם טוקן אקראי; אתגר חד־פעמי וקצוב; נעילה מחדש לפי חוסר פעילות ותקרה מוחלטת | 07-SECURITY-PRIVACY.md § Sessions | 8 | Verified (M8) — ADR-0028; 42 בדיקות מדיניות |

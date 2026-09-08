@@ -37,6 +37,14 @@ export interface EnvironmentFacts {
   readonly flag: string | undefined;
   /** Whether the household has been set up on this machine. */
   readonly hasLocalStore: boolean;
+  /**
+   * Where this deployment keeps financial truth.
+   *
+   * Defaults to the local store so every existing caller and test keeps its
+   * meaning; a production deployment states `supabase` and the rule below stops
+   * a file on disk from being served as a family's money.
+   */
+  readonly backend?: 'local_json' | 'supabase' | undefined;
 }
 
 export const DEV_DATA_FLAG = 'NEXT_PUBLIC_DEV_DATA_SOURCE';
@@ -45,6 +53,28 @@ export const DEV_DATA_FLAG = 'NEXT_PUBLIC_DEV_DATA_SOURCE';
 const FLAG_ON = 'on';
 
 export function resolveDataSource(env: EnvironmentFacts): DataSourceDescriptor {
+  /*
+   * A file on disk is never the answer when the deployment says otherwise.
+   *
+   * This check comes before the local store, and that ordering is the whole
+   * point. A production container that happens to contain a `.data` directory —
+   * left by a build step, a mounted volume, a copied image — would otherwise
+   * serve it as the household's truth: no row-level security, no durability,
+   * and a disk the host may discard between deploys.
+   *
+   * `readDeploymentConfig` refuses to let such a process start at all. This is
+   * the second lock on the same door, for the case where the process was started
+   * before the configuration changed under it.
+   */
+  if (env.backend === 'supabase' && env.hasLocalStore) {
+    return {
+      kind: 'none',
+      label: 'אין מקור נתונים',
+      isRealData: false,
+      reason: 'ההתקנה הזו מוגדרת לעבוד מול מסד הנתונים, ולכן קובץ מקומי לא ישמש כמקור אמת.',
+    };
+  }
+
   if (env.hasLocalStore) {
     return {
       kind: 'local_store',
@@ -89,6 +119,7 @@ export function currentEnvironment(hasLocalStore: boolean): EnvironmentFacts {
     // can see the whole expression at build time.
     flag: process.env.NEXT_PUBLIC_DEV_DATA_SOURCE,
     hasLocalStore,
+    backend: process.env.FAMILY_FINANCE_DATA_BACKEND === 'supabase' ? 'supabase' : 'local_json',
   };
 }
 

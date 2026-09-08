@@ -85,7 +85,11 @@ async function startServer(dataDirectory) {
     [resolveNextBin(), 'start', '--hostname', HOST, '--port', String(PORT)],
     {
       cwd: WEB_ROOT,
-      env: { ...nextEnv(), FAMILY_FINANCE_DATA_DIR: dataDirectory },
+      env: {
+        ...nextEnv(),
+        FAMILY_FINANCE_DATA_BACKEND: 'local_json',
+        FAMILY_FINANCE_DATA_DIR: dataDirectory,
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );

@@ -43,3 +43,4 @@
 | [0028](0028-authentication-state-outside-the-household-document.md) | מצב הכניסה נשמר בקובץ נפרד ממסמך משק הבית | Accepted | 8 |
 | [0029](0029-passkeys-live-at-localhost-not-at-an-address.md) | מפתחות הכניסה חיים ב־localhost, לא בכתובת IP | Accepted | 8 |
 | [0030](0030-a-check-is-not-a-payment.md) | צ׳ק שנמסר אינו תשלום | Accepted | 8 |
+| [0031](0031-production-refuses-the-local-store.md) | ייצור מסרב לעלות עם החנות המקומית | Accepted | 9 |
