@@ -77,6 +77,12 @@
 | `PROD-FAILCLOSED-001` | build של ייצור שמוגדר לחנות המקומית מסרב לעלות; אין דגל שפותח את הדלת | 05-ARCHITECTURE-DATA.md § גבולות | 9 | Verified (M9) — ADR-0031; 37 בדיקות יחידה + 7 בדיקות מול שרת שרץ |
 | `PROD-HEALTH-001` | נקודת בריאות ציבורית שמדווחת תצורה בלבד — בלי מידע פיננסי, בלי סודות, בלי ערכים | 07-SECURITY-PRIVACY.md § Operations | 9 | Verified (M9) — נבדק שהתשובה נקייה מאוצר מילים פיננסי |
 | `PROD-NOENV-001` | אף קובץ סביבה אינו במעקב git ואינו בתוך תוצר ה־build | 07-SECURITY-PRIVACY.md § Secrets | 9 | Verified (M9) — שער check:no-env-files |
+| `PROD-SCHEMA-001` | סכימת ייצור לכל יכולת שנבנתה: הגדרות, משימות, יבוא, צ׳קים דחויים, תוכניות החזר, מפתחות כניסה, התראות ומפתחות idempotency | 05-ARCHITECTURE-DATA.md § Data model | 9 | **נכתבה, לא הוחלה** (M9) — 14 טבלאות חדשות; דורש מסד אמיתי לאימות |
+| `PROD-CHECKS-DB-001` | האינווריאנטים של הצ׳קים נאכפים במסד: קישור לתנועה ולאירוע חוב רק במצב cleared, וקישור ייחודי לכל אחד | 02-FINANCIAL-RULES.md § אינווריאנטים | 9 | **נכתבה, לא הוחלה** (M9) — ADR-0030; אינדקסים ייחודיים + CHECK |
+| `PROD-APPROVAL-DB-001` | אי אפשר לאשר יבוא עם שורה שלא הוכרעה — נאכף ב־trigger ולא רק בקוד האפליקציה | 05-ARCHITECTURE-DATA.md § Imports | 9 | **נכתבה, לא הוחלה** (M9) — תקף גם ל־service role |
+| `PROD-RLS-COVER-001` | כל טבלה מצהירה RLS מופעל, כפוי, ועם policies — כולל policy ל־select | 07-SECURITY-PRIVACY.md § RLS | 9 | Verified (M9) — שער סטטי על 32 טבלאות; **בדיקות allow/deny מול מסד עדיין לא רצו** |
+| `PROD-PERSON-SCOPE-001` | מפתחות כניסה, מנויי push והעדפות התראה מוגבלים לפרופיל ולא למשק הבית — בן/בת זוג אינם רואים את מפתח הכניסה של השני | 07-SECURITY-PRIVACY.md § Access | 9 | **נכתבה, לא הוחלה** (M9) — policies לפי current_profile_id |
+| `PROD-NOTIFY-PRIVACY-001` | רשומת התראה אינה יכולה להחזיק תוכן פיננסי — אין עמודת גוף, סכום או שם | 07-SECURITY-PRIVACY.md § Privacy | 9 | **נכתבה, לא הוחלה** (M9) — הסכימה חסרת מקום לכך |
 | `AUTH-PASSKEY-001` | כניסה לאפליקציה מאומתת ב־WebAuthn מול Windows Hello; אימות משתמש נדרש, לא רק נוכחות | 07-SECURITY-PRIVACY.md § Access | 8 | Verified (M8) — ADR-0029; 70 בדיקות פרוטוקול מול מאמת תוכנה אמיתי |
 | `AUTH-NOBIO-001` | האפליקציה אינה מקבלת, שומרת, רושמת או מייצאת טביעת אצבע או תבנית ביומטרית | 07-SECURITY-PRIVACY.md § Privacy | 8 | Verified (M8) — הסכימה מכילה מפתח ציבורי ומזהה בלבד |
 | `AUTH-SESSION-001` | עוגיית סשן httpOnly עם טוקן אקראי; אתגר חד־פעמי וקצוב; נעילה מחדש לפי חוסר פעילות ותקרה מוחלטת | 07-SECURITY-PRIVACY.md § Sessions | 8 | Verified (M8) — ADR-0028; 42 בדיקות מדיניות |

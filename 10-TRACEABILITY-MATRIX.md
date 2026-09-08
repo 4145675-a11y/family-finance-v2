@@ -63,3 +63,9 @@
 | PROD-FAILCLOSED-001 | Architecture | apps/web/lib/config/deployment.ts + instrumentation.ts | unit/gate | 9 | **Verified in M9** — השרת הבנוי מסרב לעלות; התצורה התקינה כן עולה |
 | PROD-HEALTH-001 | Operations | apps/web/app/api/health/route.ts | gate | 9 | **Verified in M9** — שמות הגדרות בלבד, לעולם לא ערכים |
 | PROD-NOENV-001 | Security | tools/check-no-env-files.mjs | gate | 9 | **Verified in M9** — נמצא כש־.env.local סיפק תצורה בשקט לשער אחר |
+| PROD-SCHEMA-001 | Architecture | supabase/migrations/20260908* | migration | 9 | **Written in M9, DB unverified** — 32 טבלאות סה״כ, 94 policies |
+| PROD-CHECKS-DB-001 | Financial | post_dated_checks constraints + unique indexes | migration | 9 | **Written in M9, DB unverified** — צ׳ק אחד ↔ תנועה אחת ↔ אירוע חוב אחד |
+| PROD-APPROVAL-DB-001 | Architecture | app.assert_batch_ready_for_approval() | migration | 9 | **Written in M9, DB unverified** — שתיקה אינה הסכמה, גם בשכבת המסד |
+| PROD-RLS-COVER-001 | Security | tools/check-rls-coverage.mjs | gate | 9 | **Verified in M9** — סטטי; מסמן במפורש שאינו מוכיח נכונות policy |
+| PROD-PERSON-SCOPE-001 | Security | webauthn_credentials / push_subscriptions policies | migration | 9 | **Written in M9, DB unverified** — משק בית משותף אינו זהות משותפת |
+| PROD-NOTIFY-PRIVACY-001 | Privacy | notification_deliveries | migration | 9 | **Written in M9, DB unverified** — subject_key בלבד, ללא גוף הודעה |

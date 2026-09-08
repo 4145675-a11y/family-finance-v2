@@ -5,7 +5,7 @@
 --   regenerate: npm run db:build
 --   verified by: tools/manual-sql.test.mjs
 --
--- Contains 10 migrations, in filename order:
+-- Contains 15 migrations, in filename order:
 --   1. 20260816090000_identity_foundation.sql
 --   2. 20260816090100_profiles_households.sql
 --   3. 20260816090200_invitations.sql
@@ -16,6 +16,11 @@
 --   8. 20260822100200_financial_row_security.sql
 --   9. 20260823110000_budgets.sql
 --   10. 20260823110100_budget_row_security.sql
+--   11. 20260908120000_gemach_and_checks.sql
+--   12. 20260908120100_imports_and_documents.sql
+--   13. 20260908120200_household_settings_and_tasks.sql
+--   14. 20260908120300_access_and_notifications.sql
+--   15. 20260908120400_new_tables_row_security.sql
 --
 -- Safe to run more than once: every trigger and policy is dropped before it is
 -- created, and every enum is created under an existence check (ADR-0015). Running
@@ -2480,5 +2485,1973 @@ grant select, insert, update on public.budgets to authenticated;
 grant select, insert, update on public.budget_lines to authenticated;
 grant select, insert, update on public.budget_changes to authenticated;
 -- <<< END MIGRATION: 20260823110100_budget_row_security.sql
+
+-- >>> BEGIN MIGRATION: 20260908120000_gemach_and_checks.sql
+-- Milestone 9 — gemach loans and the post-dated checks that repay them.
+--
+-- ADR-0030 is the authority, and the one sentence it turns on is the reason this
+-- migration exists as its own set of tables rather than columns on `debts`:
+--
+--   Handing a check to the gemach changes no number.
+--   The bank honouring it changes exactly two, exactly once.
+--
+-- Three separate facts, three separate records, and the schema is shaped so they
+-- cannot be merged:
+--
+--   1. The debt exists          -> public.debts + an opening_balance event
+--   2. A check was handed over  -> a row here, and nothing else moves
+--   3. The bank honoured it     -> a transaction AND a principal_payment, both
+--                                  linked from the check row
+--
+-- The links in (3) are what make double counting structurally impossible rather
+-- than merely unlikely. A check carries at most one `cleared_transaction_id` and
+-- at most one `debt_event_id`, and both are permitted only in the `cleared`
+-- state — so a statement imported twice cannot produce two repayments for one
+-- piece of paper.
+--
+-- `due` is deliberately not a stored status. It is what today's date makes of a
+-- check nobody has cashed; storing it would mean a value that is correct when
+-- written and quietly wrong the next morning, with a family depending on a
+-- background job to tell them a check is late. Urgency is derived on read, in
+-- packages/finance-engine, and only there.
+
+-- ---------------------------------------------------------------------------
+-- Enumerations
+-- ---------------------------------------------------------------------------
+
+-- A gemach is its own kind of creditor. Not `institution` and not
+-- `private_person`: it charges no interest, which changes what progress means,
+-- and it is repaid through paper handed over in advance, which no other kind is.
+--
+-- ADD VALUE is separated from any use of the value. PostgreSQL will not let a
+-- new enum label be used in the same transaction that created it, so the tables
+-- below reference `debt_kind` only through foreign keys, never as a literal.
+alter type public.debt_kind add value if not exists 'gemach';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'check_status' and n.nspname = 'public'
+  ) then
+    -- What has actually happened to the paper. `cleared` is the only state in
+    -- which money moved.
+    create type public.check_status as enum (
+      'prepared',   -- written, still in the chequebook, nobody else can cash it
+      'delivered',  -- handed over; can be presented at any moment
+      'deposited',  -- known to be at the bank, not yet honoured
+      'cleared',    -- the bank paid it
+      'returned',   -- presented and not honoured; not a payment
+      'cancelled',  -- withdrawn by agreement, with a reason
+      'replaced'    -- swapped for another check, which is linked
+    );
+  end if;
+
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'check_source' and n.nspname = 'public'
+  ) then
+    create type public.check_source as enum ('manual', 'import', 'reconciliation');
+  end if;
+
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'repayment_cadence' and n.nspname = 'public'
+  ) then
+    -- Monthly is the only cadence a gemach uses in practice. Kept as an enum so
+    -- adding another is a migration rather than a free-text field nobody parses.
+    create type public.repayment_cadence as enum ('monthly');
+  end if;
+end
+$$;
+
+-- ---------------------------------------------------------------------------
+-- repayment_plans — what was agreed, which is not what has been written
+-- ---------------------------------------------------------------------------
+--
+-- Separate from the checks because either can exist without the other: a plan
+-- may be agreed before a single check is written, and checks can be handed over
+-- for an arrangement nobody wrote down. Keeping them apart is what lets the
+-- product answer "do the checks actually cover what we owe?" — a question with
+-- no meaning if the plan is defined as the sum of the checks.
+
+create table if not exists public.repayment_plans (
+  id            uuid primary key default gen_random_uuid(),
+  household_id  uuid not null references public.households (id) on delete cascade,
+  debt_id       uuid not null references public.debts (id) on delete cascade,
+
+  -- The arrangement in the family's own words. Never parsed, only shown.
+  agreement_summary text check (length(btrim(agreement_summary)) <= 1000),
+
+  installment_count        integer not null check (installment_count between 1 and 600),
+  installment_amount_minor bigint  not null
+    check (app.is_valid_amount_minor(installment_amount_minor) and installment_amount_minor > 0),
+
+  -- A different last payment, when the total does not divide evenly. NULL when
+  -- every installment is the same.
+  final_installment_amount_minor bigint
+    check (final_installment_amount_minor is null
+      or (app.is_valid_amount_minor(final_installment_amount_minor)
+          and final_installment_amount_minor > 0)),
+
+  first_due_date date not null,
+  cadence        public.repayment_cadence not null default 'monthly',
+
+  created_by uuid not null references public.profiles (id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version    integer not null default 1,
+
+  -- One agreement per debt. A second row would be a second answer to "what did
+  -- we agree", and the screens would have to choose between them.
+  constraint repayment_plans_one_per_debt unique (debt_id)
+);
+
+comment on table public.repayment_plans is
+  'What was agreed with the lender. The checks are the paper; this is the arrangement, and the two are compared rather than merged.';
+comment on column public.repayment_plans.final_installment_amount_minor is
+  'A different last payment when the total does not divide evenly. NULL when every installment is equal.';
+
+drop trigger if exists repayment_plans_touch_updated_at on public.repayment_plans;
+create trigger repayment_plans_touch_updated_at
+  before update on public.repayment_plans
+  for each row execute function app.touch_updated_at();
+
+create index if not exists repayment_plans_household_idx
+  on public.repayment_plans (household_id, debt_id);
+
+-- ---------------------------------------------------------------------------
+-- post_dated_checks — the paper, and what has happened to it
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.post_dated_checks (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households (id) on delete cascade,
+
+  -- Every check repays exactly one debt, and is drawn on exactly one account.
+  debt_id    uuid not null references public.debts (id) on delete cascade,
+  account_id uuid not null references public.financial_accounts (id) on delete restrict,
+
+  -- Optional, because a borrower does not always write them down and a model
+  -- that demands one produces invented data. Digits only: anything else is
+  -- somebody typing a note into the wrong field.
+  check_number text check (check_number is null or check_number ~ '^[0-9]{1,12}$'),
+
+  amount_minor bigint not null
+    check (app.is_valid_amount_minor(amount_minor) and amount_minor > 0),
+  currency text not null default 'ILS' check (currency ~ '^[A-Z]{3}$'),
+
+  -- The date printed on the paper: the earliest it should be presented.
+  due_date date not null,
+  -- When it was physically handed over. NULL until it is.
+  delivered_on date,
+
+  payee_name text not null check (length(btrim(payee_name)) between 1 and 160),
+  installment_number integer check (installment_number is null or installment_number between 1 and 600),
+  note text check (length(btrim(note)) <= 500),
+
+  source public.check_source not null default 'manual',
+  status public.check_status not null default 'prepared',
+
+  -- Set only in `cleared`. The two links below are the whole defence against
+  -- one piece of paper becoming two repayments.
+  cleared_on            date,
+  cleared_transaction_id uuid references public.transactions (id) on delete restrict,
+  debt_event_id          uuid references public.debt_events (id) on delete restrict,
+
+  returned_on date,
+  -- Required for `cancelled` and `returned`. Blame-free wording is a product
+  -- rule; that it exists at all is a schema rule.
+  resolution_reason text check (length(btrim(resolution_reason)) <= 300),
+
+  replaced_by_check_id uuid references public.post_dated_checks (id) on delete restrict,
+  replaces_check_id    uuid references public.post_dated_checks (id) on delete restrict,
+
+  -- The import batch that proposed the clearing, when one did.
+  import_batch_id uuid,
+
+  created_by uuid not null references public.profiles (id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version    integer not null default 1,
+
+  -- --- the invariants that keep "delivered" and "paid" apart ---------------
+
+  -- A clearing date exists exactly when the check cleared.
+  constraint checks_cleared_date_matches_status check (
+    (status = 'cleared') = (cleared_on is not null)
+  ),
+
+  -- Only a cleared check may point at money. Without this a check could carry a
+  -- transaction while sitting in somebody's drawer, and the household would have
+  -- paid for paper the bank has never seen.
+  constraint checks_transaction_only_when_cleared check (
+    cleared_transaction_id is null or status = 'cleared'
+  ),
+  constraint checks_debt_event_only_when_cleared check (
+    debt_event_id is null or status = 'cleared'
+  ),
+
+  -- A returned check records when it came back.
+  constraint checks_returned_date_when_returned check (
+    status <> 'returned' or returned_on is not null
+  ),
+
+  -- The returned date outlives the returned status, in one direction only. A
+  -- check that bounced and was then cancelled or replaced still bounced, and
+  -- erasing the date would delete the fact a family most needs later. What must
+  -- not happen is a date surviving onto a check that is back in play, so
+  -- re-presenting one clears it.
+  constraint checks_returned_date_allowed_states check (
+    returned_on is null or status in ('returned', 'cancelled', 'replaced')
+  ),
+
+  -- A replaced check names its replacement.
+  constraint checks_replacement_link_matches_status check (
+    (status = 'replaced') = (replaced_by_check_id is not null)
+  ),
+
+  -- Cancelling or recording a return needs a reason on the record.
+  constraint checks_resolution_reason_required check (
+    status not in ('cancelled', 'returned') or resolution_reason is not null
+  ),
+
+  -- Never handed over, so it cannot have reached the bank. `cancelled` and
+  -- `replaced` are permitted alongside `prepared` because both are things that
+  -- happen to a check still in the chequebook — torn up, or rewritten.
+  constraint checks_undelivered_states check (
+    delivered_on is not null or status in ('prepared', 'cancelled', 'replaced')
+  ),
+
+  constraint checks_no_self_replacement check (
+    replaces_check_id is null or replaces_check_id <> id
+  ),
+  constraint checks_no_self_replacement_forward check (
+    replaced_by_check_id is null or replaced_by_check_id <> id
+  )
+);
+
+comment on table public.post_dated_checks is
+  'One row per piece of paper. Handing one over moves no money; only `cleared` does, and then exactly once through the two links recorded here.';
+comment on column public.post_dated_checks.cleared_transaction_id is
+  'The cash movement the clearing created. Permitted only in the cleared state: this link is what stops one check becoming two repayments.';
+comment on column public.post_dated_checks.debt_event_id is
+  'The principal_payment the clearing created. Permitted only in the cleared state.';
+comment on column public.post_dated_checks.due_date is
+  'The date printed on the check. "Due" and "overdue" are derived from this on read and are never stored.';
+
+drop trigger if exists post_dated_checks_touch_updated_at on public.post_dated_checks;
+create trigger post_dated_checks_touch_updated_at
+  before update on public.post_dated_checks
+  for each row execute function app.touch_updated_at();
+
+-- A check number is unique within the account it is drawn on, and only when one
+-- was supplied. Two different chequebooks legitimately share numbers, and most
+-- families do not record them at all — so this is a partial index rather than a
+-- column constraint. Cancelled and replaced checks still occupy their number:
+-- the paper exists, and the bank will honour it if it turns up.
+create unique index if not exists post_dated_checks_number_per_account_idx
+  on public.post_dated_checks (account_id, check_number)
+  where check_number is not null;
+
+-- One cash movement belongs to at most one check. The application refuses to
+-- clear a check twice; this refuses two checks to claim the same debit.
+create unique index if not exists post_dated_checks_transaction_idx
+  on public.post_dated_checks (cleared_transaction_id)
+  where cleared_transaction_id is not null;
+
+create unique index if not exists post_dated_checks_debt_event_idx
+  on public.post_dated_checks (debt_event_id)
+  where debt_event_id is not null;
+
+-- The question every screen asks: what is still out there, and when.
+create index if not exists post_dated_checks_outstanding_idx
+  on public.post_dated_checks (household_id, due_date)
+  where status in ('prepared', 'delivered', 'deposited');
+
+create index if not exists post_dated_checks_debt_idx
+  on public.post_dated_checks (debt_id, due_date);
+
+-- Matching an imported bank debit looks for account + exact amount.
+create index if not exists post_dated_checks_match_idx
+  on public.post_dated_checks (account_id, amount_minor)
+  where status in ('prepared', 'delivered', 'deposited');
+
+drop trigger if exists post_dated_checks_audit on public.post_dated_checks;
+create trigger post_dated_checks_audit
+  after insert or update on public.post_dated_checks
+  for each row execute function app.audit_row_change(
+    'post_dated_checks', 'id', 'status', 'amount_minor', 'currency',
+    'due_date', 'delivered_on', 'cleared_on', 'returned_on', 'debt_id'
+  );
+
+-- ---------------------------------------------------------------------------
+-- Cross-household references
+-- ---------------------------------------------------------------------------
+--
+-- Foreign keys are checked with the table owner's privileges and are not
+-- filtered by Row Level Security, so a member of household A could otherwise
+-- name household B's debt or account in one of these columns and the constraint
+-- would accept it. The RLS policies prove visibility of every referenced row;
+-- this trigger proves they belong to the same household, which is the stronger
+-- statement and holds even for a service-role caller.
+
+create or replace function app.assert_check_references()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_debt_household uuid;
+  v_account_household uuid;
+  v_replaced_household uuid;
+begin
+  select household_id into v_debt_household
+  from public.debts where id = new.debt_id;
+
+  if v_debt_household is null or v_debt_household <> new.household_id then
+    raise exception 'a check must repay a debt belonging to the same household';
+  end if;
+
+  select household_id into v_account_household
+  from public.financial_accounts where id = new.account_id;
+
+  if v_account_household is null or v_account_household <> new.household_id then
+    raise exception 'a check must be drawn on an account belonging to the same household';
+  end if;
+
+  if new.replaced_by_check_id is not null then
+    select household_id into v_replaced_household
+    from public.post_dated_checks where id = new.replaced_by_check_id;
+
+    if v_replaced_household is null or v_replaced_household <> new.household_id then
+      raise exception 'a check may only be replaced by a check in the same household';
+    end if;
+  end if;
+
+  if new.replaces_check_id is not null then
+    select household_id into v_replaced_household
+    from public.post_dated_checks where id = new.replaces_check_id;
+
+    if v_replaced_household is null or v_replaced_household <> new.household_id then
+      raise exception 'a check may only replace a check in the same household';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+comment on function app.assert_check_references() is
+  'Foreign keys ignore RLS. This proves a check''s debt, account and replacement links all belong to the same household.';
+
+drop trigger if exists post_dated_checks_assert_references on public.post_dated_checks;
+create trigger post_dated_checks_assert_references
+  before insert or update on public.post_dated_checks
+  for each row execute function app.assert_check_references();
+
+-- The same hazard for a repayment plan naming another household's debt.
+create or replace function app.assert_repayment_plan_references()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_debt_household uuid;
+begin
+  select household_id into v_debt_household
+  from public.debts where id = new.debt_id;
+
+  if v_debt_household is null or v_debt_household <> new.household_id then
+    raise exception 'a repayment plan must belong to the same household as its debt';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists repayment_plans_assert_references on public.repayment_plans;
+create trigger repayment_plans_assert_references
+  before insert or update on public.repayment_plans
+  for each row execute function app.assert_repayment_plan_references();
+-- <<< END MIGRATION: 20260908120000_gemach_and_checks.sql
+
+-- >>> BEGIN MIGRATION: 20260908120100_imports_and_documents.sql
+-- Milestone 9 — uploaded documents, staged proposals, and the approval boundary.
+--
+-- 05-ARCHITECTURE-DATA.md § Imports and `IMP-DRAFT-001` are the authority, and
+-- one sentence from CLAUDE.md is what these tables are shaped around:
+--
+--   draft לא truth
+--
+-- A spreadsheet a bank produced is a claim about a family's money, not the money
+-- itself. Until a person has looked at a proposed row and said yes, it may not
+-- move a single balance, budget, debt or forecast.
+--
+-- The schema enforces that structurally rather than by convention:
+--
+--   * proposals live in their own table and are referenced by nothing that
+--     computes a balance. No view, no trigger and no foreign key leads from a
+--     financial table back to `import_proposals`;
+--   * the link runs the other way. `committed_record_id` is written when a
+--     proposal became a record, so a batch can be reversed and every record it
+--     created can be found;
+--   * a batch cannot be approved while any row is still `pending`. Silence is
+--     never consent, and that is a CHECK rather than a code path;
+--   * `raw`, `proposed` and `correction` are three separate columns. What the
+--     document said, what the parser read, and what the reviewer decided are
+--     never merged — a reviewer must always be able to see all three.
+--
+-- The uploaded bytes themselves are NOT stored here. They live in a private
+-- Supabase Storage bucket under an unguessable household-scoped path; this table
+-- holds the metadata and the hash. A financial database is the wrong place for
+-- a multi-megabyte PDF, and a row that could hold one is a row that eventually
+-- does.
+
+-- ---------------------------------------------------------------------------
+-- Enumerations
+-- ---------------------------------------------------------------------------
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'import_file_kind' and n.nspname = 'public'
+  ) then
+    create type public.import_file_kind as enum ('xlsx', 'csv', 'pdf');
+  end if;
+
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'import_batch_status' and n.nspname = 'public'
+  ) then
+    -- `failed` is separated from `rejected`: one is the software not managing to
+    -- read the file, the other is a person deciding it should not be used. They
+    -- mean different things to a reader of the import history.
+    create type public.import_batch_status as enum (
+      'extracting', 'needs_review', 'approved', 'rejected', 'failed', 'reversed'
+    );
+  end if;
+
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'import_document_type' and n.nspname = 'public'
+  ) then
+    create type public.import_document_type as enum (
+      'bank_statement', 'credit_card_statement', 'loan_schedule',
+      'mortgage_schedule', 'private_debt_list', 'household_income_expense',
+      'business_income_expense', 'balance_summary', 'budget_file',
+      'general_table', 'unrecognised'
+    );
+  end if;
+
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'proposal_kind' and n.nspname = 'public'
+  ) then
+    create type public.proposal_kind as enum (
+      'account', 'transaction', 'balance', 'debt',
+      'debt_payment', 'planned_item', 'budget_line'
+    );
+  end if;
+
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'review_state' and n.nspname = 'public'
+  ) then
+    -- `pending` is the only state a row can be created in.
+    create type public.review_state as enum ('pending', 'included', 'excluded');
+  end if;
+
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'duplicate_verdict' and n.nspname = 'public'
+  ) then
+    create type public.duplicate_verdict as enum (
+      'new', 'possible_duplicate', 'likely_duplicate'
+    );
+  end if;
+
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'document_retention_state' and n.nspname = 'public'
+  ) then
+    -- Where the bytes are in their life. `quarantined` is the state on arrival:
+    -- stored, hashed, and not yet read by anything.
+    create type public.document_retention_state as enum (
+      'quarantined', 'parsed', 'retained', 'purged'
+    );
+  end if;
+end
+$$;
+
+-- ---------------------------------------------------------------------------
+-- import_source_files — the metadata of what was uploaded
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.import_source_files (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households (id) on delete cascade,
+
+  -- Kept only so a reviewer can see which file they picked. It never becomes a
+  -- path: 07-SECURITY-PRIVACY.md's traversal rule is kept structurally, by
+  -- addressing objects with a generated id instead of a supplied name.
+  display_name text not null check (length(btrim(display_name)) between 1 and 300),
+
+  -- The object key inside the private bucket. Household-scoped and unguessable.
+  storage_path text not null check (length(btrim(storage_path)) between 1 and 500),
+
+  kind       public.import_file_kind not null,
+  byte_size  bigint not null check (byte_size > 0 and byte_size <= 20971520),
+  sha256     text not null check (sha256 ~ '^[0-9a-f]{64}$'),
+
+  -- What the browser claimed. Recorded, never trusted: the format is decided
+  -- from the bytes.
+  declared_mime_type text check (length(btrim(declared_mime_type)) <= 200),
+
+  retention_state public.document_retention_state not null default 'quarantined',
+  purged_at       timestamptz,
+
+  uploaded_by uuid not null references public.profiles (id) on delete restrict,
+  uploaded_at timestamptz not null default now(),
+
+  constraint import_source_files_purged_state check (
+    (retention_state = 'purged') = (purged_at is not null)
+  ),
+
+  -- One object per household path. Two rows pointing at the same bytes would
+  -- make deletion ambiguous.
+  constraint import_source_files_path_unique unique (household_id, storage_path)
+);
+
+comment on table public.import_source_files is
+  'Metadata for an uploaded document. The bytes live in a private Storage bucket; this row holds the hash, the size and where to find them.';
+comment on column public.import_source_files.sha256 is
+  'Hash of the uploaded bytes. Used to recognise the same file arriving twice, which is shown to a reviewer and never acted on automatically.';
+comment on column public.import_source_files.storage_path is
+  'Object key in the private bucket. Generated, never derived from the supplied filename.';
+
+create index if not exists import_source_files_household_idx
+  on public.import_source_files (household_id, uploaded_at desc);
+
+-- The same file uploaded twice is recognised, not refused: a family may
+-- legitimately re-upload after a mistake, and the duplicate is surfaced to the
+-- reviewer instead.
+create index if not exists import_source_files_hash_idx
+  on public.import_source_files (household_id, sha256);
+
+-- ---------------------------------------------------------------------------
+-- import_batches — one upload, and where its review stands
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.import_batches (
+  id             uuid primary key default gen_random_uuid(),
+  household_id   uuid not null references public.households (id) on delete cascade,
+  source_file_id uuid not null references public.import_source_files (id) on delete restrict,
+
+  status        public.import_batch_status not null default 'extracting',
+  document_type public.import_document_type not null default 'unrecognised',
+
+  -- Detection is a hint that steers the review, never a fact that skips it.
+  document_confidence_bp integer not null default 0
+    check (document_confidence_bp between 0 and 10000),
+
+  rows_proposed integer not null default 0 check (rows_proposed >= 0),
+  rows_scanned  integer not null default 0 check (rows_scanned >= 0),
+  truncated     boolean not null default false,
+
+  -- Why extraction failed, when it did. A code, not a sentence: the Hebrew
+  -- belongs in the copy layer where it can be reviewed as product language.
+  failure_code text check (length(btrim(failure_code)) <= 80),
+
+  -- Which account the file appears to be about, when the user picked one.
+  target_account_id uuid references public.financial_accounts (id) on delete restrict,
+
+  approved_at timestamptz,
+  approved_by uuid references public.profiles (id) on delete restrict,
+  reversed_at timestamptz,
+  reversed_by uuid references public.profiles (id) on delete restrict,
+
+  created_by uuid not null references public.profiles (id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version    integer not null default 1,
+
+  -- An approval records who and when, together.
+  constraint import_batches_approval_complete check (
+    (approved_at is null) = (approved_by is null)
+  ),
+  constraint import_batches_reversal_complete check (
+    (reversed_at is null) = (reversed_by is null)
+  ),
+  -- Only an approved batch can have been approved, and only an approved batch
+  -- can be reversed. Neither is reachable from `failed`.
+  constraint import_batches_approved_status check (
+    approved_at is null or status in ('approved', 'reversed')
+  ),
+  constraint import_batches_reversed_status check (
+    reversed_at is null or status = 'reversed'
+  ),
+  constraint import_batches_failure_code_when_failed check (
+    failure_code is null or status = 'failed'
+  )
+);
+
+comment on table public.import_batches is
+  'One uploaded document being reviewed. Nothing here affects a balance: approval is what crosses that boundary, and it is recorded with who and when.';
+
+drop trigger if exists import_batches_touch_updated_at on public.import_batches;
+create trigger import_batches_touch_updated_at
+  before update on public.import_batches
+  for each row execute function app.touch_updated_at();
+
+create index if not exists import_batches_household_idx
+  on public.import_batches (household_id, created_at desc);
+
+create index if not exists import_batches_open_idx
+  on public.import_batches (household_id)
+  where status = 'needs_review';
+
+drop trigger if exists import_batches_audit on public.import_batches;
+create trigger import_batches_audit
+  after insert or update on public.import_batches
+  for each row execute function app.audit_row_change(
+    'import_batches', 'id', 'status', 'document_type', 'rows_proposed'
+  );
+
+-- ---------------------------------------------------------------------------
+-- import_proposals — what the document said, and what it would become
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.import_proposals (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households (id) on delete cascade,
+  batch_id     uuid not null references public.import_batches (id) on delete cascade,
+
+  kind public.proposal_kind not null,
+
+  -- Exactly where in the document this came from, so any number can be traced
+  -- back to the row a person can look at.
+  location_sheet_name text check (length(location_sheet_name) <= 200),
+  location_page       integer check (location_page is null or location_page between 1 and 10000),
+  location_row        integer check (location_row is null or location_row between 1 and 1000000),
+  location_snippet    text check (length(location_snippet) <= 1000),
+
+  -- Three separate columns, never merged. What the file said, what the parser
+  -- read it as, and what the reviewer changed it to.
+  raw        jsonb not null,
+  proposed   jsonb not null,
+  correction jsonb,
+
+  confidence_bp integer not null default 0 check (confidence_bp between 0 and 10000),
+  warnings      text[] not null default '{}',
+
+  duplicate_verdict public.duplicate_verdict not null default 'new',
+  duplicate_of_id   uuid,
+
+  review_state public.review_state not null default 'pending',
+
+  -- Which account, debt or check the row attaches to once approved.
+  target_account_id uuid references public.financial_accounts (id) on delete restrict,
+  target_debt_id    uuid references public.debts (id) on delete restrict,
+  target_check_id   uuid references public.post_dated_checks (id) on delete restrict,
+
+  -- The record created when the batch was approved. NULL until then. This is
+  -- the only link between a proposal and financial truth, and it points from
+  -- the proposal outward — nothing that computes a balance reads this table.
+  committed_record_id uuid,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version    integer not null default 1,
+
+  -- A duplicate verdict must name the record it matched.
+  constraint import_proposals_duplicate_names_record check (
+    duplicate_verdict = 'new' or duplicate_of_id is not null
+  ),
+  -- A row that was never included cannot have created a record.
+  constraint import_proposals_committed_only_when_included check (
+    committed_record_id is null or review_state = 'included'
+  )
+);
+
+comment on table public.import_proposals is
+  'A staged row. Never read by anything that computes a balance: approval copies it into a financial table, and `committed_record_id` records where it went.';
+comment on column public.import_proposals.raw is
+  'What the document said, verbatim. Never rewritten by a correction.';
+comment on column public.import_proposals.correction is
+  'What the reviewer changed it to. Stored beside the parsed value, never over it.';
+comment on column public.import_proposals.target_check_id is
+  'The post-dated check this row is the clearing of, once a person says so. Never filled in automatically, however confident the match.';
+
+drop trigger if exists import_proposals_touch_updated_at on public.import_proposals;
+create trigger import_proposals_touch_updated_at
+  before update on public.import_proposals
+  for each row execute function app.touch_updated_at();
+
+create index if not exists import_proposals_batch_idx
+  on public.import_proposals (batch_id, created_at);
+
+create index if not exists import_proposals_pending_idx
+  on public.import_proposals (household_id)
+  where review_state = 'pending';
+
+-- ---------------------------------------------------------------------------
+-- Approval is all-or-nothing, and silence is not consent
+-- ---------------------------------------------------------------------------
+--
+-- The application refuses to approve a batch with an undecided row. This is the
+-- same rule in the database, so it holds for any caller — including a
+-- service-role worker, which RLS does not constrain.
+
+create or replace function app.assert_batch_ready_for_approval()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_pending integer;
+  v_included integer;
+begin
+  if new.status <> 'approved' or old.status = 'approved' then
+    return new;
+  end if;
+
+  select
+    count(*) filter (where review_state = 'pending'),
+    count(*) filter (where review_state = 'included')
+  into v_pending, v_included
+  from public.import_proposals
+  where batch_id = new.id;
+
+  if v_pending > 0 then
+    raise exception 'this import still has % undecided row(s); silence is not consent', v_pending;
+  end if;
+
+  if v_included = 0 then
+    raise exception 'no row was included, so there is nothing to approve';
+  end if;
+
+  return new;
+end;
+$$;
+
+comment on function app.assert_batch_ready_for_approval() is
+  'A batch cannot become approved while a row is still pending. Enforced in the database so it holds for callers RLS does not constrain.';
+
+drop trigger if exists import_batches_assert_ready on public.import_batches;
+create trigger import_batches_assert_ready
+  before update on public.import_batches
+  for each row execute function app.assert_batch_ready_for_approval();
+
+-- ---------------------------------------------------------------------------
+-- Cross-household references
+-- ---------------------------------------------------------------------------
+
+create or replace function app.assert_import_references()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_household uuid;
+begin
+  if tg_table_name = 'import_batches' then
+    select household_id into v_household
+    from public.import_source_files where id = new.source_file_id;
+    if v_household is null or v_household <> new.household_id then
+      raise exception 'an import batch must reference a file belonging to the same household';
+    end if;
+
+    if new.target_account_id is not null then
+      select household_id into v_household
+      from public.financial_accounts where id = new.target_account_id;
+      if v_household is null or v_household <> new.household_id then
+        raise exception 'an import batch must target an account belonging to the same household';
+      end if;
+    end if;
+
+    return new;
+  end if;
+
+  -- import_proposals
+  select household_id into v_household
+  from public.import_batches where id = new.batch_id;
+  if v_household is null or v_household <> new.household_id then
+    raise exception 'a proposal must belong to the same household as its batch';
+  end if;
+
+  if new.target_account_id is not null then
+    select household_id into v_household
+    from public.financial_accounts where id = new.target_account_id;
+    if v_household is null or v_household <> new.household_id then
+      raise exception 'a proposal must target an account belonging to the same household';
+    end if;
+  end if;
+
+  if new.target_debt_id is not null then
+    select household_id into v_household
+    from public.debts where id = new.target_debt_id;
+    if v_household is null or v_household <> new.household_id then
+      raise exception 'a proposal must target a debt belonging to the same household';
+    end if;
+  end if;
+
+  if new.target_check_id is not null then
+    select household_id into v_household
+    from public.post_dated_checks where id = new.target_check_id;
+    if v_household is null or v_household <> new.household_id then
+      raise exception 'a proposal must target a check belonging to the same household';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists import_batches_assert_references on public.import_batches;
+create trigger import_batches_assert_references
+  before insert or update on public.import_batches
+  for each row execute function app.assert_import_references();
+
+drop trigger if exists import_proposals_assert_references on public.import_proposals;
+create trigger import_proposals_assert_references
+  before insert or update on public.import_proposals
+  for each row execute function app.assert_import_references();
+
+-- The check table's import link, now that batches exist.
+alter table public.post_dated_checks
+  drop constraint if exists post_dated_checks_import_batch_fkey;
+alter table public.post_dated_checks
+  add constraint post_dated_checks_import_batch_fkey
+  foreign key (import_batch_id) references public.import_batches (id) on delete set null;
+-- <<< END MIGRATION: 20260908120100_imports_and_documents.sql
+
+-- >>> BEGIN MIGRATION: 20260908120200_household_settings_and_tasks.sql
+-- Milestone 9 — household settings, setup progress, and the family task list.
+--
+-- These are the collections the local store has carried since M7 that had no
+-- table yet. None of them is money, and that is exactly why they are worth
+-- getting right: settings decide how money is *interpreted* (which day a month
+-- starts, what reserve floor applies), and a wrong value here moves every figure
+-- on every screen without any of them looking wrong.
+
+-- ---------------------------------------------------------------------------
+-- household_settings — one row per household
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.household_settings (
+  household_id uuid primary key references public.households (id) on delete cascade,
+
+  currency  text not null default 'ILS' check (currency ~ '^[A-Z]{3}$'),
+  -- Israel. Stored rather than assumed, because every date boundary in the
+  -- product — a month start, a check falling due, a weekly food window —
+  -- depends on it, and a server in another region must not shift them.
+  time_zone text not null default 'Asia/Jerusalem'
+    check (length(btrim(time_zone)) between 1 and 60),
+
+  -- The day a household's month begins. Salary rarely arrives on the 1st, and a
+  -- budget measured against the wrong window is a budget nobody trusts.
+  month_start_day integer not null default 1 check (month_start_day between 1 and 28),
+
+  -- 02-FINANCIAL-RULES.md § רזרבה מינימלית: the floor is the highest of these,
+  -- and NULL means "not set", never zero.
+  manual_reserve_floor_minor  bigint check (manual_reserve_floor_minor is null
+    or app.is_valid_amount_minor(manual_reserve_floor_minor)),
+  incident_buffer_minor       bigint check (incident_buffer_minor is null
+    or app.is_valid_amount_minor(incident_buffer_minor)),
+  revolving_avoidance_minor   bigint check (revolving_avoidance_minor is null
+    or app.is_valid_amount_minor(revolving_avoidance_minor)),
+
+  -- Money already earmarked for something else. Not part of the floor; simply
+  -- not available to spend.
+  protected_reserves_minor bigint not null default 0
+    check (app.is_valid_amount_minor(protected_reserves_minor)),
+
+  -- Notification preferences that belong to the household rather than a device.
+  weekly_food_guidance        boolean not null default true,
+  balance_freshness_reminder  boolean not null default true,
+  balance_freshness_days      integer not null default 7
+    check (balance_freshness_days between 1 and 90),
+
+  updated_at timestamptz not null default now(),
+  version    integer not null default 1
+);
+
+comment on table public.household_settings is
+  'How this household reads its own money: currency, calendar, month boundary and reserve components. One row per household, created with it.';
+comment on column public.household_settings.month_start_day is
+  'Capped at 28 so every month has the day. A budget window that silently moves in February is a budget window nobody can reconcile.';
+comment on column public.household_settings.manual_reserve_floor_minor is
+  'NULL means not set. Never treated as zero: an unset floor and a floor of nothing are different claims.';
+
+drop trigger if exists household_settings_touch_updated_at on public.household_settings;
+create trigger household_settings_touch_updated_at
+  before update on public.household_settings
+  for each row execute function app.touch_updated_at();
+
+drop trigger if exists household_settings_audit on public.household_settings;
+create trigger household_settings_audit
+  after insert or update on public.household_settings
+  for each row execute function app.audit_row_change(
+    'household_settings', 'household_id', 'currency', 'month_start_day'
+  );
+
+-- ---------------------------------------------------------------------------
+-- setup_progress — what the household has told us so far
+-- ---------------------------------------------------------------------------
+--
+-- Deliberately booleans rather than a percentage. "You are 60% set up" is a
+-- number nobody can act on; "you have not confirmed a balance yet" is.
+
+create table if not exists public.setup_progress (
+  household_id uuid primary key references public.households (id) on delete cascade,
+
+  household_named               boolean not null default false,
+  members_added                 boolean not null default false,
+  accounts_added                boolean not null default false,
+  balances_confirmed            boolean not null default false,
+  business_decided              boolean not null default false,
+  debts_recorded                boolean not null default false,
+  recurring_income_recorded     boolean not null default false,
+  recurring_obligations_recorded boolean not null default false,
+  budget_started                boolean not null default false,
+  privacy_explained             boolean not null default false,
+
+  updated_at timestamptz not null default now()
+);
+
+comment on table public.setup_progress is
+  'Which parts of the opening picture the household has completed. Booleans, not a score: a percentage is not something a person can act on.';
+
+drop trigger if exists setup_progress_touch_updated_at on public.setup_progress;
+create trigger setup_progress_touch_updated_at
+  before update on public.setup_progress
+  for each row execute function app.touch_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- family_tasks — the recommendation, with a name against it
+-- ---------------------------------------------------------------------------
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'task_status' and n.nspname = 'public'
+  ) then
+    create type public.task_status as enum ('open', 'done', 'dropped');
+  end if;
+end
+$$;
+
+create table if not exists public.family_tasks (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households (id) on delete cascade,
+
+  title  text not null check (length(btrim(title)) between 1 and 200),
+  -- Why this is worth doing, in the words the home screen used when it
+  -- suggested it. Carried so a task still makes sense a week later.
+  reason text check (length(btrim(reason)) <= 500),
+
+  -- Which recommendation produced it, when one did. A code, not a sentence.
+  recommendation_key text check (length(btrim(recommendation_key)) <= 60),
+
+  status public.task_status not null default 'open',
+
+  -- Whose it is. NULL is a real answer: a task the couple has not assigned.
+  assigned_member_id uuid references public.household_members (id) on delete set null,
+
+  due_on      date,
+  completed_at timestamptz,
+
+  created_by uuid not null references public.profiles (id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  version    integer not null default 1,
+
+  constraint family_tasks_completed_matches_status check (
+    (status = 'done') = (completed_at is not null)
+  )
+);
+
+comment on table public.family_tasks is
+  'A recommendation that became something with a name against it. Creating one changes no figure — that separation is the point.';
+
+drop trigger if exists family_tasks_touch_updated_at on public.family_tasks;
+create trigger family_tasks_touch_updated_at
+  before update on public.family_tasks
+  for each row execute function app.touch_updated_at();
+
+create index if not exists family_tasks_open_idx
+  on public.family_tasks (household_id, due_on)
+  where status = 'open';
+
+-- ---------------------------------------------------------------------------
+-- Cross-household reference
+-- ---------------------------------------------------------------------------
+
+create or replace function app.assert_task_references()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_household uuid;
+begin
+  if new.assigned_member_id is not null then
+    select household_id into v_household
+    from public.household_members where id = new.assigned_member_id;
+
+    if v_household is null or v_household <> new.household_id then
+      raise exception 'a task can only be assigned to a member of the same household';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists family_tasks_assert_references on public.family_tasks;
+create trigger family_tasks_assert_references
+  before insert or update on public.family_tasks
+  for each row execute function app.assert_task_references();
+
+-- ---------------------------------------------------------------------------
+-- idempotency_keys — the same request twice is one effect
+-- ---------------------------------------------------------------------------
+--
+-- A phone on a poor connection retries. A user double-taps. A worker restarts
+-- mid-job. None of those may approve an import twice or clear a check twice.
+--
+-- The check state machine already refuses a second clearing by name, which is
+-- the stronger defence. This is the general one, for operations that have no
+-- such state to lean on.
+
+create table if not exists public.idempotency_keys (
+  household_id uuid not null references public.households (id) on delete cascade,
+  -- Supplied by the caller: stable for one logical operation, unguessable.
+  key          text not null check (length(btrim(key)) between 8 and 200),
+  operation    text not null check (length(btrim(operation)) between 1 and 80),
+
+  -- What the first attempt produced, so a retry can be answered identically
+  -- rather than re-executed.
+  result_record_id uuid,
+  created_at       timestamptz not null default now(),
+  -- Retention: long enough to cover any plausible retry, short enough that the
+  -- table does not grow without bound.
+  expires_at       timestamptz not null default (now() + interval '7 days'),
+
+  primary key (household_id, key)
+);
+
+comment on table public.idempotency_keys is
+  'One logical operation, one effect. A retry finds its key and is answered with the original result instead of running again.';
+
+create index if not exists idempotency_keys_expiry_idx
+  on public.idempotency_keys (expires_at);
+-- <<< END MIGRATION: 20260908120200_household_settings_and_tasks.sql
+
+-- >>> BEGIN MIGRATION: 20260908120300_access_and_notifications.sql
+-- Milestone 9 — passkeys, devices and notifications.
+--
+-- Two subjects that share one property: they are the parts of the system that
+-- know about *people and their devices* rather than about money. Everything
+-- here is scoped to a profile, not just to a household, because a passkey
+-- belongs to one person and a phone belongs to one person.
+--
+-- The rule that shapes every table below, from ADR-0028 and 07-SECURITY-PRIVACY.md:
+--
+--   No biometric information is stored. Anywhere. Ever.
+--
+-- Windows Hello checks the fingerprint inside the device and answers with a
+-- signature. What is kept here is a public key — the same class of thing a web
+-- server keeps about a TLS client. There is deliberately no column in which a
+-- template, an image or a score could be placed even by mistake.
+
+-- ---------------------------------------------------------------------------
+-- Enumerations
+-- ---------------------------------------------------------------------------
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'webauthn_challenge_purpose' and n.nspname = 'public'
+  ) then
+    create type public.webauthn_challenge_purpose as enum (
+      'registration', 'authentication', 'reauthentication'
+    );
+  end if;
+
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'notification_category' and n.nspname = 'public'
+  ) then
+    create type public.notification_category as enum (
+      'security',        -- a sign-in from a new device, a passkey removed
+      'checks',          -- a post-dated check due, overdue, or returned
+      'payments',        -- an expected payment approaching, income that did not arrive
+      'forecast',        -- a material shortfall ahead
+      'imports',         -- a document finished processing, rows awaiting approval
+      'tasks',           -- a task due or overdue
+      'data_quality',    -- balances have gone stale
+      'weekly_summary'
+    );
+  end if;
+
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'notification_delivery_state' and n.nspname = 'public'
+  ) then
+    create type public.notification_delivery_state as enum (
+      'pending', 'sent', 'failed', 'expired', 'suppressed'
+    );
+  end if;
+end
+$$;
+
+-- ---------------------------------------------------------------------------
+-- webauthn_credentials — a public key and a label, and nothing else
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.webauthn_credentials (
+  id         uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles (id) on delete cascade,
+
+  -- base64url of the credential id the authenticator generated.
+  credential_id text not null check (length(credential_id) between 1 and 2000),
+
+  -- base64url of the COSE public key. A public key: it verifies, it cannot sign.
+  public_key_cose text not null check (length(public_key_cose) between 1 and 4000),
+
+  -- COSE algorithm identifier: -7 ES256, -257 RS256, -8 EdDSA.
+  algorithm integer not null check (algorithm between -65536 and 65536),
+
+  -- Advances on every assertion for authenticators that keep one. A counter
+  -- that fails to advance is the published signal of a copied credential.
+  sign_count bigint not null default 0 check (sign_count >= 0),
+
+  -- The relying party this credential was enrolled against.
+  --
+  -- Stored, and checked on every assertion, because it is what stops a passkey
+  -- created against `localhost` during development from being accepted by the
+  -- production deployment. ADR-0029 measured that the two are different origins
+  -- to the browser; this makes them different rows to the server as well.
+  rp_id text not null check (length(btrim(rp_id)) between 1 and 253),
+  origin text not null check (length(btrim(origin)) between 1 and 300),
+
+  -- The authenticator model, when it reported one. NULL for `attestation: none`,
+  -- which is what this build requests.
+  aaguid text check (aaguid is null or aaguid ~ '^[0-9a-f-]{36}$'),
+
+  -- What the person called it: "המחשב של יוסי". Their words, not a device string.
+  label text not null check (length(btrim(label)) between 1 and 80),
+
+  -- True when the platform says the passkey is synchronised to an account.
+  backed_up boolean not null default false,
+
+  created_at   timestamptz not null default now(),
+  last_used_at timestamptz,
+
+  -- One credential id per relying party. The same authenticator may legitimately
+  -- hold a credential for localhost and one for the production domain.
+  constraint webauthn_credentials_unique_per_rp unique (credential_id, rp_id)
+);
+
+comment on table public.webauthn_credentials is
+  'Public keys for passkey sign-in. No biometric information is stored here or anywhere else: there is no column that could hold it.';
+comment on column public.webauthn_credentials.rp_id is
+  'The relying party the credential was enrolled against. Checked on every assertion, so a development passkey cannot open production.';
+comment on column public.webauthn_credentials.sign_count is
+  'Signature counter. Must advance for authenticators that keep one; both-zero means the authenticator keeps none, which is not a clone signal.';
+
+create index if not exists webauthn_credentials_profile_idx
+  on public.webauthn_credentials (profile_id, rp_id);
+
+-- ---------------------------------------------------------------------------
+-- webauthn_challenges — issued once, usable once, briefly
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.webauthn_challenges (
+  id         uuid primary key default gen_random_uuid(),
+  -- NULL during registration bootstrap, when there is not yet a profile.
+  profile_id uuid references public.profiles (id) on delete cascade,
+
+  -- base64url of 32 random bytes.
+  value   text not null check (length(value) between 20 and 200),
+  purpose public.webauthn_challenge_purpose not null,
+
+  -- For a re-authentication, the session it was issued to. Without this a
+  -- challenge minted for one browser could be answered by another.
+  session_id text check (length(session_id) <= 200),
+  -- What the re-authentication is for, so the screen can name it.
+  action_key text check (length(action_key) <= 60),
+
+  created_at timestamptz not null default now(),
+  -- Short, because it need not be long. Replay is defeated by single use; this
+  -- bounds the window in which a captured challenge is even a candidate.
+  expires_at timestamptz not null,
+
+  -- Set the moment it is used, for any outcome including failure. That is what
+  -- makes it single-use: a replayed assertion answers a challenge that is gone.
+  consumed_at timestamptz,
+
+  constraint webauthn_challenges_expiry_after_creation check (expires_at > created_at)
+);
+
+comment on table public.webauthn_challenges is
+  'One challenge, one use. Consumed on every outcome including failure, so a captured assertion cannot be replayed.';
+
+create index if not exists webauthn_challenges_expiry_idx
+  on public.webauthn_challenges (expires_at)
+  where consumed_at is null;
+
+-- ---------------------------------------------------------------------------
+-- push_subscriptions — one row per device, per person
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.push_subscriptions (
+  id         uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles (id) on delete cascade,
+
+  -- The push service endpoint the browser gave us. Treated as a capability:
+  -- anyone holding it can deliver to that device, so it is protected by RLS and
+  -- never leaves the server.
+  endpoint text not null check (length(btrim(endpoint)) between 1 and 1000),
+
+  -- The subscription's own public key and auth secret, produced by the browser.
+  -- These encrypt the payload to the device; they are not household credentials
+  -- and grant no access to anything here.
+  p256dh text not null check (length(btrim(p256dh)) between 1 and 200),
+  auth   text not null check (length(btrim(auth)) between 1 and 100),
+
+  -- What the person calls this device, so one can be revoked by name.
+  device_label text check (length(btrim(device_label)) <= 80),
+
+  created_at    timestamptz not null default now(),
+  last_used_at  timestamptz,
+  -- Set when the push service reports the endpoint is gone. Kept rather than
+  -- deleted so a device that disappears is visible rather than merely absent.
+  expired_at    timestamptz,
+
+  constraint push_subscriptions_endpoint_unique unique (endpoint)
+);
+
+comment on table public.push_subscriptions is
+  'One browser on one device. The VAPID private key that signs to these lives only in the server environment and never in this table.';
+
+create index if not exists push_subscriptions_profile_idx
+  on public.push_subscriptions (profile_id)
+  where expired_at is null;
+
+-- ---------------------------------------------------------------------------
+-- notification_preferences — opt-in, per person
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.notification_preferences (
+  profile_id   uuid primary key references public.profiles (id) on delete cascade,
+  household_id uuid not null references public.households (id) on delete cascade,
+
+  -- Every category is off until the person turns it on. A financial application
+  -- that starts by pushing notifications has decided something for a family that
+  -- was theirs to decide.
+  security       boolean not null default false,
+  checks         boolean not null default false,
+  payments       boolean not null default false,
+  forecast       boolean not null default false,
+  imports        boolean not null default false,
+  tasks          boolean not null default false,
+  data_quality   boolean not null default false,
+  weekly_summary boolean not null default false,
+
+  -- Lock-screen text is generic unless the person asks otherwise. A push that
+  -- says "1,500 ₪ to the gemach tomorrow" is readable by anyone holding the
+  -- phone, and the default must not assume that is acceptable.
+  detailed_lock_screen boolean not null default false,
+
+  -- Quiet hours, in the household's own timezone. Equal values mean no quiet
+  -- period rather than a zero-length one.
+  quiet_hours_start time,
+  quiet_hours_end   time,
+
+  -- When a daily reminder may arrive, and how far ahead a due date warns.
+  preferred_hour   integer not null default 9 check (preferred_hour between 0 and 23),
+  lead_time_days   integer not null default 3 check (lead_time_days between 0 and 30),
+
+  -- Which day the weekly summary lands on. 0 = Sunday, matching the Israeli week.
+  weekly_summary_day integer not null default 0 check (weekly_summary_day between 0 and 6),
+
+  updated_at timestamptz not null default now(),
+
+  constraint notification_preferences_quiet_hours_paired check (
+    (quiet_hours_start is null) = (quiet_hours_end is null)
+  )
+);
+
+comment on table public.notification_preferences is
+  'Opt-in, per person, per category. Everything defaults to off, and lock-screen text defaults to generic.';
+comment on column public.notification_preferences.detailed_lock_screen is
+  'Off by default. A lock screen is readable by whoever is holding the phone, so amounts and names stay inside the authenticated app.';
+
+drop trigger if exists notification_preferences_touch_updated_at on public.notification_preferences;
+create trigger notification_preferences_touch_updated_at
+  before update on public.notification_preferences
+  for each row execute function app.touch_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- notification_deliveries — what was sent, never what it said
+-- ---------------------------------------------------------------------------
+--
+-- This table is an audit trail and a deduplication ledger. It is deliberately
+-- incapable of holding the content of a notification: there is no body column,
+-- no amount, no debt name, no document name. A notification log that records
+-- what it notified about is a second copy of the household's finances in a
+-- place nobody thinks to protect.
+
+create table if not exists public.notification_deliveries (
+  id           uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households (id) on delete cascade,
+  profile_id   uuid not null references public.profiles (id) on delete cascade,
+
+  category public.notification_category not null,
+
+  -- What this notification is *about*, as an opaque key: the check id and the
+  -- day, the batch id, the task id. Two runs of the scheduler produce the same
+  -- key, and the unique index below turns that into one delivery.
+  subject_key text not null check (length(btrim(subject_key)) between 1 and 200),
+
+  -- Where it went. NULL for an in-app notification, which has no endpoint.
+  subscription_id uuid references public.push_subscriptions (id) on delete set null,
+
+  state    public.notification_delivery_state not null default 'pending',
+  -- A short machine-readable reason, never a message body.
+  reason   text check (length(btrim(reason)) <= 80),
+  attempts integer not null default 0 check (attempts >= 0 and attempts <= 10),
+
+  -- Read in the application. An in-app notification that was seen stops being
+  -- offered; a push that was never opened does not.
+  read_at timestamptz,
+
+  created_at timestamptz not null default now(),
+  sent_at    timestamptz,
+
+  constraint notification_deliveries_sent_state check (
+    (state = 'sent') = (sent_at is not null)
+  )
+);
+
+comment on table public.notification_deliveries is
+  'That a notification happened, and nothing about what it said. There is no body column on purpose: a log of financial alerts is a copy of the finances.';
+comment on column public.notification_deliveries.subject_key is
+  'An opaque identity for the thing notified about. Two scheduler runs produce the same key, which the unique index turns into one delivery.';
+
+-- The deduplication rule. One person is told about one subject once.
+create unique index if not exists notification_deliveries_dedupe_idx
+  on public.notification_deliveries (profile_id, category, subject_key);
+
+create index if not exists notification_deliveries_unread_idx
+  on public.notification_deliveries (profile_id, created_at desc)
+  where read_at is null;
+
+create index if not exists notification_deliveries_retry_idx
+  on public.notification_deliveries (state, created_at)
+  where state in ('pending', 'failed');
+
+-- ---------------------------------------------------------------------------
+-- Cross-household reference
+-- ---------------------------------------------------------------------------
+
+create or replace function app.assert_notification_references()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_ok boolean;
+begin
+  -- The person being notified must actually be in the household the
+  -- notification is about. Without this, a delivery row could pair one
+  -- household's subject with another household's member.
+  select exists (
+    select 1 from public.household_members m
+    where m.profile_id = new.profile_id
+      and m.household_id = new.household_id
+      and m.status = 'active'
+  ) into v_ok;
+
+  if not v_ok then
+    raise exception 'a notification must be addressed to an active member of the household it concerns';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists notification_deliveries_assert_references on public.notification_deliveries;
+create trigger notification_deliveries_assert_references
+  before insert or update on public.notification_deliveries
+  for each row execute function app.assert_notification_references();
+
+drop trigger if exists notification_preferences_assert_references on public.notification_preferences;
+create trigger notification_preferences_assert_references
+  before insert or update on public.notification_preferences
+  for each row execute function app.assert_notification_references();
+-- <<< END MIGRATION: 20260908120300_access_and_notifications.sql
+
+-- >>> BEGIN MIGRATION: 20260908120400_new_tables_row_security.sql
+-- Milestone 9 — Row Level Security for every table this milestone added.
+--
+-- Same rules as the earlier security migrations: enabled AND forced on every
+-- table, one policy per command, membership as the only isolation boundary, and
+-- no DELETE on anything that represents money or history.
+--
+-- Two boundaries are in play here, and the difference matters.
+--
+--   * **Household-scoped** — checks, plans, imports, settings, tasks. Either
+--     spouse may read and write them, because 01-PRODUCT-SPEC.md says either may
+--     approve ordinary household updates and the product has always worked that
+--     way.
+--
+--   * **Person-scoped** — passkeys, push subscriptions, notification
+--     preferences. These are *not* shared. Tamar must not be able to read or
+--     remove Aharon's passkey, and a shared household is not a shared identity.
+--     Scoped by `app.current_profile_id()`, never by membership.
+--
+-- The foreign-key hazard from 20260822100200 applies to every new table too:
+-- constraints are checked with the owner's privileges and ignore RLS, so a
+-- member of household A could otherwise name household B's row in a reference
+-- column. Each policy that accepts a reference proves the referenced row is
+-- visible; the BEFORE triggers added with the tables prove the stronger
+-- statement — same household — and hold even for a service-role caller.
+
+-- ---------------------------------------------------------------------------
+-- Reference ownership helpers
+-- ---------------------------------------------------------------------------
+--
+-- SECURITY INVOKER, like their siblings: these read tables that carry their own
+-- policies, so an invisible row simply does not exist as far as the check is
+-- concerned. A definer here would see everything and defeat the point.
+
+create or replace function app.household_owns_check(
+  p_household_id uuid,
+  p_check_id uuid
+)
+returns boolean
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select p_check_id is null or exists (
+    select 1 from public.post_dated_checks c
+    where c.id = p_check_id and c.household_id = p_household_id
+  );
+$$;
+
+create or replace function app.household_owns_import_batch(
+  p_household_id uuid,
+  p_batch_id uuid
+)
+returns boolean
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select p_batch_id is null or exists (
+    select 1 from public.import_batches b
+    where b.id = p_batch_id and b.household_id = p_household_id
+  );
+$$;
+
+create or replace function app.household_owns_source_file(
+  p_household_id uuid,
+  p_file_id uuid
+)
+returns boolean
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select p_file_id is null or exists (
+    select 1 from public.import_source_files f
+    where f.id = p_file_id and f.household_id = p_household_id
+  );
+$$;
+
+create or replace function app.household_owns_member(
+  p_household_id uuid,
+  p_member_id uuid
+)
+returns boolean
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select p_member_id is null or exists (
+    select 1 from public.household_members m
+    where m.id = p_member_id and m.household_id = p_household_id
+  );
+$$;
+
+do $$
+declare
+  v_function text;
+begin
+  foreach v_function in array array[
+    'app.household_owns_check(uuid, uuid)',
+    'app.household_owns_import_batch(uuid, uuid)',
+    'app.household_owns_source_file(uuid, uuid)',
+    'app.household_owns_member(uuid, uuid)'
+  ]
+  loop
+    execute format('revoke all on function %s from public, anon', v_function);
+    execute format('grant execute on function %s to authenticated', v_function);
+  end loop;
+end
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Table privileges
+-- ---------------------------------------------------------------------------
+--
+-- Revoked from everyone first, then granted narrowly. `anon` receives nothing at
+-- all: an unauthenticated caller has no business knowing these tables exist.
+--
+-- DELETE is granted on exactly two tables. Everything else is corrected by a
+-- reversing record, never by removal — 02-FINANCIAL-RULES.md's history rule.
+
+do $$
+declare
+  v_table text;
+begin
+  foreach v_table in array array[
+    'public.post_dated_checks',
+    'public.repayment_plans',
+    'public.import_source_files',
+    'public.import_batches',
+    'public.import_proposals',
+    'public.household_settings',
+    'public.setup_progress',
+    'public.family_tasks',
+    'public.idempotency_keys',
+    'public.webauthn_credentials',
+    'public.webauthn_challenges',
+    'public.push_subscriptions',
+    'public.notification_preferences',
+    'public.notification_deliveries'
+  ]
+  loop
+    execute format('revoke all on table %s from public, anon, authenticated', v_table);
+    execute format('grant select, insert, update on table %s to authenticated', v_table);
+  end loop;
+
+  -- A passkey must be removable: a lost laptop is exactly the case the feature
+  -- exists for. A push subscription must be revocable per device. Neither is
+  -- financial history.
+  execute 'grant delete on table public.webauthn_credentials to authenticated';
+  execute 'grant delete on table public.push_subscriptions to authenticated';
+end
+$$;
+
+-- ---------------------------------------------------------------------------
+-- post_dated_checks — household-scoped
+-- ---------------------------------------------------------------------------
+
+alter table public.post_dated_checks enable row level security;
+alter table public.post_dated_checks force row level security;
+
+drop policy if exists post_dated_checks_select_member on public.post_dated_checks;
+create policy post_dated_checks_select_member
+  on public.post_dated_checks
+  for select
+  to authenticated
+  using (app.is_household_member(household_id));
+
+drop policy if exists post_dated_checks_insert_member on public.post_dated_checks;
+create policy post_dated_checks_insert_member
+  on public.post_dated_checks
+  for insert
+  to authenticated
+  with check (
+    app.is_household_member(household_id)
+    and app.household_owns_debt(household_id, debt_id)
+    and app.household_owns_account(household_id, account_id)
+    and app.household_owns_check(household_id, replaced_by_check_id)
+    and app.household_owns_check(household_id, replaces_check_id)
+    and app.household_owns_transaction(household_id, cleared_transaction_id)
+    and app.household_owns_debt_event(household_id, debt_event_id)
+  );
+
+drop policy if exists post_dated_checks_update_member on public.post_dated_checks;
+create policy post_dated_checks_update_member
+  on public.post_dated_checks
+  for update
+  to authenticated
+  using (app.is_household_member(household_id))
+  with check (
+    app.is_household_member(household_id)
+    and app.household_owns_debt(household_id, debt_id)
+    and app.household_owns_account(household_id, account_id)
+    and app.household_owns_check(household_id, replaced_by_check_id)
+    and app.household_owns_check(household_id, replaces_check_id)
+    and app.household_owns_transaction(household_id, cleared_transaction_id)
+    and app.household_owns_debt_event(household_id, debt_event_id)
+  );
+
+-- ---------------------------------------------------------------------------
+-- repayment_plans — household-scoped
+-- ---------------------------------------------------------------------------
+
+alter table public.repayment_plans enable row level security;
+alter table public.repayment_plans force row level security;
+
+drop policy if exists repayment_plans_select_member on public.repayment_plans;
+create policy repayment_plans_select_member
+  on public.repayment_plans
+  for select to authenticated
+  using (app.is_household_member(household_id));
+
+drop policy if exists repayment_plans_insert_member on public.repayment_plans;
+create policy repayment_plans_insert_member
+  on public.repayment_plans
+  for insert to authenticated
+  with check (
+    app.is_household_member(household_id)
+    and app.household_owns_debt(household_id, debt_id)
+  );
+
+drop policy if exists repayment_plans_update_member on public.repayment_plans;
+create policy repayment_plans_update_member
+  on public.repayment_plans
+  for update to authenticated
+  using (app.is_household_member(household_id))
+  with check (
+    app.is_household_member(household_id)
+    and app.household_owns_debt(household_id, debt_id)
+  );
+
+-- ---------------------------------------------------------------------------
+-- import_source_files — household-scoped
+-- ---------------------------------------------------------------------------
+
+alter table public.import_source_files enable row level security;
+alter table public.import_source_files force row level security;
+
+drop policy if exists import_source_files_select_member on public.import_source_files;
+create policy import_source_files_select_member
+  on public.import_source_files
+  for select to authenticated
+  using (app.is_household_member(household_id));
+
+drop policy if exists import_source_files_insert_member on public.import_source_files;
+create policy import_source_files_insert_member
+  on public.import_source_files
+  for insert to authenticated
+  with check (app.is_household_member(household_id));
+
+drop policy if exists import_source_files_update_member on public.import_source_files;
+create policy import_source_files_update_member
+  on public.import_source_files
+  for update to authenticated
+  using (app.is_household_member(household_id))
+  with check (app.is_household_member(household_id));
+
+-- ---------------------------------------------------------------------------
+-- import_batches — household-scoped
+-- ---------------------------------------------------------------------------
+
+alter table public.import_batches enable row level security;
+alter table public.import_batches force row level security;
+
+drop policy if exists import_batches_select_member on public.import_batches;
+create policy import_batches_select_member
+  on public.import_batches
+  for select to authenticated
+  using (app.is_household_member(household_id));
+
+drop policy if exists import_batches_insert_member on public.import_batches;
+create policy import_batches_insert_member
+  on public.import_batches
+  for insert to authenticated
+  with check (
+    app.is_household_member(household_id)
+    and app.household_owns_source_file(household_id, source_file_id)
+    and app.household_owns_account(household_id, target_account_id)
+  );
+
+drop policy if exists import_batches_update_member on public.import_batches;
+create policy import_batches_update_member
+  on public.import_batches
+  for update to authenticated
+  using (app.is_household_member(household_id))
+  with check (
+    app.is_household_member(household_id)
+    and app.household_owns_source_file(household_id, source_file_id)
+    and app.household_owns_account(household_id, target_account_id)
+  );
+
+-- ---------------------------------------------------------------------------
+-- import_proposals — household-scoped
+-- ---------------------------------------------------------------------------
+
+alter table public.import_proposals enable row level security;
+alter table public.import_proposals force row level security;
+
+drop policy if exists import_proposals_select_member on public.import_proposals;
+create policy import_proposals_select_member
+  on public.import_proposals
+  for select to authenticated
+  using (app.is_household_member(household_id));
+
+drop policy if exists import_proposals_insert_member on public.import_proposals;
+create policy import_proposals_insert_member
+  on public.import_proposals
+  for insert to authenticated
+  with check (
+    app.is_household_member(household_id)
+    and app.household_owns_import_batch(household_id, batch_id)
+    and app.household_owns_account(household_id, target_account_id)
+    and app.household_owns_debt(household_id, target_debt_id)
+    and app.household_owns_check(household_id, target_check_id)
+  );
+
+drop policy if exists import_proposals_update_member on public.import_proposals;
+create policy import_proposals_update_member
+  on public.import_proposals
+  for update to authenticated
+  using (app.is_household_member(household_id))
+  with check (
+    app.is_household_member(household_id)
+    and app.household_owns_import_batch(household_id, batch_id)
+    and app.household_owns_account(household_id, target_account_id)
+    and app.household_owns_debt(household_id, target_debt_id)
+    and app.household_owns_check(household_id, target_check_id)
+  );
+
+-- ---------------------------------------------------------------------------
+-- household_settings, setup_progress, family_tasks, idempotency_keys
+-- ---------------------------------------------------------------------------
+
+alter table public.household_settings enable row level security;
+alter table public.household_settings force row level security;
+
+drop policy if exists household_settings_select_member on public.household_settings;
+create policy household_settings_select_member
+  on public.household_settings for select to authenticated
+  using (app.is_household_member(household_id));
+
+drop policy if exists household_settings_insert_member on public.household_settings;
+create policy household_settings_insert_member
+  on public.household_settings for insert to authenticated
+  with check (app.is_household_member(household_id));
+
+drop policy if exists household_settings_update_member on public.household_settings;
+create policy household_settings_update_member
+  on public.household_settings for update to authenticated
+  using (app.is_household_member(household_id))
+  with check (app.is_household_member(household_id));
+
+alter table public.setup_progress enable row level security;
+alter table public.setup_progress force row level security;
+
+drop policy if exists setup_progress_select_member on public.setup_progress;
+create policy setup_progress_select_member
+  on public.setup_progress for select to authenticated
+  using (app.is_household_member(household_id));
+
+drop policy if exists setup_progress_insert_member on public.setup_progress;
+create policy setup_progress_insert_member
+  on public.setup_progress for insert to authenticated
+  with check (app.is_household_member(household_id));
+
+drop policy if exists setup_progress_update_member on public.setup_progress;
+create policy setup_progress_update_member
+  on public.setup_progress for update to authenticated
+  using (app.is_household_member(household_id))
+  with check (app.is_household_member(household_id));
+
+alter table public.family_tasks enable row level security;
+alter table public.family_tasks force row level security;
+
+drop policy if exists family_tasks_select_member on public.family_tasks;
+create policy family_tasks_select_member
+  on public.family_tasks for select to authenticated
+  using (app.is_household_member(household_id));
+
+drop policy if exists family_tasks_insert_member on public.family_tasks;
+create policy family_tasks_insert_member
+  on public.family_tasks for insert to authenticated
+  with check (
+    app.is_household_member(household_id)
+    and app.household_owns_member(household_id, assigned_member_id)
+  );
+
+drop policy if exists family_tasks_update_member on public.family_tasks;
+create policy family_tasks_update_member
+  on public.family_tasks for update to authenticated
+  using (app.is_household_member(household_id))
+  with check (
+    app.is_household_member(household_id)
+    and app.household_owns_member(household_id, assigned_member_id)
+  );
+
+alter table public.idempotency_keys enable row level security;
+alter table public.idempotency_keys force row level security;
+
+drop policy if exists idempotency_keys_select_member on public.idempotency_keys;
+create policy idempotency_keys_select_member
+  on public.idempotency_keys for select to authenticated
+  using (app.is_household_member(household_id));
+
+drop policy if exists idempotency_keys_insert_member on public.idempotency_keys;
+create policy idempotency_keys_insert_member
+  on public.idempotency_keys for insert to authenticated
+  with check (app.is_household_member(household_id));
+
+drop policy if exists idempotency_keys_update_member on public.idempotency_keys;
+create policy idempotency_keys_update_member
+  on public.idempotency_keys for update to authenticated
+  using (app.is_household_member(household_id))
+  with check (app.is_household_member(household_id));
+
+-- ---------------------------------------------------------------------------
+-- Person-scoped tables
+-- ---------------------------------------------------------------------------
+--
+-- A shared household is not a shared identity. These are scoped to the profile,
+-- so Tamar cannot read, change or remove Aharon's passkey — and neither can a
+-- household member who has been revoked but still holds a session.
+
+alter table public.webauthn_credentials enable row level security;
+alter table public.webauthn_credentials force row level security;
+
+drop policy if exists webauthn_credentials_select_own on public.webauthn_credentials;
+create policy webauthn_credentials_select_own
+  on public.webauthn_credentials for select to authenticated
+  using (profile_id = app.current_profile_id());
+
+drop policy if exists webauthn_credentials_insert_own on public.webauthn_credentials;
+create policy webauthn_credentials_insert_own
+  on public.webauthn_credentials for insert to authenticated
+  with check (profile_id = app.current_profile_id());
+
+drop policy if exists webauthn_credentials_update_own on public.webauthn_credentials;
+create policy webauthn_credentials_update_own
+  on public.webauthn_credentials for update to authenticated
+  using (profile_id = app.current_profile_id())
+  with check (profile_id = app.current_profile_id());
+
+drop policy if exists webauthn_credentials_delete_own on public.webauthn_credentials;
+create policy webauthn_credentials_delete_own
+  on public.webauthn_credentials for delete to authenticated
+  using (profile_id = app.current_profile_id());
+
+-- Challenges are written by the server before a profile is necessarily known
+-- (registration bootstrap), so the readable set is deliberately narrow: a
+-- challenge is looked up by the server, not browsed by a client.
+alter table public.webauthn_challenges enable row level security;
+alter table public.webauthn_challenges force row level security;
+
+drop policy if exists webauthn_challenges_select_own on public.webauthn_challenges;
+create policy webauthn_challenges_select_own
+  on public.webauthn_challenges for select to authenticated
+  using (profile_id is not null and profile_id = app.current_profile_id());
+
+drop policy if exists webauthn_challenges_insert_own on public.webauthn_challenges;
+create policy webauthn_challenges_insert_own
+  on public.webauthn_challenges for insert to authenticated
+  with check (profile_id is null or profile_id = app.current_profile_id());
+
+drop policy if exists webauthn_challenges_update_own on public.webauthn_challenges;
+create policy webauthn_challenges_update_own
+  on public.webauthn_challenges for update to authenticated
+  using (profile_id is not null and profile_id = app.current_profile_id())
+  with check (profile_id is not null and profile_id = app.current_profile_id());
+
+alter table public.push_subscriptions enable row level security;
+alter table public.push_subscriptions force row level security;
+
+drop policy if exists push_subscriptions_select_own on public.push_subscriptions;
+create policy push_subscriptions_select_own
+  on public.push_subscriptions for select to authenticated
+  using (profile_id = app.current_profile_id());
+
+drop policy if exists push_subscriptions_insert_own on public.push_subscriptions;
+create policy push_subscriptions_insert_own
+  on public.push_subscriptions for insert to authenticated
+  with check (profile_id = app.current_profile_id());
+
+drop policy if exists push_subscriptions_update_own on public.push_subscriptions;
+create policy push_subscriptions_update_own
+  on public.push_subscriptions for update to authenticated
+  using (profile_id = app.current_profile_id())
+  with check (profile_id = app.current_profile_id());
+
+drop policy if exists push_subscriptions_delete_own on public.push_subscriptions;
+create policy push_subscriptions_delete_own
+  on public.push_subscriptions for delete to authenticated
+  using (profile_id = app.current_profile_id());
+
+alter table public.notification_preferences enable row level security;
+alter table public.notification_preferences force row level security;
+
+drop policy if exists notification_preferences_select_own on public.notification_preferences;
+create policy notification_preferences_select_own
+  on public.notification_preferences for select to authenticated
+  using (profile_id = app.current_profile_id());
+
+drop policy if exists notification_preferences_insert_own on public.notification_preferences;
+create policy notification_preferences_insert_own
+  on public.notification_preferences for insert to authenticated
+  with check (
+    profile_id = app.current_profile_id()
+    and app.is_household_member(household_id)
+  );
+
+drop policy if exists notification_preferences_update_own on public.notification_preferences;
+create policy notification_preferences_update_own
+  on public.notification_preferences for update to authenticated
+  using (profile_id = app.current_profile_id())
+  with check (
+    profile_id = app.current_profile_id()
+    and app.is_household_member(household_id)
+  );
+
+-- A delivery record is readable only by the person it was addressed to. The
+-- household boundary is not enough here: what Aharon was reminded about is not
+-- automatically Tamar's to read.
+alter table public.notification_deliveries enable row level security;
+alter table public.notification_deliveries force row level security;
+
+drop policy if exists notification_deliveries_select_own on public.notification_deliveries;
+create policy notification_deliveries_select_own
+  on public.notification_deliveries for select to authenticated
+  using (profile_id = app.current_profile_id());
+
+drop policy if exists notification_deliveries_insert_own on public.notification_deliveries;
+create policy notification_deliveries_insert_own
+  on public.notification_deliveries for insert to authenticated
+  with check (
+    profile_id = app.current_profile_id()
+    and app.is_household_member(household_id)
+  );
+
+-- Update is how a notification is marked read. Nothing else about a delivery
+-- record is a person's to change.
+drop policy if exists notification_deliveries_update_own on public.notification_deliveries;
+create policy notification_deliveries_update_own
+  on public.notification_deliveries for update to authenticated
+  using (profile_id = app.current_profile_id())
+  with check (profile_id = app.current_profile_id());
+-- <<< END MIGRATION: 20260908120400_new_tables_row_security.sql
 
 commit;
