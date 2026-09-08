@@ -36,11 +36,25 @@ export const authScreen = {
     'מה שנשמר כאן הוא מפתח ציבורי — מספר שאפשר לבדוק איתו חתימה, ואי אפשר לחתום איתו.',
     'כל בדיקה נעשית מול המחשב הזה בלבד. אין שרת, אין ענן, אין חשבון.',
   ],
-  enrol: 'להגדיר עכשיו',
+  /** The button that starts the ceremony. Says what pressing it will do. */
+  enrol: 'הגדרת כניסה באמצעות Windows Hello',
+
+  /* The phases, each with its own sentence. A person who pressed a button is
+     owed the difference between "we are preparing" and "Windows is asking you". */
+  enrolStarting: 'מתכוננים…',
   enrolling: 'ממתינים ל־Windows Hello…',
+  enrolWaitingHint: 'Windows יבקש עכשיו טביעת אצבע, פנים או PIN. החלון נפתח מחוץ לדפדפן.',
   enrolled: 'המפתח נוסף. מעכשיו האפליקציה תבקש אישור בכניסה.',
+  enrolCancelled: 'ההגדרה בוטלה, או שחלף הזמן. אפשר לנסות שוב.',
+  enrolFailed: 'ההגדרה לא הושלמה. שום דבר לא נשמר. אפשר לנסות שוב.',
+
   enrolLabel: 'איך לקרוא למפתח הזה',
-  enrolLabelHint: 'למשל: המחשב בבית. השם הזה נשאר אצלכם.',
+  enrolLabelHint: 'השם נשאר אצלכם ומופיע רק במסך הזה.',
+  /** Pre-filled, so pressing Enter straight away is a complete action. */
+  enrolDefaultLabel: 'המחשב האישי שלי',
+  enrolLabelRequired: 'צריך שם למפתח. אפשר להשאיר את מה שמוצע.',
+  /** Shown only for a failure we could not name, so it can be reported. */
+  technicalDetail: 'פרט טכני',
 
   addAnother: 'להוסיף מפתח נוסף',
   addAnotherNote:

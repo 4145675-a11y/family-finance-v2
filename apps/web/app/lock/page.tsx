@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-import { Card, Disclosure } from '../../components/ui';
+import { Card, Disclosure, LinkButton } from '../../components/ui';
 import { PasskeySignIn } from '../../components/passkey';
 import { authScreen } from '../../lib/copy/security';
 import { sessionContext } from '../../lib/auth/session';
@@ -50,19 +50,23 @@ export default async function LockPage() {
         </Card>
       ) : (
         <Card tone="attention">
-          <h2 className="text-h3 font-semibold">{authScreen.originTitle}</h2>
+          <h2 className="text-[18px] leading-tight font-semibold">{authScreen.originTitle}</h2>
           <p className="mt-2 text-text-secondary">{authScreen.originExplain}</p>
           <p className="mt-2 text-text-secondary">{authScreen.originFix(origin.origin)}</p>
           <p className="mt-2 text-small text-text-secondary">{authScreen.originSameMachine}</p>
           <div className="mt-5">
-            {/* An ordinary link: this is a different origin, so it is a fresh
-                document rather than a client-side navigation. */}
-            <a
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand px-5 py-2.5 font-medium text-white transition-colors hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-              href={`${origin.origin}/lock`}
-            >
+            {/*
+              The product's own button, not a hand-rolled one. The first version
+              of this link invented its own colour classes, which resolved to
+              nothing — so the only way out of a lock screen reached at the wrong
+              address was itself invisible.
+
+              `LinkButton` renders a plain anchor, which is what this needs: a
+              different origin is a fresh document, not a client-side navigation.
+            */}
+            <LinkButton href={`${origin.origin}/lock`}>
               {authScreen.openAtAuthOrigin}
-            </a>
+            </LinkButton>
           </div>
         </Card>
       )}
