@@ -2,8 +2,8 @@
 
 מצב הפרויקט מול `09-MILESTONES.md`. מתעדכן בסוף כל milestone, לפני העצירה לאישור.
 
-- **תאריך עדכון אחרון**: 2026-09-14
-- **Milestone פעיל**: 8 — Local Access and Gemach
+- **תאריך עדכון אחרון**: 2026-09-15
+- **Milestone פעיל**: Production Data Layer (ADR-0032) — ענף `production-data-layer`, ממתין לאישור ולמיזוג
 - **סטטוס**: **מוצר מקומי שלם ושמיש, עם נעילה אמיתית.** משפחה יכולה להקים משק בית, להזין
   הכול ידנית, להעלות קובץ בנק, לעבור עליו ולאשר, לראות תמונה יומית, לנהל תקציב וחובות,
   לנהל הלוואת גמ״ח שנפרעת בצ׳קים דחויים, להפיק דוחות, לייצא ולגבות — הכול על המחשב הזה,
@@ -43,6 +43,7 @@
 | 13 | Summaries, Notifications & Reports | **In progress** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | דוחות וייצוא קיימים; התראות מקומיות בלבד |
 | 14 | Hardening & Production | **In progress** | [milestone-8](docs/checkpoints/milestone-8-access-and-gemach.md) | נעילת גישה מקומית עובדת; אירוח, TLS ו־RPO/RTO עדיין פתוחים |
 | — | **Local Access & Gemach** | **Complete — evidenced** | [milestone-8](docs/checkpoints/milestone-8-access-and-gemach.md) | **WebAuthn מול Windows Hello; גמ״ח וצ׳קים דחויים** |
+| — | **Production Data Layer** | **Implemented — evidenced; live validation pending one input** | [production-data-layer](docs/checkpoints/production-data-layer.md) | **האפליקציה קוראת וכותבת דרך Supabase כמשתמש מחובר; RLS מוכח על 32 טבלאות; לא מוזג** |
 
 ## שערי איכות — מצב נוכחי
 
@@ -54,15 +55,16 @@
 | Format | Active | `prettier --check .`, exit 0 |
 | Typecheck | Active | שורש + 7 workspaces |
 | Lint | Active | `--max-warnings=0`, type-aware |
-| **Unit** | Active | **1513/1513**, 48 קבצים, 0 מדולגות (מ־1228) |
+| **Unit** | Active | **1805/1805**, 53 קבצים, 0 מדולגות |
 | **Property** | Active | **41/41**, כולל אינווריאנטים של צ׳קים תחת רצפי פעולות שרירותיים |
 | Build | Active | 26 מסלולים |
 | **Built-shell** | Active | **14/14 מול השרת הרץ** — 5 מסלולים, משק בית מוזרע (`ADR-0027`) |
 | Client-secret boundary | Active | 0 ממצאים |
 | Manual bundle | Active | 10 מיגרציות, תואם למקורות (`ADR-0019`) |
 | Forbidden scan | Active | 177 קבצים, 0 errors |
-| Traceability | Active | 46/46 |
-| **Integration / RLS** | Active (מקומי, `npm run integration`) | **38/38 מול Supabase**, 2026-09-14; לא חלק מ־`verify` — דורש `SUPABASE_DB_URL` מקומי |
+| Traceability | Active | 66/66 |
+| **Integration / RLS** | Active (מקומי, `npm run integration`) | **231/231 מול Supabase** (8 קבצים, 32 טבלאות, 9 תחומי store), 2026-09-15; לא חלק מ־`verify` — דורש `SUPABASE_DB_URL` מקומי |
+| **Fail-closed + readiness** | Active | **9/9** |
 | E2E / axe אוטומטי | Defined, לא פעיל | Playwright לא מותקן; ביקורת מבנית הורצה במקום ומוצהרת ככזו |
 
 ## פערים פתוחים
@@ -71,7 +73,8 @@
 |---:|---|---|---|
 | 1 | דרישות ב־`04`, `05`, `07`, `08`, `11` ללא תוויות מזהה | traceability חלקי מחוץ ל־46 המזהים הרשומים | כל milestone רושם מזהים למה שהוא מממש — `ADR-0004` |
 | 2 | `UX-DEBT-001` אינו מוקצה | אין | המזהה שמור |
-| 3 | remote `origin` מוגדר; CI טרם אומת שרץ | אותם שערים רצים מקומית | לאמת ריצת CI אחרי ה־push הראשון |
+| 3 | CI ירוק ב־GitHub Actions על `main` ועל `production-data-layer`; בדיקות האינטגרציה מול המסד אינן ב־CI | RLS מוכח מקומית בלבד | סוד DB ל־CI — החלטה לפני שילוב |
+| 11 | `apps/web/.env.local`: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` אינו במבנה `sb_publishable_…` | הריצה החיה (`validate:production-path`) לא רצה | להציב את המפתח מ־Project Settings → API Keys |
 | 4 | axe ומקלדת אוטומטיים לא הורצו | `UX-A11Y-001` חלקי | ביקורת מבנית על 17 מסלולים × 4 רוחבים הורצה; axe דורש Playwright |
 | 5 | גופני Assistant/Heebo לא מוטמעים | טקסט עברי נופל לגופן מערכת | milestone עיצוב; קשור ל־`ADR-0026` |
 | 6 | `.nvmrc` נועל Node 24.18.1; המכונה מריצה 24.19.0 | CI ירוץ על גרסה אחרת מהמקומית | נדרשת החלטה; לא שונה בלי ADR |

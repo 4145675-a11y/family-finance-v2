@@ -20,7 +20,8 @@
 | Client-secret boundary | `npm run check:client-secrets` | כן | 2 | ✅ |
 | Built shell (Hebrew RTL, landmarks, manifest) | `npm run check:shell` | כן | 1/7 | ✅ |
 | Manual bundle up to date | `npm run db:check` | כן | 3 | ✅ |
-| Integration + RLS negative | `npm run integration` | כן | 2 | — (חסום: דורש חיבור DB; ראה checkpoint M2) |
+| Integration + RLS negative | `npm run integration` | כן | 2 | ✅ מקומית (8 קבצים, 231 בדיקות, 32 טבלאות; דורש `SUPABASE_DB_URL` — לא ב־CI עדיין) |
+| Fail-closed startup + data-layer readiness | `npm run check:fail-closed` | כן | PDL | ✅ 9/9 |
 | Property | `npm run property` | כן | 5 | ✅ (רץ מקומית; אין remote) |
 | E2E smoke | `npm run e2e -- --grep @smoke` | כן | 6 | — |
 | Accessibility / RTL visual | `npm run a11y` | כן | 6 | — |

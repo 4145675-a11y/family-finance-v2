@@ -37,6 +37,9 @@ Package manager: **npm**, נעול לפי `ADR-0001`. אין להחליף בלי
 | 19c | env-file gate | `npm run check:no-env-files` → `node tools/check-no-env-files.mjs` | אף קובץ סביבה במעקב git או בתוך `.next` | 9 | **Active** |
 | 19a | auth reset | `npm run auth:reset` → `node tools/auth-reset.mjs` | מסיר את מפתחות הכניסה והסשנים. **אינו נוגע בנתונים הכספיים.** דורש גישה למחשב; אין מסלול HTTP. עם `NODE_ENV=production` מסרב אלא אם נמסר `--i-am-at-the-machine` | 8 | **Active** |
 | 19 | copy SQL | `npm run db:copy:diagnostic` · `npm run db:copy:schema` → `node tools/copy-sql.mjs <file>` | — (כלי החלה ידנית) | 2 | **Active** |
+| 20 | apply migration | `npm run db:apply <supabase/migrations/file.sql>` → `node tools/apply-migration.mjs` | מחיל קובץ מיגרציה בטרנזקציה אחת מול `SUPABASE_DB_URL` (מהסביבה או `.env.integration.local`); מדפיס שם, sha256 ותוצאה בלבד | PDL | **Active** |
+| 21 | db cleanliness | `npm run db:cleanliness` → `node tools/db-cleanliness.mjs` | קריאה בלבד: ספירות (households, profiles, `@example.test`, audit), RLS forced 32/32, guards פעילים. exit 1 אם לא נקי | PDL | **Active** |
+| 22 | production-path validation | `npm run validate:production-path` → `vitest run --config vitest.validation.config.ts` | שרת ייצור בנוי מול המסד האמיתי: Supabase Auth, המסלול הקריטי דרך ה־transport של הייצור, עמודים מרונדרים, בידוד, ניקוי עצמי. דורש build + publishable key ב־`apps/web/.env.local` | PDL | **Active** (לא חלק מ־`verify`) |
 
 `unit` רץ על Vitest בלבד מ־Milestone 1 (`ADR-0009`). ב־Milestone 0 הוא רץ על `node --test` כי לא הותקנה שום תלות.
 

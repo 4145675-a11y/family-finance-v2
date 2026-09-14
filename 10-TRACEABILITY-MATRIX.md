@@ -60,13 +60,13 @@
 | GEM-DELIVERY-001 | Financial | local-store/src/checks.ts | unit/property | 8 | **Verified in M8** — מסירה אינה יוצרת תנועה ואינה יוצרת אירוע חוב |
 | GEM-FORECAST-001 | Financial | local-store/src/projection.ts | integration | 8 | **Verified in M8** — פריט אחד לכל צ׳ק, לפי מזהה הצ׳ק |
 | GEM-MATCH-001 | Architecture | local-store/src/check-match.ts | unit/integration | 8 | **Verified in M8** — יבוא חוזר של אותו דף אינו פורע צ׳ק פעמיים |
-| PROD-DATASOURCE-001 | Architecture | apps/web/lib/dashboard/source.ts + lib/config/deployment.ts | unit + fail-closed gate | PDL | In progress — ADR-0032 |
-| PROD-AUTHDB-001 | Security | lib/supabase/server.ts + SQL functions (security invoker) | integration (real DB) | PDL | In progress — ADR-0032 |
-| PROD-SECRET-BOUNDARY-001 | Security | check:client-secrets + deployment.ts + auth modules | gate + unit | PDL | In progress |
-| PROD-RLS-BEHAVIOUR-001 | Security | supabase/tests/*.integration.test.ts | negative integration (32 tables) | PDL | In progress |
-| PROD-DOMAIN-PERSIST-001 | Architecture | packages/supabase-store + migration 20260914* | integration + parity | PDL | In progress |
-| PROD-PARTIAL-FAILCLOSED-001 | Architecture | resolveDataSource + instrumentation.ts | unit + fail-closed gate | PDL | In progress |
-| PROD-HEALTH-002 | Operations | apps/web/app/api/health/route.ts | unit + gate | PDL | In progress |
+| PROD-DATASOURCE-001 | Architecture | apps/web/lib/dashboard/source.ts + lib/config/deployment.ts | unit + fail-closed gate | PDL | **Verified in PDL** — 24 unit + fail-closed gate |
+| PROD-AUTHDB-001 | Security | lib/supabase/server.ts + SQL functions (security invoker) | integration (real DB) | PDL | **Verified in PDL** — 17 real-DB store tests as the signed-in person; live JWT run pending the publishable key |
+| PROD-SECRET-BOUNDARY-001 | Security | check:client-secrets + deployment.ts + auth modules | gate + unit | PDL | **Verified in PDL** — client-secrets gate, health tests, boundary tests |
+| PROD-RLS-BEHAVIOUR-001 | Security | supabase/tests/*.integration.test.ts | negative integration (32 tables) | PDL | **Verified in PDL** — 7 suites, 214 tests, rollback |
+| PROD-DOMAIN-PERSIST-001 | Architecture | packages/supabase-store + migration 20260914* | integration + parity | PDL | **Verified in PDL** — 9 domains, 17 real-DB + 16 in-memory |
+| PROD-PARTIAL-FAILCLOSED-001 | Architecture | resolveDataSource + instrumentation.ts | unit + fail-closed gate | PDL | **Verified in PDL** — 503 not_ready, never a file or fixture |
+| PROD-HEALTH-002 | Operations | apps/web/app/api/health/route.ts | unit + gate | PDL | **Verified in PDL** — 6 unit + 2 gate checks |
 | PROD-FAILCLOSED-001 | Architecture | apps/web/lib/config/deployment.ts + instrumentation.ts | unit/gate | 9 | **Verified in M9** — השרת הבנוי מסרב לעלות; התצורה התקינה כן עולה |
 | PROD-HEALTH-001 | Operations | apps/web/app/api/health/route.ts | gate | 9 | **Verified in M9** — שמות הגדרות בלבד, לעולם לא ערכים |
 | PROD-NOENV-001 | Security | tools/check-no-env-files.mjs | gate | 9 | **Verified in M9** — נמצא כש־.env.local סיפק תצורה בשקט לשער אחר |

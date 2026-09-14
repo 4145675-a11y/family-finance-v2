@@ -3,9 +3,10 @@
 ## מה יש כאן
 
 ```
-migrations/   15 קבצי SQL, מיושמים לפי סדר שם הקובץ
+migrations/   16 קבצי SQL, מיושמים לפי סדר שם הקובץ
 manual/       חבילה מיוצרת להדבקה ידנית + אבחון קריאה־בלבד
-tests/        חבילת בידוד — 38 בדיקות שליליות מול DB אמיתי
+tests/        בידוד ו־store — 8 קבצים, 231 בדיקות מול DB אמיתי, rollback בלבד
+validation/   הריצה החיה מקצה לקצה (npm run validate:production-path)
 ```
 
 | קובץ | תוכן |
@@ -19,13 +20,13 @@ tests/        חבילת בידוד — 38 בדיקות שליליות מול DB
 | `20260822100100_debt_domain.sql` | `debts`, `debt_events`, `debt_rollovers` + אימות קישורי גלגול |
 | `20260822100200_financial_row_security.sql` | RLS ל־10 הטבלאות החדשות + עוזרי בעלות על הפניות |
 
-הטבלה מתארת את שמונת הקבצים של M2–M4. שני קבצי `20260823*` (תקציב) וחמשת קבצי `20260908*` (M9: גמ״ח וצ׳קים, יבוא ומסמכים, הגדרות ומשימות, גישה והתראות, RLS לטבלאות החדשות) מתועדים ב־checkpoints של המילסטונים שלהם.
+הטבלה מתארת את שמונת הקבצים של M2–M4. שני קבצי `20260823*` (תקציב) וחמשת קבצי `20260908*` (M9: גמ״ח וצ׳קים, יבוא ומסמכים, הגדרות ומשימות, גישה והתראות, RLS לטבלאות החדשות) מתועדים ב־checkpoints של המילסטונים שלהם. `20260914120000_production_data_layer.sql` (ADR-0032): תיקוני פגמים שנמצאו בהרצה, עמודות שהחוזים דורשים, provenance של יבוא, `voided_at`/`removed_at`, `create_household()`, `create_household_invitation()`, ושתי נקודות הכניסה של האפליקציה — `load_household_document()` ו־`apply_household_changes()` (שתיהן `security invoker`).
 
 **הסדר מחייב.** קובץ מאוחר מסתמך על אובייקטים של קודמו.
 
 ## סטטוס
 
-✅ **אומת מול Supabase ב־2026-09-14.** החיבור הצליח (PostgreSQL 17.6). `diagnostic.sql` מצא **31/31** אובייקטים קיימים; ספירה נוספת: **32/32** טבלאות ציבוריות עם RLS enabled+forced, **94** policies. `npm run integration`: **38/38** בדיקות בידוד עברו. החבילה רצה בטרנזקציה אחת שמתגלגלת אחורה, ואחרי הריצה המסד נקי מרשומות בדיקה (0 households, 0 profiles). פירוט, כולל שני באגים בקוד הבדיקה שנמצאו ותוקנו בריצה הראשונה: `docs/checkpoints/milestone-2.md`.
+✅ **אומת מול Supabase ב־2026-09-14, והאפליקציה עוברת דרכו מ־2026-09-15 (Production Data Layer, `docs/checkpoints/production-data-layer.md`).** החיבור הצליח (PostgreSQL 17.6). `diagnostic.sql` מצא **31/31** אובייקטים קיימים; ספירה נוספת: **32/32** טבלאות ציבוריות עם RLS enabled+forced, **94** policies. `npm run integration`: **38/38** בדיקות בידוד עברו. החבילה רצה בטרנזקציה אחת שמתגלגלת אחורה, ואחרי הריצה המסד נקי מרשומות בדיקה (0 households, 0 profiles). פירוט, כולל שני באגים בקוד הבדיקה שנמצאו ותוקנו בריצה הראשונה: `docs/checkpoints/milestone-2.md`.
 
 ## הדרך המומלצת: שתי פקודות
 
@@ -84,6 +85,15 @@ npx supabase@2.114.0 db push
 psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/manual/apply-all.sql
 ```
 
+## החלה של מיגרציה חדשה
+
+```bash
+npm run db:apply supabase/migrations/<file>.sql   # טרנזקציה אחת; מדפיס שם, sha256 ותוצאה
+npm run db:cleanliness                              # קריאה בלבד: ספירות, RLS forced, guards
+```
+
+שני הכלים קוראים `SUPABASE_DB_URL` מהסביבה או מ־`.env.integration.local` ולעולם אינם מדפיסים אותו.
+
 ## הרצת בדיקות הבידוד
 
 1. Studio → **Project Settings → Database → Connection string (URI)**
@@ -108,6 +118,8 @@ psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/manual/apply-all.sql
 ## מה הבדיקות מוכיחות
 
 שני משקי בית, ארבעה אנשים (Alice+Bob במשק A, Carol במשק B, Mallory ללא שיוך). לכל טבלה ולכל פועל נשאלת אותה שאלה: האם משק A יכול להגיע למשהו של משק B?
+
+שבעה קבצי `rls-*` מכסים את כל 32 הטבלאות (214 בדיקות); `store.integration.test.ts` (17) מריץ את תשעת התחומים דרך `SupabaseHouseholdStore` מול המסד. המקורי (זהות):
 
 RLS enabled+forced (5) · SELECT חוצה־משפחות · UPDATE חוצה־משפחות · יצירה בשם אחר · DELETE ללא policy · הצטרפות עצמית · צפייה בחברים · ביטול חברות · הסלמה דרך revoke · צפייה בפרופיל של זר · עריכת פרופיל של בן/בת הזוג · טוקן hashed · פדיון תקין פעם אחת + replay ע"י אדם אחר · טוקן שגוי · טוקן שפג · טוקן שבוטל · פדיון ע"י `anon` (אין EXECUTE, `42501`) · audit חוצה־משפחות · UPDATE/DELETE על audit גם לבעלים · זיוף actor · actor מה־session · גישת `anon` לחמש טבלאות (`42501`, לא "אפס שורות").
 
