@@ -87,7 +87,7 @@ export default async function ReportsPage() {
         {/* Printing renders a screen this person is already looking at, so it is
             outside the gate. The two file exports carry every figure out of the
             application, so they are inside it. */}
-        <ReauthGate actionKey="export_all">
+        <ReauthGate actionKey="export_all" returnTo="/reports">
           <div className="flex flex-wrap gap-3">
             <LinkButton href="/api/export/workbook" tone="secondary">
               {screens.reports.exportExcel}

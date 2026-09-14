@@ -2,11 +2,13 @@ import { AppShell } from '../../components/app-shell';
 import { ReauthGate } from '../../components/reauth-gate';
 import { RestorePanel } from '../../components/restore-panel';
 import { NoHousehold } from '../../components/screen';
-import { Card, Figure, Notice, SectionTitle, StatRow } from '../../components/ui';
+import { Card, Figure, LinkButton, Notice, SectionTitle, StatRow } from '../../components/ui';
 import { ActionForm } from '../../components/form';
 import { createBackupAction } from '../../lib/actions/backup';
 import { screens } from '../../lib/copy/screens';
 import { loadDashboardView } from '../../lib/dashboard/load';
+import { activeBackend } from '../../lib/auth/backend';
+import { accountScreen } from '../../lib/copy/security';
 import { dataDirectory } from '../../lib/store/server';
 
 /**
@@ -27,6 +29,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function BackupPage() {
   const view = await loadDashboardView();
+  const backend = activeBackend();
 
   if (view.document === null) {
     return (
@@ -67,24 +70,43 @@ export default async function BackupPage() {
       <Card title={screens.backup.whereTitle}>
         <p className="text-text-secondary">{screens.backup.whereBody}</p>
         <p className="mt-2 text-small text-text-secondary">
-          <bdi dir="ltr">{dataDirectory()}</bdi>
+          <bdi dir="ltr">{dataDirectory() ?? accountScreen.storedInDatabase}</bdi>
         </p>
         <div className="mt-4">
-          <ReauthGate actionKey="backup_create">
-            <ActionForm action={createBackupAction} submitLabel={screens.backup.create}>
-              <></>
-            </ActionForm>
+          <ReauthGate actionKey="backup_create" returnTo="/backup">
+            {backend === 'supabase' ? (
+              // A hosted server keeps nothing on its own disk: the backup goes
+              // straight to the person's device (ADR-0032).
+              <div>
+                <p className="mb-3 text-small text-text-secondary">
+                  {accountScreen.backupDownloadIntro}
+                </p>
+                <LinkButton href="/api/export/backup.json">
+                  {accountScreen.backupDownload}
+                </LinkButton>
+              </div>
+            ) : (
+              <ActionForm action={createBackupAction} submitLabel={screens.backup.create}>
+                <></>
+              </ActionForm>
+            )}
           </ReauthGate>
         </div>
       </Card>
 
       <SectionTitle>{screens.backup.restoreTitle}</SectionTitle>
-      <Notice tone="attention">{screens.backup.restoreWarning}</Notice>
-      <Card>
-        <ReauthGate actionKey="backup_restore">
-          <RestorePanel />
-        </ReauthGate>
-      </Card>
+      {backend === 'supabase' ? (
+        <Notice tone="attention">{accountScreen.restoreUnavailable}</Notice>
+      ) : (
+        <>
+          <Notice tone="attention">{screens.backup.restoreWarning}</Notice>
+          <Card>
+            <ReauthGate actionKey="backup_restore" returnTo="/backup">
+              <RestorePanel />
+            </ReauthGate>
+          </Card>
+        </>
+      )}
     </AppShell>
   );
 }

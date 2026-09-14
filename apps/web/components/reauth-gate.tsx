@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react';
 
 import { ReauthenticateButton } from './passkey';
-import { Notice } from './ui';
+import { LinkButton, Notice } from './ui';
+import { activeBackend } from '../lib/auth/backend';
 import { sessionContext } from '../lib/auth/session';
+import { recentlyAuthenticated } from '../lib/auth/supabase';
+import { accountScreen } from '../lib/copy/security';
 import { authScreen } from '../lib/copy/security';
 
 /**
@@ -20,10 +23,30 @@ import { authScreen } from '../lib/copy/security';
 export async function ReauthGate({
   actionKey,
   children,
+  returnTo = '/',
 }: {
   actionKey: string;
   children: ReactNode;
+  /** Where the password screen sends the person back to. */
+  returnTo?: string;
 }) {
+  // Database backend: recent authentication is a recent password entry, and
+  // the way to provide one is the password screen.
+  if (activeBackend() === 'supabase') {
+    if (await recentlyAuthenticated()) return <>{children}</>;
+    return (
+      <div>
+        <Notice tone="attention" title={accountScreen.reauthTitle}>
+          <p>{accountScreen.reauthNeeded}</p>
+        </Notice>
+        <div className="mt-4">
+          <LinkButton href={`/reauth?next=${encodeURIComponent(returnTo)}`}>
+            {accountScreen.reauthConfirm}
+          </LinkButton>
+        </div>
+      </div>
+    );
+  }
   const context = await sessionContext();
 
   if (!context.locked || context.recentlyVerified) return <>{children}</>;

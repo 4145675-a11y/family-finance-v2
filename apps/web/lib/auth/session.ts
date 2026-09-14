@@ -2,7 +2,9 @@ import 'server-only';
 
 import { cookies, headers } from 'next/headers';
 
+import { activeBackend } from './backend';
 import { configuredAuthOrigin, requestIsAtAuthOrigin } from './origin';
+import { currentUser, recentlyAuthenticated } from './supabase';
 import {
   AuthError,
   findSessionByHash,
@@ -127,6 +129,17 @@ export async function assertRecentlyVerified(
   actionKey: string,
   now = new Date().toISOString(),
 ): Promise<void> {
+  // Production identity: the password entered recently, as the auth server
+  // recorded it in the session's claims (lib/auth/supabase.ts).
+  if (activeBackend() === 'supabase') {
+    if ((await currentUser()) === null) {
+      throw new AuthError('not_signed_in', 'no signed-in person');
+    }
+    if (!(await recentlyAuthenticated(Date.parse(now)))) {
+      throw new AuthError('reauthentication_required', `${actionKey} needs the password again`);
+    }
+    return;
+  }
   const context = await sessionContext(now);
   if (!context.locked) return;
 

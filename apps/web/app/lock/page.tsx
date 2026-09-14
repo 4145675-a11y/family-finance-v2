@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Card, Disclosure, LinkButton } from '../../components/ui';
 import { PasskeySignIn } from '../../components/passkey';
 import { authScreen } from '../../lib/copy/security';
+import { activeBackend } from '../../lib/auth/backend';
 import { sessionContext } from '../../lib/auth/session';
 import { configuredAuthOrigin } from '../../lib/auth/origin';
 
@@ -27,6 +28,7 @@ export const metadata = {
 };
 
 export default async function LockPage() {
+  if (activeBackend() === 'supabase') redirect('/login');
   const context = await sessionContext();
   const origin = configuredAuthOrigin();
 

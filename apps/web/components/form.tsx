@@ -198,7 +198,7 @@ export function TextField({
   maxLength,
   max,
 }: BaseFieldProps & {
-  type?: 'text' | 'date' | 'number' | 'month';
+  type?: 'text' | 'date' | 'number' | 'month' | 'email' | 'password';
   defaultValue?: string | undefined;
   placeholder?: string;
   inputMode?: 'text' | 'decimal' | 'numeric';

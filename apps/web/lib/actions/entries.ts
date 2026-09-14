@@ -60,7 +60,9 @@ export async function recordExpenseAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       recordTransaction(
         document,
         {
@@ -109,7 +111,9 @@ export async function recordIncomeAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       recordTransaction(
         document,
         {
@@ -166,7 +170,9 @@ export async function recordMovementAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       recordTransaction(
         document,
         {
@@ -214,7 +220,9 @@ export async function recordBalanceAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       recordBalance(
         document,
         {
@@ -256,7 +264,9 @@ export async function acceptGapAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       acceptReconciliationGap(
         document,
         { accountId, differenceMinor, direction, asOfDate },
@@ -280,9 +290,9 @@ export async function closeAccountAction(
   if (!reader.ok || accountId === null) return failed('לא נבחר חשבון.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
-      closeAccount(document, { accountId }, context),
-    );
+    await (
+      await householdStore()
+    ).run((document, context) => closeAccount(document, { accountId }, context));
   } catch (error) {
     return describe(error);
   }
@@ -304,9 +314,9 @@ export async function voidTransactionAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
-      voidTransaction(document, { transactionId, reason }, context),
-    );
+    await (
+      await householdStore()
+    ).run((document, context) => voidTransaction(document, { transactionId, reason }, context));
   } catch (error) {
     return describe(error);
   }
@@ -349,7 +359,9 @@ export async function addPlannedItemAction(
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       addPlannedItem(
         document,
         {
@@ -398,7 +410,9 @@ export async function settlePlannedItemAction(
   }
 
   try {
-    await householdStore().run((document, context) => {
+    await (
+      await householdStore()
+    ).run((document, context) => {
       const item = document.cashflowItems.find((candidate) => candidate.id === itemId);
       if (item === undefined) {
         return { document, value: undefined };
@@ -445,9 +459,9 @@ export async function removePlannedItemAction(
   if (!reader.ok || itemId === null) return failed('לא נבחר פריט.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
-      removePlannedItem(document, { itemId }, context),
-    );
+    await (
+      await householdStore()
+    ).run((document, context) => removePlannedItem(document, { itemId }, context));
   } catch (error) {
     return describe(error);
   }
@@ -501,7 +515,9 @@ export async function addDebtAction(_previous: FormState, data: FormData): Promi
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       addDebt(
         document,
         {
@@ -557,7 +573,9 @@ export async function recordDebtPaymentAction(
   }
 
   try {
-    await householdStore().run((document, context) => {
+    await (
+      await householdStore()
+    ).run((document, context) => {
       let working = document;
       let transactionId: string | null = null;
 
@@ -641,7 +659,9 @@ export async function recordNewDebtAmountAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       recordDebtEvent(
         document,
         {
@@ -678,7 +698,9 @@ export async function recordRolloverAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       recordRollover(
         document,
         { fromDebtId, toDebtId, amountMinor, occurredOn, notes },
@@ -709,7 +731,9 @@ export async function transferToHouseholdAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       transferToHousehold(
         document,
         { businessAccountId, householdAccountId, amountMinor, transactionDate, note },
@@ -736,9 +760,9 @@ export async function startBudgetAction(
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
-      startBudget(document, { period, lines: [] }, context),
-    );
+    await (
+      await householdStore()
+    ).run((document, context) => startBudget(document, { period, lines: [] }, context));
   } catch (error) {
     return describe(error);
   }
@@ -777,7 +801,9 @@ export async function setBudgetLineAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       setBudgetLine(document, { budgetId, categoryKey, plannedMinor }, context),
     );
   } catch (error) {
@@ -801,7 +827,9 @@ export async function addTaskAction(_previous: FormState, data: FormData): Promi
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       addTask(
         document,
         {
@@ -842,7 +870,9 @@ export async function updateTaskAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       updateTask(
         document,
         {

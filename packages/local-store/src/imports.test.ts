@@ -2,7 +2,7 @@ import { buildCsv, extractDocument } from '@family-finance/document-import';
 import { describe, expect, test } from 'vitest';
 
 import { CommandError } from './commands';
-import type { StoreDocument } from './document';
+import { parseStoreDocument, type StoreDocument } from './document';
 import { contextFor, seededHousehold, spend, TEST_NOW } from './fixtures/household';
 import {
   alreadyImported,
@@ -412,6 +412,14 @@ describe('an approved import can be taken back', () => {
   test('the batch says it was reversed, and when', () => {
     expect(reversed.document.importBatches[0]?.status).toBe('reversed');
     expect(reversed.document.importBatches[0]?.reversedAt).toBe(TEST_NOW);
+  });
+
+  test('a reversed batch is still a valid document — it keeps the record of its approval', () => {
+    // The store validates every document before writing it. A reversed batch
+    // that failed this would leave the reversal impossible to save at all.
+    expect(() => parseStoreDocument(reversed.document)).not.toThrow();
+    expect(reversed.document.importBatches[0]?.approvedAt).not.toBeNull();
+    expect(reversed.document.importBatches[0]?.reversedAt).not.toBeNull();
   });
 
   test('a batch that was never approved cannot be reversed', () => {

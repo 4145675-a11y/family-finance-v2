@@ -10,7 +10,9 @@
     "vitest.config.ts",
     "vitest.integration.config.ts",
     "vitest.property.config.ts",
+    "vitest.validation.config.ts",
     "tools/test-shims/**/*.ts",
-    "supabase/tests/**/*.ts"
+    "supabase/tests/**/*.ts",
+    "supabase/validation/**/*.ts"
   ]
 }

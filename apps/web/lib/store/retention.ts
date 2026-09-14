@@ -38,7 +38,7 @@ export interface SweepResult {
  * live in the document, and the raw text of every row is stored with it.
  */
 export async function sweepExpiredUploads(now = Date.now()): Promise<SweepResult> {
-  const store = householdStore();
+  const store = await householdStore();
 
   if (!(await store.exists())) return { removed: 0, expiredBatches: 0 };
 

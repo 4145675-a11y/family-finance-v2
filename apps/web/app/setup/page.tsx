@@ -15,6 +15,7 @@ import { screens } from '../../lib/copy/screens';
 import { requireUnlocked } from '../../lib/auth/guard';
 import { householdStore } from '../../lib/store/server';
 import { SimpleAction } from '../../components/simple-action';
+import { InviteForm } from '../../components/invite-form';
 
 /**
  * First-time setup.
@@ -32,7 +33,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function SetupPage() {
   await requireUnlocked();
-  const store = householdStore();
+  const store = await householdStore();
   const document = await store.readDocumentOrNull();
 
   if (document === null) {
@@ -104,14 +105,20 @@ export default async function SetupPage() {
           <StatRow key={profile.id} label={profile.displayName} value="" />
         ))}
         <div className="mt-4">
-          <ActionForm
-            action={addMemberAction}
-            submitLabel={screens.setup.addMember}
-            resetOnSuccess
-            tone="secondary"
-          >
-            <TextField name="displayName" label={screens.setup.memberName} maxLength={80} />
-          </ActionForm>
+          {store.backend === 'supabase' ? (
+            // A member is a real signed-in person here, so joining is by
+            // invitation rather than by typing a name (ADR-0032).
+            <InviteForm />
+          ) : (
+            <ActionForm
+              action={addMemberAction}
+              submitLabel={screens.setup.addMember}
+              resetOnSuccess
+              tone="secondary"
+            >
+              <TextField name="displayName" label={screens.setup.memberName} maxLength={80} />
+            </ActionForm>
+          )}
         </div>
       </Card>
 

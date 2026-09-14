@@ -6,7 +6,8 @@ import { copy } from '../../lib/copy/copy';
 import { screens } from '../../lib/copy/screens';
 import { householdExists } from '../../lib/dashboard/load';
 import { requireUnlocked } from '../../lib/auth/guard';
-import { authScreen } from '../../lib/copy/security';
+import { accountScreen, authScreen } from '../../lib/copy/security';
+import { activeBackend } from '../../lib/auth/backend';
 import { gemach } from '../../lib/copy/gemach';
 
 /**
@@ -61,7 +62,13 @@ export default async function MorePage() {
       description: screens.settings.subtitle,
     },
     { href: '/backup', title: screens.backup.title, description: screens.backup.subtitle },
-    { href: '/security', title: authScreen.title, description: authScreen.setupIntro },
+    activeBackend() === 'supabase'
+      ? {
+          href: '/account',
+          title: accountScreen.membersTitle,
+          description: accountScreen.inviteIntro,
+        }
+      : { href: '/security', title: authScreen.title, description: authScreen.setupIntro },
   ];
 
   return (

@@ -11,6 +11,7 @@ import {
 } from '@family-finance/finance-engine';
 import type { StoreDocument } from '@family-finance/local-store';
 
+import { activeBackend } from '../auth/backend';
 import { requireUnlocked } from '../auth/guard';
 import { householdStore } from '../store/server';
 import {
@@ -62,12 +63,20 @@ export async function loadDashboardView(
   // which is what a person should actually see.
   await requireUnlocked();
 
-  const store = householdStore();
+  const store = await householdStore();
   const view = await store.view(asOf);
+
+  // What the screens are told about their source. With the database backend
+  // the answer depends on the session, not on a file: a real household read
+  // as a signed-in person is the only thing that counts as real data.
+  const facts =
+    activeBackend() === 'supabase'
+      ? currentEnvironment(false, { authenticated: true, hasSupabaseHousehold: view !== null })
+      : currentEnvironment(view !== null);
 
   if (view !== null) {
     return {
-      descriptor: resolveDataSource(currentEnvironment(true)),
+      descriptor: resolveDataSource(facts),
       snapshot: view.snapshot,
       input: view.input,
       budget: view.budget,
@@ -79,9 +88,7 @@ export async function loadDashboardView(
     };
   }
 
-  const { descriptor, input, budget, food } = await loadDashboardSource(
-    currentEnvironment(false),
-  );
+  const { descriptor, input, budget, food } = await loadDashboardSource(facts);
 
   return {
     descriptor,
@@ -96,7 +103,7 @@ export async function loadDashboardView(
   };
 }
 
-/** True when a household exists on this machine. */
+/** True when this person has a household to read. */
 export async function householdExists(): Promise<boolean> {
-  return householdStore().exists();
+  return (await householdStore()).exists();
 }

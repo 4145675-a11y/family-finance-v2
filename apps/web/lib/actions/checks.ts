@@ -67,7 +67,9 @@ export async function addGemachLoanAction(
 
   let debtId: string;
   try {
-    debtId = await householdStore().run((document, context) =>
+    debtId = await (
+      await householdStore()
+    ).run((document, context) =>
       addDebt(
         document,
         {
@@ -126,7 +128,9 @@ export async function setRepaymentPlanAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       setRepaymentPlan(
         document,
         {
@@ -167,7 +171,9 @@ export async function addCheckAction(_previous: FormState, data: FormData): Prom
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       addCheck(
         document,
         {
@@ -222,7 +228,9 @@ export async function addCheckSeriesAction(
   let created = 0;
   try {
     created = (
-      await householdStore().run((document, context) =>
+      await (
+        await householdStore()
+      ).run((document, context) =>
         addCheckSeries(
           document,
           {
@@ -267,9 +275,9 @@ export async function deliverChecksAction(
 
   let count = 0;
   try {
-    count = await householdStore().run((document, context) =>
-      deliverChecks(document, { checkIds, deliveredOn }, context),
-    );
+    count = await (
+      await householdStore()
+    ).run((document, context) => deliverChecks(document, { checkIds, deliveredOn }, context));
   } catch (error) {
     return explain(error);
   }
@@ -292,9 +300,9 @@ export async function markCheckDepositedAction(
   if (!reader.ok || checkId === null) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
-      markCheckDeposited(document, { checkId }, context),
-    );
+    await (
+      await householdStore()
+    ).run((document, context) => markCheckDeposited(document, { checkId }, context));
   } catch (error) {
     return explain(error);
   }
@@ -313,9 +321,9 @@ export async function clearCheckAction(
   if (!reader.ok || checkId === null) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
-      clearCheck(document, { checkId, clearedOn }, context),
-    );
+    await (
+      await householdStore()
+    ).run((document, context) => clearCheck(document, { checkId, clearedOn }, context));
   } catch (error) {
     return explain(error);
   }
@@ -337,7 +345,9 @@ export async function markCheckReturnedAction(
   if (!reader.ok || checkId === null) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       markCheckReturned(document, { checkId, occurredOn, reason }, context),
     );
   } catch (error) {
@@ -359,7 +369,9 @@ export async function cancelCheckAction(
   if (!reader.ok || checkId === null) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       cancelCheck(document, { checkId, occurredOn, reason }, context),
     );
   } catch (error) {
@@ -389,7 +401,9 @@ export async function replaceCheckAction(
   if (!reader.ok || checkId === null) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       replaceCheck(
         document,
         { checkId, reason, checkNumber, amountMinor, dueDate, note, deliveredOn },
@@ -415,7 +429,9 @@ export async function correctCheckAction(
   if (!reader.ok || checkId === null) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       revertCheckStatus(document, { checkId, reason, occurredOn }, context),
     );
   } catch (error) {
@@ -437,7 +453,9 @@ export async function closeLoanAction(
   if (!reader.ok || debtId === null) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) => closeLoan(document, { debtId }, context));
+    await (
+      await householdStore()
+    ).run((document, context) => closeLoan(document, { debtId }, context));
   } catch (error) {
     return explain(error);
   }

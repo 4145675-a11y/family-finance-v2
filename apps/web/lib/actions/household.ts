@@ -11,7 +11,9 @@ import {
 import { revalidatePath } from 'next/cache';
 
 import { FieldReader, failed, succeeded, type FormState } from '../forms';
-import { householdStore } from '../store/server';
+import { householdStore, supabaseHouseholdStore } from '../store/server';
+import { activeBackend } from '../auth/backend';
+import { accountScreen } from '../copy/security';
 import { describe, refreshMoneyScreens } from './errors';
 
 /**
@@ -34,7 +36,7 @@ export async function createHouseholdAction(
 
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
-  const store = householdStore();
+  const store = await householdStore();
   if (await store.exists()) {
     return failed('כבר קיים כאן משק בית. אפשר להמשיך משם.');
   }
@@ -59,9 +61,9 @@ export async function renameHouseholdAction(
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
-      renameHousehold(document, { name }, context),
-    );
+    await (
+      await householdStore()
+    ).run((document, context) => renameHousehold(document, { name }, context));
   } catch (error) {
     return describe(error);
   }
@@ -69,6 +71,40 @@ export async function renameHouseholdAction(
   refreshMoneyScreens();
   revalidatePath('/setup');
   return succeeded('השם עודכן.');
+}
+
+/**
+ * Invites a person into the household by email — the database backend's way
+ * of adding a member. The token is returned once in the form state and never
+ * stored; the inviter passes it on. Under the file backend membership is a
+ * local profile (addMemberAction) and this action refuses.
+ */
+export async function inviteMemberAction(
+  _previous: FormState,
+  data: FormData,
+): Promise<FormState> {
+  if (activeBackend() !== 'supabase') {
+    return failed('הזמנות באימייל זמינות רק כשהנתונים נשמרים במסד הנתונים.');
+  }
+  const reader = new FieldReader(data);
+  const email = reader.text('email', accountScreen.inviteEmail, { max: 254 });
+  if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
+  if (!/^[^s@]+@[^s@]+.[^s@]+$/.test(email)) {
+    return failed('בואו נשלים כמה פרטים.', [
+      { field: 'email', message: 'האימייל לא נראה תקין' },
+    ]);
+  }
+
+  let token: string;
+  try {
+    token = await (await supabaseHouseholdStore()).invite(email.trim().toLowerCase());
+  } catch (error) {
+    return describe(error);
+  }
+
+  revalidatePath('/setup');
+  revalidatePath('/security');
+  return succeeded(accountScreen.inviteCreated, token);
 }
 
 export async function addMemberAction(
@@ -80,9 +116,9 @@ export async function addMemberAction(
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
-      addMember(document, { displayName }, context),
-    );
+    await (
+      await householdStore()
+    ).run((document, context) => addMember(document, { displayName }, context));
   } catch (error) {
     return describe(error);
   }
@@ -118,7 +154,9 @@ export async function updateSettingsAction(
   if (!reader.ok) return failed('בואו נבדוק את הסכומים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       updateSettings(
         document,
         {
@@ -143,9 +181,9 @@ export async function updateSettingsAction(
 }
 
 export async function acknowledgePrivacyAction(): Promise<void> {
-  await householdStore().run((document, context) =>
-    updateSettings(document, { privacyExplained: true }, context),
-  );
+  await (
+    await householdStore()
+  ).run((document, context) => updateSettings(document, { privacyExplained: true }, context));
   revalidatePath('/setup');
 }
 
@@ -164,7 +202,9 @@ export async function addBusinessAction(
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       addBusiness(
         document,
         {
@@ -185,7 +225,9 @@ export async function addBusinessAction(
 }
 
 export async function declareNoBusinessAction(): Promise<void> {
-  await householdStore().run((document, context) => declareNoBusiness(document, context));
+  await (
+    await householdStore()
+  ).run((document, context) => declareNoBusiness(document, context));
   refreshMoneyScreens();
   revalidatePath('/setup');
 }
@@ -228,7 +270,9 @@ export async function addAccountAction(
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
   try {
-    const id = await householdStore().run((document, context) =>
+    const id = await (
+      await householdStore()
+    ).run((document, context) =>
       addAccount(
         document,
         {
