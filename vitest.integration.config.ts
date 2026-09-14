@@ -13,6 +13,15 @@ export default defineConfig({
     include: ['supabase/tests/**/*.integration.test.ts'],
     exclude: ['**/node_modules/**', '**/.next/**', '.npm-cache/**'],
     environment: 'node',
+    /*
+     * Loads `.env.integration.local` before the suite starts.
+     *
+     * The tests document that file as where the connection string goes, and
+     * until now nothing read it — so following the instructions failed exactly
+     * as not following them did. A value already in the environment still wins,
+     * and the loader never prints anything.
+     */
+    setupFiles: ['supabase/tests/load-env.ts'],
     allowOnly: false,
     passWithNoTests: false,
     // A database round trip is slower than an in-process assertion, and the

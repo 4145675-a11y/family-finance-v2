@@ -15,9 +15,9 @@
 | UX-HOME-001 | UX | home route | usability/E2E | 6 | Structure built in M6b — סדר ההיררכיה נאכף ב־screens.test.ts; בדיקת משתמש ב־M14 |
 | UX-TRUST-001 | UX | breakdown sheet | E2E | 6 | **Verified in M6b** — כל מספר מרכזי פותח פירוט; כיסוי ניסוח נאכף ב־copy.test.ts |
 | UX-RTL-001 | UX | design system | visual | 1/6 | In progress — shell verified in M1 (lang/dir/bidi unit tests); pixel overflow at 4 widths pending M6 |
-| SEC-RLS-001 | Security | policies | negative integration | 2+ | Implemented in M2–M4 — 15 טבלאות RLS enabled+forced; **הרצה מול DB טרם בוצעה** |
-| SEC-INVITE-001 | Security | household_invitations + accept function | negative integration | 2 | Implemented in M2 — tests written, NOT RUN |
-| SEC-AUDIT-001 | Security | audit_events + append-only triggers | negative integration | 2+ | Implemented in M2–M4 — טריגר audit אוטומטי; **לא הורץ** |
+| SEC-RLS-001 | Security | policies | negative integration | 2+ | **Verified in M2 (2026-09-14)** — 38/38 בדיקות שליליות מול Supabase, 5 טבלאות M2; 32/32 טבלאות RLS enabled+forced במסד; allow/deny ל־M3+ טרם |
+| SEC-INVITE-001 | Security | household_invitations + accept function | negative integration | 2 | **Verified in M2 (2026-09-14)** — 7 בדיקות מול DB: hash, פדיון יחיד, replay/שגוי/פג/מבוטל/anon נדחים |
+| SEC-AUDIT-001 | Security | audit_events + append-only triggers | negative integration | 2+ | **Verified in M2 (2026-09-14)** — UPDATE/DELETE נדחים גם לבעלים; מגבלת מחיקה מתועדת, ארכוב/אנונימיזציה בעתיד |
 | SEC-KEY-001 | Security | env contract + client-secret gate | source + bundle scan | 2+ | **Verified in M2** — gate passes, negative test confirms it fails on a planted secret |
 | OFF-SYNC-001 | Architecture | sync engine | E2E/property | 7 | Planned |
 | IMP-DRAFT-001 | Architecture | import pipeline | integration | 8 | Planned |
@@ -63,9 +63,9 @@
 | PROD-FAILCLOSED-001 | Architecture | apps/web/lib/config/deployment.ts + instrumentation.ts | unit/gate | 9 | **Verified in M9** — השרת הבנוי מסרב לעלות; התצורה התקינה כן עולה |
 | PROD-HEALTH-001 | Operations | apps/web/app/api/health/route.ts | gate | 9 | **Verified in M9** — שמות הגדרות בלבד, לעולם לא ערכים |
 | PROD-NOENV-001 | Security | tools/check-no-env-files.mjs | gate | 9 | **Verified in M9** — נמצא כש־.env.local סיפק תצורה בשקט לשער אחר |
-| PROD-SCHEMA-001 | Architecture | supabase/migrations/20260908* | migration | 9 | **Written in M9, DB unverified** — 32 טבלאות סה״כ, 94 policies |
-| PROD-CHECKS-DB-001 | Financial | post_dated_checks constraints + unique indexes | migration | 9 | **Written in M9, DB unverified** — צ׳ק אחד ↔ תנועה אחת ↔ אירוע חוב אחד |
-| PROD-APPROVAL-DB-001 | Architecture | app.assert_batch_ready_for_approval() | migration | 9 | **Written in M9, DB unverified** — שתיקה אינה הסכמה, גם בשכבת המסד |
-| PROD-RLS-COVER-001 | Security | tools/check-rls-coverage.mjs | gate | 9 | **Verified in M9** — סטטי; מסמן במפורש שאינו מוכיח נכונות policy |
-| PROD-PERSON-SCOPE-001 | Security | webauthn_credentials / push_subscriptions policies | migration | 9 | **Written in M9, DB unverified** — משק בית משותף אינו זהות משותפת |
-| PROD-NOTIFY-PRIVACY-001 | Privacy | notification_deliveries | migration | 9 | **Written in M9, DB unverified** — subject_key בלבד, ללא גוף הודעה |
+| PROD-SCHEMA-001 | Architecture | supabase/migrations/20260908* | migration | 9 | **Applied (2026-09-14)** — 32 טבלאות, 94 policies קיימות במסד; בדיקות התנהגות ל־M9 טרם |
+| PROD-CHECKS-DB-001 | Financial | post_dated_checks constraints + unique indexes | migration | 9 | **Applied (2026-09-14), behaviour untested on DB** — צ׳ק אחד ↔ תנועה אחת ↔ אירוע חוב אחד |
+| PROD-APPROVAL-DB-001 | Architecture | app.assert_batch_ready_for_approval() | migration | 9 | **Applied (2026-09-14), behaviour untested on DB** — שתיקה אינה הסכמה, גם בשכבת המסד |
+| PROD-RLS-COVER-001 | Security | tools/check-rls-coverage.mjs | gate | 9 | **Verified in M9** — סטטי; **אומת במסד 2026-09-14**: 32/32 forced, 94 policies |
+| PROD-PERSON-SCOPE-001 | Security | webauthn_credentials / push_subscriptions policies | migration | 9 | **Applied (2026-09-14), allow/deny untested** — משק בית משותף אינו זהות משותפת |
+| PROD-NOTIFY-PRIVACY-001 | Privacy | notification_deliveries | migration | 9 | **Applied (2026-09-14)** — subject_key בלבד, ללא גוף הודעה |

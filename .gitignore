@@ -27,6 +27,7 @@ test-results/
 *.pem
 *.key
 service-role*.json
+*-firebase-adminsdk-*.json
 
 # The household's own data. Never committed, for the obvious reason: this is a
 # family's financial records, and a repository is the wrong place for them.

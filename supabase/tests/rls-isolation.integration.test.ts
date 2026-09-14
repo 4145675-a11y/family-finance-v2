@@ -9,12 +9,31 @@
  * Requires a PostgreSQL connection with owner rights (SUPABASE_DB_URL). Without
  * it this suite FAILS — it never skips. A skipped isolation test reads like a
  * passing one in a summary, and 08-TEST-PLAN.md forbids exactly that.
+ *
+ * ## Why the whole suite runs inside one transaction
+ *
+ * `audit_events` is append-only, enforced by a statement-level BEFORE DELETE
+ * trigger. `households → audit_events` cascades on delete, and a cascade is a
+ * DELETE statement on the child table, so the trigger fires — even when no
+ * audit row exists. The consequence, verified against a real database: a
+ * household can never be deleted, by anyone. A teardown that cleans up with
+ * DELETE therefore cannot work, and disabling the trigger to make it work would
+ * be exactly the weakening the trigger exists to prevent.
+ *
+ * So nothing here is ever committed. One owner connection opens a transaction
+ * in `beforeAll`, every fixture row lives only inside it, and `afterAll` rolls
+ * it back. Acting as a user happens in a savepoint on that same connection:
+ * `set_config(..., is_local => true)` is scoped to the transaction, and rolling
+ * back to the savepoint restores both `role` and the JWT claims. Row-level
+ * security is evaluated per statement against the current role, so the proof
+ * is the same as it would be over separate connections — and the database is
+ * left exactly as it was found, whether the run passes, fails, or dies.
  */
 
 import { randomUUID } from 'node:crypto';
 
 import { Client } from 'pg';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 
 const DB_URL = process.env.SUPABASE_DB_URL;
 
@@ -43,6 +62,9 @@ interface Person {
   email: string;
 }
 
+/** Who a statement runs as: a signed-in person, the anonymous role, or the table owner. */
+type Actor = Person | 'anon' | 'owner';
+
 const alice: Person = { id: randomUUID(), email: `alice-${randomUUID()}@example.test` };
 const bob: Person = { id: randomUUID(), email: `bob-${randomUUID()}@example.test` };
 const carol: Person = { id: randomUUID(), email: `carol-${randomUUID()}@example.test` };
@@ -51,29 +73,66 @@ const mallory: Person = { id: randomUUID(), email: `mallory-${randomUUID()}@exam
 const householdA = randomUUID();
 const householdB = randomUUID();
 
+/** The one connection. Owner rights, one transaction, rolled back at the end. */
 let admin: Client;
+let transactionOpen = false;
 
-/** Runs a callback with the session acting as the given profile. */
-async function asUser<T>(person: Person, run: (client: Client) => Promise<T>): Promise<T> {
-  const client = new Client({ connectionString: DB_URL });
-  await client.connect();
+/** Switches the current transaction to act as `actor` until the enclosing savepoint ends. */
+async function impersonate(actor: Actor): Promise<void> {
+  if (actor === 'owner') return;
+  const role = actor === 'anon' ? 'anon' : 'authenticated';
+  const claims =
+    actor === 'anon' ? '' : JSON.stringify({ sub: actor.id, role: 'authenticated' });
+  await admin.query("select set_config('role', $1, true)", [role]);
+  await admin.query("select set_config('request.jwt.claims', $1, true)", [claims]);
+}
+
+/**
+ * Returns to the owner. Needed after a released savepoint: a local setting made
+ * inside a subtransaction survives its release and would otherwise leak into
+ * every later statement of the test.
+ */
+async function backToOwner(): Promise<void> {
+  await admin.query("select set_config('role', 'none', true)");
+  await admin.query("select set_config('request.jwt.claims', '', true)");
+}
+
+/**
+ * Runs a callback as the given actor inside a savepoint.
+ *
+ * By default the savepoint is rolled back, so nothing the callback did — not a
+ * write, not a failed statement — survives it. With `keep: true` the savepoint
+ * is released instead and the writes stay visible for the rest of the test.
+ */
+async function asUser<T>(
+  actor: Actor,
+  run: (client: Client) => Promise<T>,
+  { keep = false }: { keep?: boolean } = {},
+): Promise<T> {
+  await admin.query('savepoint impersonation');
+  let result: T;
   try {
-    await client.query('begin');
-    await client.query("select set_config('role', 'authenticated', true)");
-    await client.query("select set_config('request.jwt.claims', $1, true)", [
-      JSON.stringify({ sub: person.id, role: 'authenticated' }),
-    ]);
-    const result = await run(client);
-    await client.query('rollback');
-    return result;
-  } finally {
-    await client.end();
+    await impersonate(actor);
+    result = await run(admin);
+  } catch (error) {
+    await admin.query('rollback to savepoint impersonation');
+    await admin.query('release savepoint impersonation');
+    await backToOwner();
+    throw error;
   }
+  if (keep) {
+    await admin.query('release savepoint impersonation');
+  } else {
+    await admin.query('rollback to savepoint impersonation');
+    await admin.query('release savepoint impersonation');
+  }
+  await backToOwner();
+  return result;
 }
 
 /** Asserts that a statement is rejected, and returns the error for inspection. */
-async function expectRejection(person: Person, sql: string, params: unknown[] = []) {
-  return asUser(person, async (client) => {
+async function expectRejection(actor: Actor, sql: string, params: unknown[] = []) {
+  return asUser(actor, async (client) => {
     try {
       await client.query(sql, params);
       return null;
@@ -86,6 +145,8 @@ async function expectRejection(person: Person, sql: string, params: unknown[] = 
 beforeAll(async () => {
   admin = new Client({ connectionString: DB_URL });
   await admin.connect();
+  await admin.query('begin');
+  transactionOpen = true;
 
   for (const person of [alice, bob, carol, mallory]) {
     await admin.query(
@@ -125,25 +186,23 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (!admin) return;
-  await admin.query(`delete from public.household_invitations where household_id = any($1)`, [
-    [householdA, householdB],
-  ]);
-  // audit_events is append-only by trigger, so the fixture rows are removed by
-  // deleting the households they hang from (cascade), not by touching the table.
-  await admin.query(`delete from public.household_members where household_id = any($1)`, [
-    [householdA, householdB],
-  ]);
-  await admin.query(`delete from public.households where id = any($1)`, [
-    [householdA, householdB],
-  ]);
-  await admin.query(`delete from public.profiles where id = any($1)`, [
-    [alice.id, bob.id, carol.id, mallory.id],
-  ]);
-  await admin.query(`delete from auth.users where id = any($1)`, [
-    [alice.id, bob.id, carol.id, mallory.id],
-  ]);
+  // The fixture was never committed. Rolling back is the whole teardown, and it
+  // cannot leave anything behind — including when a test failed halfway.
+  if (transactionOpen) await admin.query('rollback');
   await admin.end();
 }, 60_000);
+
+// Each test starts from the pristine fixture and cannot poison the next one:
+// a statement that fails outside a savepoint would otherwise abort the outer
+// transaction and turn every later test into the same misleading error.
+beforeEach(async () => {
+  await admin.query('savepoint test_case');
+});
+
+afterEach(async () => {
+  await admin.query('rollback to savepoint test_case');
+  await admin.query('release savepoint test_case');
+});
 
 describe('RLS is enabled and forced on every private table', () => {
   test.each([
@@ -292,34 +351,34 @@ describe('household_members: membership cannot be self-granted', () => {
   });
 
   test('the revoke policy cannot be used to re-activate a membership', async () => {
+    // The per-test savepoint undoes this revocation once the test is over.
     await admin.query(
       `update public.household_members set status = 'revoked', revoked_at = now()
        where household_id = $1 and profile_id = $2`,
       [householdB, carol.id],
     );
-    try {
-      const error = await expectRejection(
-        carol,
-        `update public.household_members set status = 'active', revoked_at = null
-         where household_id = $1 and profile_id = $2`,
-        [householdB, carol.id],
-      );
-      // Carol is revoked, so she is no longer a member and the USING clause
-      // already excludes her. Either way the row must remain revoked.
-      expect(error !== null || true).toBe(true);
+    // Carol is revoked, so she is no longer a member. Whether the policy
+    // refuses the statement or its USING clause simply matches nothing, the
+    // one outcome that must never happen is a changed row.
+    const changed = await asUser(carol, async (c) => {
+      try {
+        const { rowCount } = await c.query(
+          `update public.household_members set status = 'active', revoked_at = null
+           where household_id = $1 and profile_id = $2`,
+          [householdB, carol.id],
+        );
+        return rowCount ?? 0;
+      } catch {
+        return 0;
+      }
+    });
+    expect(changed, 'the update must not reach the revoked row').toBe(0);
 
-      const { rows } = await admin.query(
-        'select status from public.household_members where household_id = $1 and profile_id = $2',
-        [householdB, carol.id],
-      );
-      expect(rows[0].status).toBe('revoked');
-    } finally {
-      await admin.query(
-        `update public.household_members set status = 'active', revoked_at = null
-         where household_id = $1 and profile_id = $2`,
-        [householdB, carol.id],
-      );
-    }
+    const { rows } = await admin.query(
+      'select status from public.household_members where household_id = $1 and profile_id = $2',
+      [householdB, carol.id],
+    );
+    expect(rows[0].status).toBe('revoked');
   });
 });
 
@@ -406,21 +465,16 @@ describe('household_invitations: tokens are hashed and single use', () => {
   });
 
   test('a valid token admits exactly one person, once', async () => {
-    const client = new Client({ connectionString: DB_URL });
-    await client.connect();
-    try {
-      await client.query("select set_config('role', 'authenticated', true)");
-      await client.query("select set_config('request.jwt.claims', $1, true)", [
-        JSON.stringify({ sub: mallory.id, role: 'authenticated' }),
-      ]);
-      const { rows } = await client.query(
-        'select public.accept_household_invitation($1) as hid',
-        [plaintext],
-      );
-      expect(rows[0].hid).toBe(householdA);
-    } finally {
-      await client.end();
-    }
+    // Mallory's acceptance must stay visible after her savepoint ends, so that
+    // the membership check and the replay below see it: keep, don't roll back.
+    const admitted = await asUser(
+      mallory,
+      async (c) =>
+        (await c.query('select public.accept_household_invitation($1) as hid', [plaintext]))
+          .rows[0].hid,
+      { keep: true },
+    );
+    expect(admitted).toBe(householdA);
 
     const { rows: members } = await admin.query(
       'select status from public.household_members where household_id = $1 and profile_id = $2',
@@ -471,17 +525,14 @@ describe('household_invitations: tokens are hashed and single use', () => {
   });
 
   test('an unauthenticated caller cannot redeem a token', async () => {
-    const client = new Client({ connectionString: DB_URL });
-    await client.connect();
-    try {
-      await client.query("select set_config('role', 'anon', true)");
-      await client.query("select set_config('request.jwt.claims', '', true)");
-      await expect(
-        client.query('select public.accept_household_invitation($1)', [plaintext]),
-      ).rejects.toThrow();
-    } finally {
-      await client.end();
-    }
+    const error = await expectRejection(
+      'anon',
+      'select public.accept_household_invitation($1)',
+      [plaintext],
+    );
+    // EXECUTE is revoked from anon, so the call is refused before the function
+    // body runs — the token is never even compared.
+    expect(error?.code, 'anon has no EXECUTE on the function').toBe('42501');
   });
 });
 
@@ -510,18 +561,21 @@ describe('audit_events: append-only and household-scoped', () => {
   });
 
   test('an audit row cannot be updated, even by the table owner', async () => {
-    await expect(
-      admin.query(
-        `update public.audit_events set action = 'tampered' where household_id = $1`,
-        [householdA],
-      ),
-    ).rejects.toThrow(/append-only/);
+    const error = await expectRejection(
+      'owner',
+      `update public.audit_events set action = 'tampered' where household_id = $1`,
+      [householdA],
+    );
+    expect(error?.message).toMatch(/append-only/);
   });
 
   test('an audit row cannot be deleted, even by the table owner', async () => {
-    await expect(
-      admin.query('delete from public.audit_events where household_id = $1', [householdA]),
-    ).rejects.toThrow(/append-only/);
+    const error = await expectRejection(
+      'owner',
+      'delete from public.audit_events where household_id = $1',
+      [householdA],
+    );
+    expect(error?.message).toMatch(/append-only/);
   });
 
   test('a member cannot write an audit row for another household', async () => {
@@ -544,7 +598,7 @@ describe('audit_events: append-only and household-scoped', () => {
           )
         ).rows[0].id,
     );
-    // The write happened inside a rolled-back transaction, so nothing persists;
+    // The write happened inside a rolled-back savepoint, so nothing persists;
     // what matters is that the function accepted it and stamped the actor itself.
     expect(id).toBeTruthy();
   });
@@ -558,15 +612,8 @@ describe('anon reaches nothing', () => {
     'household_invitations',
     'audit_events',
   ])('anon cannot select from %s', async (table) => {
-    const client = new Client({ connectionString: DB_URL });
-    await client.connect();
-    try {
-      await client.query('begin');
-      await client.query("select set_config('role', 'anon', true)");
-      await expect(client.query(`select * from public.${table} limit 1`)).rejects.toThrow();
-      await client.query('rollback');
-    } finally {
-      await client.end();
-    }
+    const error = await expectRejection('anon', `select * from public.${table} limit 1`);
+    // Not "zero rows" — the grant itself is missing, so the statement is refused.
+    expect(error?.code, `anon must have no SELECT privilege on ${table}`).toBe('42501');
   });
 });

@@ -2,16 +2,17 @@
 
 מצב הפרויקט מול `09-MILESTONES.md`. מתעדכן בסוף כל milestone, לפני העצירה לאישור.
 
-- **תאריך עדכון אחרון**: 2026-09-07
+- **תאריך עדכון אחרון**: 2026-09-14
 - **Milestone פעיל**: 8 — Local Access and Gemach
 - **סטטוס**: **מוצר מקומי שלם ושמיש, עם נעילה אמיתית.** משפחה יכולה להקים משק בית, להזין
   הכול ידנית, להעלות קובץ בנק, לעבור עליו ולאשר, לראות תמונה יומית, לנהל תקציב וחובות,
   לנהל הלוואת גמ״ח שנפרעת בצ׳קים דחויים, להפיק דוחות, לייצא ולגבות — הכול על המחשב הזה,
   בלי שום חשבון חיצוני. הכניסה מוגנת ב־WebAuthn מול Windows Hello, בכתובת `http://localhost:3100`
-  (ולא ב־`127.0.0.1` — ראה ADR-0029). **המיגרציות עדיין לא הוחלו על שום מסד**
-  ובדיקות הבידוד עדיין לא הורצו — ראה חסמים.
-- **Branch**: `milestone-2-identity-isolation` — **השם מיושן.** M2 עד M7 נבנו עליו. אין
-  remote ולא בוצע push.
+  (ולא ב־`127.0.0.1` — ראה ADR-0029). **הסכמה מוחלת על Supabase ובדיקות הבידוד
+  רצו מולו** (2026-09-14): 32/32 טבלאות RLS forced, 94 policies, 38/38 בדיקות עברו,
+  המסד נקי — ראה [milestone-2](docs/checkpoints/milestone-2.md).
+- **Branch**: `milestone-2-identity-isolation` — **השם מיושן.** M2 עד M9 נבנו עליו.
+  remote `origin` מוגדר.
 - **מוזג ל־`main`**: Milestone 0 ו־Milestone 1 בלבד.
 
 ## מקרא
@@ -27,9 +28,9 @@
 |---:|---|---|---|---|
 | 0 | Bootstrap | **Complete — evidenced** | [milestone-0](docs/checkpoints/milestone-0.md) | 4 שערים, 5 ADRs, 23 דרישות |
 | 1 | Repository Foundation | **Complete — evidenced** | [milestone-1](docs/checkpoints/milestone-1.md) | 9 שערים, 88 בדיקות |
-| 2 | Identity & Isolation | **In progress — blocked** | [milestone-2](docs/checkpoints/milestone-2.md) | קוד, migrations, RLS ו־24 בדיקות בידוד; **החלה חסומה** |
+| 2 | Identity & Isolation | **Complete — evidenced** | [milestone-2](docs/checkpoints/milestone-2.md) | **38/38 בדיקות בידוד מול Supabase** (2026-09-14); החבילה ב־rollback, המסד נקי |
 | 3 | Financial Accounts & Opening Picture | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | החוזים נבדקו ב־M3; **התמונה הפותחת עובדת בפועל מ־M7** מעל החנות המקומית |
-| 4 | Debt Domain | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | אירועי חוב, גלגולים ומד נטו עובדים על נתונים אמיתיים; **המיגרציה עצמה לא הוחלה** |
+| 4 | Debt Domain | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | אירועי חוב, גלגולים ומד נטו עובדים על נתונים אמיתיים; המיגרציה מוחלת (2026-09-14), בדיקות allow/deny למסד טרם |
 | 5 | Finance Engine | **Complete — evidenced** | [milestone-5](docs/checkpoints/milestone-5.md) | 13 מודולים; טהור, ללא תלות במסד |
 | 6 | Dashboard Source of Truth | **Complete — evidenced** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | המסכים קוראים נתונים אמיתיים; fixture הפיתוח נשאר fail-closed |
 | 6b | Product & UX Refinement | **Complete — evidenced** | [milestone-6b](docs/checkpoints/milestone-6b-product-refinement.md) | שפה פשוטה, מסך יומי, עיצוב |
@@ -61,7 +62,7 @@
 | Manual bundle | Active | 10 מיגרציות, תואם למקורות (`ADR-0019`) |
 | Forbidden scan | Active | 177 קבצים, 0 errors |
 | Traceability | Active | 46/46 |
-| Integration / RLS | Defined, **חסום** | דורש `SUPABASE_DB_URL` — 24 בדיקות בידוד ממתינות |
+| **Integration / RLS** | Active (מקומי, `npm run integration`) | **38/38 מול Supabase**, 2026-09-14; לא חלק מ־`verify` — דורש `SUPABASE_DB_URL` מקומי |
 | E2E / axe אוטומטי | Defined, לא פעיל | Playwright לא מותקן; ביקורת מבנית הורצה במקום ומוצהרת ככזו |
 
 ## פערים פתוחים
@@ -70,7 +71,7 @@
 |---:|---|---|---|
 | 1 | דרישות ב־`04`, `05`, `07`, `08`, `11` ללא תוויות מזהה | traceability חלקי מחוץ ל־46 המזהים הרשומים | כל milestone רושם מזהים למה שהוא מממש — `ADR-0004` |
 | 2 | `UX-DEBT-001` אינו מוקצה | אין | המזהה שמור |
-| 3 | אין git remote | CI לא רץ בפועל | אותם שערים רצים מקומית |
+| 3 | remote `origin` מוגדר; CI טרם אומת שרץ | אותם שערים רצים מקומית | לאמת ריצת CI אחרי ה־push הראשון |
 | 4 | axe ומקלדת אוטומטיים לא הורצו | `UX-A11Y-001` חלקי | ביקורת מבנית על 17 מסלולים × 4 רוחבים הורצה; axe דורש Playwright |
 | 5 | גופני Assistant/Heebo לא מוטמעים | טקסט עברי נופל לגופן מערכת | milestone עיצוב; קשור ל־`ADR-0026` |
 | 6 | `.nvmrc` נועל Node 24.18.1; המכונה מריצה 24.19.0 | CI ירוץ על גרסה אחרת מהמקומית | נדרשת החלטה; לא שונה בלי ADR |
@@ -83,7 +84,6 @@
 
 | Milestone | מה נדרש | למה קלוד לא יכול להשיג זאת |
 |---:|---|---|
-| 2–4 | החלת המיגרציות + `SUPABASE_DB_URL` להרצת בדיקות הבידוד | סיסמת מסד. חשבון חיצוני; Docker אינו זמין במכונה |
 | 9 | ספק OCR, Gmail OAuth | חשבונות חיצוניים; שליחת מסמך החוצה היא החלטה שלכם |
 | 12 | מפתח API של ספק AI | סוד חיצוני |
 | 14 | תוכנית אירוח, RPO/RTO, אנשי קשר | החלטה עסקית |
