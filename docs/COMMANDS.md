@@ -26,10 +26,17 @@ Package manager: **npm**, נעול לפי `ADR-0001`. אין להחליף בלי
 | 9 | build | `npm run build` → `node tools/next.mjs build` ב־`apps/web` | Build | 1 | **Active** |
 | 10 | verify (aggregate) | `npm run verify` | כל השערים הפעילים ברצף | 1 | **Active** |
 | 11 | verify (M0 subset) | `npm run verify:m0` | שערי M0 בלבד — נשמר כדי ש־checkpoint M0 יישאר משחזר | 0 | **Active** |
-| 12 | property | `npm run property` → `vitest run --project property` (fast-check) | Property | 5 | Defined |
-| 13 | integration | `npm run integration` → `vitest run --project integration` (כולל RLS negative tests) | Integration/RLS | 2 | Defined |
+| 12 | property | `npm run property` → `vitest run --config vitest.property.config.ts` (fast-check, seed קבוע) | Property | 5 | **Active** |
+| 13 | integration | `npm run integration` → `vitest run --config vitest.integration.config.ts` (כולל RLS negative tests) | Integration/RLS | 2 | **Active** — נכשל במכוון ללא `SUPABASE_DB_URL` |
 | 14 | E2E | `npm run e2e` → `playwright test` | E2E | 6 | Defined |
 | 15 | a11y/visual | `npm run a11y` → axe + RTL golden snapshots ב־360/390/768/1280 | Accessibility/RTL | 6 | Defined |
+| 16 | built shell | `npm run check:shell` → `node tools/check-built-shell.mjs` | Hebrew RTL, landmarks ו־manifest **על השרת הרץ** (`ADR-0027`) | 1/7 | **Active** |
+| 17 | client secrets | `npm run check:client-secrets` → `node tools/check-client-secrets.mjs` | גבול service role | 2 | **Active** |
+| 18 | manual bundle | `npm run db:build` / `db:check` → `node tools/build-manual-bundle.mjs [--check]` | חבילת ההחלה תואמת למיגרציות | 3 | **Active** |
+| 19b | fail-closed gate | `npm run check:fail-closed` → `node tools/check-fail-closed.mjs` | מריץ את ה־build האמיתי ומוודא שתצורת ייצור שגויה **אינה עולה**, ושתצורה תקינה כן | 9 | **Active** |
+| 19c | env-file gate | `npm run check:no-env-files` → `node tools/check-no-env-files.mjs` | אף קובץ סביבה במעקב git או בתוך `.next` | 9 | **Active** |
+| 19a | auth reset | `npm run auth:reset` → `node tools/auth-reset.mjs` | מסיר את מפתחות הכניסה והסשנים. **אינו נוגע בנתונים הכספיים.** דורש גישה למחשב; אין מסלול HTTP. עם `NODE_ENV=production` מסרב אלא אם נמסר `--i-am-at-the-machine` | 8 | **Active** |
+| 19 | copy SQL | `npm run db:copy:diagnostic` · `npm run db:copy:schema` → `node tools/copy-sql.mjs <file>` | — (כלי החלה ידנית) | 2 | **Active** |
 
 `unit` רץ על Vitest בלבד מ־Milestone 1 (`ADR-0009`). ב־Milestone 0 הוא רץ על `node --test` כי לא הותקנה שום תלות.
 
@@ -58,7 +65,11 @@ exit 0 = נקי · exit 1 = ממצאי error · exit 2 = הסורק עצמו נ�
 
 ### `npm run unit`
 
-Vitest, runner יחיד (`ADR-0009`). כרגע 88 בדיקות בארבעה קבצים: כללי ה־forbidden scan (18), חישוב ניגודיות (15), tokens והתאמתם ל־CSS (42), ומעטפת ה־HTML העברית (13). `allowOnly: false` ו־`passWithNoTests: false` — ריצה ריקה או בדיקה ממוקדת נכשלות.
+Vitest, runner יחיד (`ADR-0009`). כרגע **581 בדיקות ב־25 קבצים**: כלי הבנייה והמיגרציות, חוזי Zod, finance-engine, ומודולי התצוגה של `apps/web`. `allowOnly: false` ו־`passWithNoTests: false` — ריצה ריקה או בדיקה ממוקדת נכשלות.
+
+### `npm run property`
+
+חבילה נפרדת עם config משלה (`vitest.property.config.ts`), כי unit ו־property הם שני סוגי ראיה ואין לדווח עליהם כמספר אחד. `seed: 20260823` ו־300 ריצות לכל property, כדי שכשל יהיה ניתן לשחזור על כל מכונה. הבדיקות מכסות את האינווריאנטים מ־`02-FINANCIAL-RULES.md § אינווריאנטים`.
 
 ### `npm run typecheck`
 

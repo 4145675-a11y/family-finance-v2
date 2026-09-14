@@ -25,3 +25,22 @@
 | [0010](0010-framework-telemetry-disabled.md) | טלמטריית Next מושבתת ב־CI | Superseded by 0011 | 1 |
 | [0011](0011-next-launcher-telemetry.md) | launcher שאוכף חסימת טלמטריה בכל פלטפורמה | Accepted | 1 |
 | [0012](0012-no-generated-agent-instruction-files.md) | אף תלות אינה כותבת קובצי הוראות לסוכנים במאגר | Accepted | 1 |
+| [0013](0013-publishable-key-everywhere.md) | publishable key בלקוח ובשרת; אין service role במסלול בקשה | Accepted | 2 |
+| [0014](0014-isolation-by-membership.md) | בידוד לפי חברות בלבד; אין הצטרפות עצמית ואין מחיקה | Accepted | 2 |
+| [0015](0015-idempotent-migrations.md) | כל migration ניתן להרצה חוזרת | Accepted | 2 |
+| [0016](0016-data-quality-weights.md) | משקלי ציון איכות הנתונים | Accepted | 5 |
+| [0017](0017-development-fixture-data-source.md) | מקור נתוני פיתוח מאחורי דגל, חסום בייצור | Accepted | 6 |
+| [0018](0018-extensionless-relative-imports.md) | ייבוא יחסי ללא סיומת בקוד שנארז | Accepted | 6 |
+| [0019](0019-single-apply-all-bundle.md) | חבילת החלה אחת לכל המיגרציות | Accepted | 3 |
+| [0020](0020-visual-language-revision.md) | רענון השפה הוויזואלית אחרי צפייה במוצר רץ | Accepted | 6b |
+| [0021](0021-daily-dashboard-versus-detail-screens.md) | מסך יומי מול מסכי חקירה | Accepted | 6b |
+| [0022](0022-plain-hebrew-copy-layer.md) | המנוע מחזיר קודים; העברית נמצאת בשכבה אחת | Accepted | 6b |
+| [0023](0023-deterministic-budget-and-food-week.md) | תקציב חודשי והנחיה שבועית לאוכל כדומיין דטרמיניסטי | Accepted | 6b |
+| [0024](0024-local-store-before-the-database.md) | חנות מקומית מבוססת קובץ כמקור האמת עד שיש מסד מאומת | Accepted | 7 |
+| [0025](0025-document-parsers-written-not-installed.md) | קוראי המסמכים נכתבים ולא מותקנים | Accepted | 7 |
+| [0026](0026-pdf-export-through-the-browser.md) | ייצוא PDF דרך הדפסת הדפדפן, לא דרך מחולל בשרת | Accepted | 7 |
+| [0027](0027-shell-gate-runs-against-the-server.md) | שער ה־shell נבדק מול השרת הרץ | Accepted | 7 |
+| [0028](0028-authentication-state-outside-the-household-document.md) | מצב הכניסה נשמר בקובץ נפרד ממסמך משק הבית | Accepted | 8 |
+| [0029](0029-passkeys-live-at-localhost-not-at-an-address.md) | מפתחות הכניסה חיים ב־localhost, לא בכתובת IP | Accepted | 8 |
+| [0030](0030-a-check-is-not-a-payment.md) | צ׳ק שנמסר אינו תשלום | Accepted | 8 |
+| [0031](0031-production-refuses-the-local-store.md) | ייצור מסרב לעלות עם החנות המקומית | Accepted | 9 |

@@ -7,7 +7,7 @@ export {
   minTouchTargetPx,
   requiredContrast,
   type ColorToken,
-} from './tokens.js';
+} from './tokens';
 
 export {
   contrastRatio,
@@ -16,4 +16,4 @@ export {
   parseHex,
   WCAG_AA,
   type HexColor,
-} from './contrast.js';
+} from './contrast';

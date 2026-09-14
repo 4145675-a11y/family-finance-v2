@@ -1,32 +1,43 @@
 /**
  * Design tokens — the single source of truth for the visual language.
  *
- * Source: 04-DESIGN-SYSTEM.md. That document instructs "יש לאמת ניגודיות לפני נעילה"
- * (verify contrast before locking), so two values differ from the draft palette. Both
- * deviations, and the reason for each, are recorded in ADR-0008 and enforced by
- * tokens.test.ts — no pair ships without a passing contrast assertion.
+ * Source: 04-DESIGN-SYSTEM.md. That document instructs "יש לאמת ניגודיות לפני נעילה",
+ * so every pair below is asserted in tokens.test.ts and nothing ships without a
+ * passing contrast check. Deviations from the draft palette are recorded in
+ * ADR-0008 and ADR-0020.
+ *
+ * The palette was revised once the first screens were seen in a browser: the
+ * original values were technically compliant and visually pale, which read as
+ * unfinished rather than calm. The revision keeps the same character — warm,
+ * familial, not a bank — with more depth: a warm off-white ground, a deep blue for
+ * the one answer that matters, and green kept exclusively for real progress.
  *
  * apps/web/app/globals.css mirrors these values into a Tailwind `@theme` block.
  * tokens.test.ts fails if the two drift apart.
  */
 
-import type { HexColor } from './contrast.js';
+import type { HexColor } from './contrast';
 
 export const color = {
-  background: '#F7F8F5',
+  /** Warm off-white. A neutral grey ground made the cards look like a spreadsheet. */
+  background: '#FAF7F2',
   surface: '#FFFFFF',
-  textPrimary: '#18302B',
-  textSecondary: '#5E706C',
-  primary: '#285E61',
-  primaryHover: '#204E50',
-  success: '#2F7D62',
-  /** Darkened from the draft #A66A16, which reached only 4.47:1 as text. See ADR-0008. */
-  attention: '#9E6515',
-  danger: '#B43A3A',
+  /** For nested panels and table headers, so a card can have depth without a border. */
+  surfaceMuted: '#F3EEE6',
+  textPrimary: '#1B2A2C',
+  textSecondary: '#586B6C',
+  /** Deep soft blue: primary actions and the dominant safe-spend answer. */
+  primary: '#1E4F73',
+  primaryHover: '#173D5A',
+  /** Muted teal-green. Reserved for genuine progress — never for decoration. */
+  success: '#2C7A5E',
+  attention: '#9A6410',
+  /** Restrained red, used only where something is actually at risk. */
+  danger: '#AF3A34',
   /** Decorative divider only — never the sole indicator of a control boundary. */
-  border: '#DDE5E1',
-  /** Boundary colour for controls that are identified by their border. See ADR-0008. */
-  borderInteractive: '#8B908E',
+  border: '#E6DED2',
+  /** Boundary colour for controls that are identified by their border. */
+  borderInteractive: '#87837B',
   focus: '#2B6CB0',
 } as const satisfies Record<string, HexColor>;
 
@@ -40,6 +51,20 @@ export const radius = {
   control: 8,
   card: 14,
   hero: 18,
+  /** Added, not a deviation: fully round ends for pills and progress bars. */
+  pill: 999,
+} as const;
+
+/**
+ * Elevation.
+ *
+ * Three steps and no more. Soft, warm-tinted shadows rather than grey ones, so a
+ * raised card still belongs to the same room as the background.
+ */
+export const shadow = {
+  card: '0 1px 2px rgba(27, 42, 44, 0.04), 0 2px 8px rgba(27, 42, 44, 0.04)',
+  raised: '0 2px 4px rgba(27, 42, 44, 0.05), 0 8px 24px rgba(27, 42, 44, 0.06)',
+  hero: '0 4px 12px rgba(30, 79, 115, 0.10), 0 16px 40px rgba(30, 79, 115, 0.10)',
 } as const;
 
 /** Motion durations in milliseconds; disabled under prefers-reduced-motion. */
@@ -54,6 +79,8 @@ export const typography = {
     "'Assistant', 'Heebo', system-ui, -apple-system, 'Segoe UI', 'Noto Sans Hebrew', sans-serif",
   body: { size: 16, lineHeight: 1.55 },
   small: { size: 14, lineHeight: 1.5 },
+  /** The safe-spend figure. Large enough to be the answer, not so large it shouts. */
+  display: { size: 44, lineHeight: 1.1 },
   heading: { s: 20, m: 24, l: 32 },
 } as const;
 
@@ -61,8 +88,8 @@ export const typography = {
 export const minTouchTargetPx = 44;
 
 /**
- * Contrast pairs that must hold for the palette to be usable, with the WCAG rule that
- * drives each minimum. Verified in tokens.test.ts.
+ * Contrast pairs that must hold for the palette to be usable, with the WCAG rule
+ * that drives each minimum. Verified in tokens.test.ts.
  */
 export const requiredContrast = [
   {
@@ -73,6 +100,12 @@ export const requiredContrast = [
   },
   { foreground: 'textPrimary', background: 'surface', minimum: 4.5, rule: '1.4.3 normal text' },
   {
+    foreground: 'textPrimary',
+    background: 'surfaceMuted',
+    minimum: 4.5,
+    rule: '1.4.3 normal text',
+  },
+  {
     foreground: 'textSecondary',
     background: 'background',
     minimum: 4.5,
@@ -81,6 +114,12 @@ export const requiredContrast = [
   {
     foreground: 'textSecondary',
     background: 'surface',
+    minimum: 4.5,
+    rule: '1.4.3 normal text',
+  },
+  {
+    foreground: 'textSecondary',
+    background: 'surfaceMuted',
     minimum: 4.5,
     rule: '1.4.3 normal text',
   },
@@ -109,6 +148,7 @@ export const requiredContrast = [
   },
   { foreground: 'attention', background: 'surface', minimum: 4.5, rule: '1.4.3 normal text' },
   { foreground: 'success', background: 'surface', minimum: 4.5, rule: '1.4.3 normal text' },
+  { foreground: 'success', background: 'background', minimum: 4.5, rule: '1.4.3 normal text' },
   { foreground: 'danger', background: 'background', minimum: 4.5, rule: '1.4.3 normal text' },
   { foreground: 'danger', background: 'surface', minimum: 4.5, rule: '1.4.3 normal text' },
   { foreground: 'focus', background: 'background', minimum: 3, rule: '1.4.11 focus indicator' },

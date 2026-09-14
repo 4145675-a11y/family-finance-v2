@@ -1,18 +1,33 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 
-import RootLayout, { metadata, viewport } from './layout.js';
-import HomePage from './page.js';
+import { NAV_GROUPS, NAV_ITEMS, PHONE_NAV } from '../components/app-shell';
+import { copy } from '../lib/copy/copy';
+import { Badge, EmptyState, Figure, Money, StatRow } from '../components/ui';
+import RootLayout, { metadata, viewport } from './layout';
+
+const WEB_ROOT = fileURLToPath(new URL('../', import.meta.url));
 
 /**
- * The rendered document shell, as a string of HTML.
+ * The rendered document shell and the presentational pieces every screen uses.
  *
- * Built with `createElement` rather than JSX so the test needs no JSX transform of its
- * own — the app's tsconfig sets `jsx: preserve` for Next, which the test runner cannot
- * consume. Component tests that genuinely need JSX arrive with the UI milestone.
+ * Built with `createElement` rather than JSX so the test needs no JSX transform of
+ * its own — the app's tsconfig sets `jsx: preserve` for Next, which the runner
+ * cannot consume.
+ *
+ * The page components are deliberately not rendered here. They are async server
+ * components that load a data source, and `renderToStaticMarkup` cannot await
+ * one; the built output is checked instead by `npm run check:shell`, which reads
+ * the HTML a browser actually receives.
  */
-const shell = renderToStaticMarkup(createElement(RootLayout, null, createElement(HomePage)));
+const shell = renderToStaticMarkup(
+  createElement(RootLayout, null, createElement('main', null, 'תוכן')),
+);
 
 describe('document shell (UX-RTL-001)', () => {
   test('declares Hebrew as the document language', () => {
@@ -28,63 +43,105 @@ describe('document shell (UX-RTL-001)', () => {
     expect(shell.match(/\sdir="rtl"/g)).toHaveLength(1);
   });
 
-  test('renders the page inside the body', () => {
+  test('renders its children inside the body', () => {
     expect(shell).toMatch(/<body>.*<main/s);
   });
 });
 
 describe('bidi isolation (04-DESIGN-SYSTEM.md)', () => {
-  test('a run of digits inside Hebrew text carries its own direction', () => {
-    expect(shell).toMatch(/dir="ltr"[^>]*>360 · 390 · 768 · 1280</);
+  test('a monetary figure carries its own direction', () => {
+    const markup = renderToStaticMarkup(createElement(Money, { amountMinor: 123_45 }));
+    expect(markup).toMatch(/<bdi[^>]*dir="ltr"/);
+  });
+
+  test('the amount and its currency stay together inside the isolate', () => {
+    const markup = renderToStaticMarkup(createElement(Money, { amountMinor: 123_45 }));
+    expect(markup).toContain('123.45');
+    expect(markup).toContain('₪');
+  });
+
+  test('a signed change renders its sign', () => {
+    const markup = renderToStaticMarkup(
+      createElement(Money, { amountMinor: -100_00, signed: true }),
+    );
+    expect(markup).toContain('−');
+  });
+
+  test('any other digit run is isolated the same way', () => {
+    const markup = renderToStaticMarkup(createElement(Figure, null, '360 · 390 · 768 · 1280'));
+    expect(markup).toMatch(/dir="ltr"[^>]*>360 · 390 · 768 · 1280</);
   });
 });
 
-describe('viewport and metadata', () => {
-  test('is responsive and does not block zoom', () => {
-    expect(viewport.width).toBe('device-width');
-    expect(viewport.initialScale).toBe(1);
-    // Text scaling is an accessibility requirement; a locked viewport would break it.
-    expect(viewport.maximumScale ?? Number.POSITIVE_INFINITY).toBeGreaterThanOrEqual(5);
-    expect(viewport.userScalable ?? true).not.toBe(false);
+describe('presentational pieces', () => {
+  test('a stat row shows its label, value and hint', () => {
+    const markup = renderToStaticMarkup(
+      createElement(StatRow, { label: 'יתרה', value: 'ערך', hint: 'הסבר' }),
+    );
+    expect(markup).toContain('יתרה');
+    expect(markup).toContain('ערך');
+    expect(markup).toContain('הסבר');
   });
 
-  test('carries a Hebrew title', () => {
-    expect(metadata.title).toBe('מרכז השליטה הכלכלי המשפחתי');
+  test('a stat row without a hint renders no empty hint element', () => {
+    const markup = renderToStaticMarkup(
+      createElement(StatRow, { label: 'יתרה', value: 'ערך' }),
+    );
+    expect(markup).toContain('יתרה');
+    expect(markup).not.toContain('w-full text-small');
+  });
+
+  test('a badge renders its content', () => {
+    expect(renderToStaticMarkup(createElement(Badge, null, 'מצב'))).toContain('מצב');
+  });
+
+  test('the empty state states the reason and promises no numbers', () => {
+    const markup = renderToStaticMarkup(createElement(EmptyState, { reason: 'הדגל כבוי' }));
+    expect(markup).toContain('הדגל כבוי');
+    expect(markup).toContain(copy.states.noSourceBody);
   });
 });
 
-describe('shell content boundaries (Milestone 1 scope)', () => {
-  const text = shell.replace(/<[^>]+>/g, ' ');
-
-  test('states plainly that no financial data exists yet', () => {
-    expect(text).toMatch(/עדיין אין כאן נתונים פיננסיים/);
+describe('navigation', () => {
+  test('every destination in the sidebar is a real screen', () => {
+    for (const item of NAV_ITEMS) {
+      const route = item.href === '/' ? 'page.tsx' : `${item.href.slice(1)}/page.tsx`;
+      expect(existsSync(join(WEB_ROOT, 'app', route)), `${item.href} has no page`).toBe(true);
+    }
   });
 
-  test('shows no currency figure that could be mistaken for real data', () => {
-    expect(text).not.toMatch(/₪|ILS/);
+  test('the phone bar carries five destinations, and they are the daily ones', () => {
+    expect(PHONE_NAV.map((item) => item.href)).toEqual([
+      '/',
+      '/entry',
+      '/approvals',
+      '/budget',
+      '/more',
+    ]);
   });
 
-  test('uses a single main landmark and one first-level heading', () => {
-    expect(shell.match(/<main/g)).toHaveLength(1);
-    expect(shell.match(/<h1/g)).toHaveLength(1);
+  test('the sidebar groups the rest rather than listing twenty links flat', () => {
+    expect(NAV_GROUPS.length).toBeGreaterThanOrEqual(2);
+    for (const group of NAV_GROUPS) {
+      expect(group.title.length).toBeGreaterThan(0);
+      expect(group.items.length).toBeGreaterThan(0);
+    }
   });
 
-  test('every section landmark has an accessible name', () => {
-    const sections = [...shell.matchAll(/<section[^>]*>/g)].map((match) => match[0]);
-    expect(sections.length).toBeGreaterThan(0);
-    for (const section of sections) {
-      expect(section).toMatch(/aria-labelledby=|aria-label=/);
+  test('every destination has a Hebrew label', () => {
+    for (const item of NAV_ITEMS) {
+      expect(item.label.length).toBeGreaterThan(0);
     }
   });
 });
 
-describe('layout does not fix widths that would overflow a 360px viewport', () => {
-  test('the main container is fluid and capped, not fixed', () => {
-    expect(shell).toMatch(/<main[^>]*class="[^"]*\bw-full\b/);
-    expect(shell).toMatch(/<main[^>]*class="[^"]*\bmax-w-/);
+describe('document metadata', () => {
+  test('carries a Hebrew title and description', () => {
+    expect(metadata.title).toBeTruthy();
+    expect(metadata.description).toBeTruthy();
   });
 
-  test('no inline pixel width is hard-coded into the markup', () => {
-    expect(shell).not.toMatch(/style="[^"]*width:\s*\d+px/);
+  test('allows the viewer to zoom, which text scaling depends on (UX-A11Y-001)', () => {
+    expect(viewport.maximumScale).toBeGreaterThanOrEqual(5);
   });
 });

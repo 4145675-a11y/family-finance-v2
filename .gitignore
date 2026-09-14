@@ -27,6 +27,12 @@ test-results/
 *.pem
 *.key
 service-role*.json
+*-firebase-adminsdk-*.json
+
+# The household's own data. Never committed, for the obvious reason: this is a
+# family's financial records, and a repository is the wrong place for them.
+# ADR-0024 puts the store here; the directory is created on first run.
+.data/
 
 # local temp / uploads (import pipeline scratch space)
 tmp/

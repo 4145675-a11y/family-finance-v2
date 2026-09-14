@@ -1,0 +1,18 @@
+{
+  "name": "@family-finance/local-store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@family-finance/contracts": "*",
+    "@family-finance/document-import": "*",
+    "@family-finance/finance-engine": "*",
+    "zod": "4.4.3"
+  }
+}

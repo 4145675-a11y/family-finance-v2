@@ -3,7 +3,14 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  /* Root-level TypeScript that belongs to no workspace. Without this, the linter's
-     type-aware rules cannot resolve these files and refuse to check them. */
-  "include": ["vitest.config.ts"]
+  /* Root-level TypeScript that belongs to no workspace: build configuration and
+     the integration suite, which targets the database rather than a package.
+     Without this the linter's type-aware rules cannot resolve these files. */
+  "include": [
+    "vitest.config.ts",
+    "vitest.integration.config.ts",
+    "vitest.property.config.ts",
+    "tools/test-shims/**/*.ts",
+    "supabase/tests/**/*.ts"
+  ]
 }

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
 
-import { contrastRatio, WCAG_AA } from './contrast.js';
+import { contrastRatio, WCAG_AA } from './contrast';
 import {
   color,
   minTouchTargetPx,
@@ -12,7 +12,7 @@ import {
   requiredContrast,
   space,
   typography,
-} from './tokens.js';
+} from './tokens';
 
 /** The Tailwind theme block that mirrors these tokens. */
 const GLOBALS_CSS = fileURLToPath(
@@ -61,7 +61,12 @@ describe('scales', () => {
   });
 
   test('radii and motion match the specification', () => {
-    expect(radius).toEqual({ control: 8, card: 14, hero: 18 });
+    // 04-DESIGN-SYSTEM.md fixes the first three. `pill` is an addition for fully
+    // round ends, not a change to any specified value.
+    expect(radius.control).toBe(8);
+    expect(radius.card).toBe(14);
+    expect(radius.hero).toBe(18);
+    expect(radius.pill).toBe(999);
     expect(motion.fast).toBe(120);
     expect(motion.slow).toBe(200);
   });

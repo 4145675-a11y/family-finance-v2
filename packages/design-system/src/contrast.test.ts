@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { contrastRatio, meetsContrast, parseHex, relativeLuminance } from './contrast.js';
+import { contrastRatio, meetsContrast, parseHex, relativeLuminance } from './contrast';
 
 describe('parseHex', () => {
   test('splits a six-digit colour into channels', () => {
