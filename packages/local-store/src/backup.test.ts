@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, posix, win32 } from 'node:path';
 
 import { afterAll, describe, expect, test } from 'vitest';
 
@@ -16,7 +16,13 @@ import { addTask } from './commands';
 import { CURRENT_FORMAT_VERSION } from './document';
 import { contextFor, seededHousehold, spend, TEST_NOW } from './fixtures/household';
 import { ConcurrentModificationError, FileStore, StoreNotInitialisedError } from './file-store';
-import { PathEscapeError, resolveStorePaths, safeJoin, uploadFileName } from './paths';
+import {
+  PathEscapeError,
+  resolveStorePaths,
+  safeJoin,
+  safeJoinOn,
+  uploadFileName,
+} from './paths';
 import { balanceOf } from './projection';
 import { HouseholdStore } from './store';
 
@@ -346,16 +352,62 @@ describe('the file store', () => {
 describe('paths never escape the data directory', () => {
   const paths = resolveStorePaths('/project', '/project/.data');
 
-  test.each([
-    ['..', 'x'],
-    ['../..', 'household.json'],
-    ['..\\..\\windows', 'x'],
-  ])('%s/%s is refused', (a, b) => {
-    expect(() => safeJoin(paths.root, a, b)).toThrow(PathEscapeError);
+  /*
+   * Every traversal spelling, whichever separator it uses. `..\..\windows` is
+   * the one CI caught: on Linux a backslash is not a separator, so it was a
+   * single (odd) file name inside the root and the containment check passed it.
+   * The rule is now that a segment is a name and never a path, so the same
+   * input is refused on both platforms — proven below on `path.posix` and
+   * `path.win32` explicitly, not just on whatever this machine happens to be.
+   */
+  const traversals: [string, string[]][] = [
+    ['..', ['..', 'x']],
+    ['../..', ['../..', 'household.json']],
+    ['..\\..\\windows', ['..\\..\\windows', 'x']],
+    ['..\\..\\Windows/x (mixed)', ['..\\..\\Windows/x']],
+    ['uploads/../../x', ['uploads/../../x']],
+    ['uploads\\..\\..\\x', ['uploads\\..\\..\\x']],
+    ['a/..\\.. then x', ['a/..\\..', 'x']],
+    ['a\\../.. then x', ['a\\../..', 'x']],
+    ['... (dots only)', ['...', 'x']],
+    ['. (current directory)', ['.', 'x']],
+    ['C:x (drive-relative)', ['C:x']],
+    ['C:\\Windows\\x (absolute)', ['C:\\Windows\\x']],
+    ['\\\\server\\share\\x (UNC)', ['\\\\server\\share\\x']],
+    ['/etc/passwd (absolute)', ['/etc/passwd']],
+    ['embedded NUL', ['a\0b']],
+    ['empty', ['']],
+  ];
+
+  test.each(traversals)('%s is refused on this platform', (_label, segments) => {
+    expect(() => safeJoin(paths.root, ...segments)).toThrow(PathEscapeError);
   });
 
-  test('an absolute path is refused', () => {
-    expect(() => safeJoin(paths.root, '/etc/passwd')).toThrow(PathEscapeError);
+  describe.each([
+    ['posix', posix, '/project/.data'],
+    ['win32', win32, 'C:\\project\\.data'],
+  ])('on %s', (_platform, platform, root) => {
+    test.each(traversals)('%s is refused', (_label, segments) => {
+      expect(() => safeJoinOn(platform, root, ...segments)).toThrow(PathEscapeError);
+    });
+
+    test('no segments is refused', () => {
+      expect(() => safeJoinOn(platform, root)).toThrow(PathEscapeError);
+    });
+
+    test('ordinary generated names land strictly inside the root', () => {
+      const id = '11111111-2222-3333-4444-555555555555';
+      for (const segments of [
+        ['uploads', 'file.csv'],
+        [uploadFileName(id, '.csv')],
+        [backupFileName(TEST_NOW)],
+        ['2026-09-14T10-00-00-000Z-deadbeef.json'],
+      ]) {
+        const joined = safeJoinOn(platform, root, ...segments);
+        expect(joined.startsWith(root + platform.sep)).toBe(true);
+        expect(joined.length).toBeGreaterThan(root.length + 1);
+      }
+    });
   });
 
   test('an ordinary name inside the directory is allowed', () => {

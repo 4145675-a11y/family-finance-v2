@@ -1,4 +1,7 @@
-import { isAbsolute, join, normalize, resolve, sep } from 'node:path';
+import path, { join, resolve } from 'node:path';
+
+/** `node:path` itself, or its `posix` / `win32` flavours — same surface, different rules. */
+type PlatformPath = typeof path;
 
 /**
  * Where the household's data lives, and the rule that nothing escapes it.
@@ -78,6 +81,18 @@ export function resolveStorePaths(projectRoot: string, override?: string): Store
 }
 
 /**
+ * Characters that make a name into a path on at least one platform.
+ *
+ * `/` everywhere; `\` on Windows; `:` because `C:x` is a drive-relative path
+ * there, resolved against that drive's current directory and so outside any
+ * root. None of them can appear in a name this code generates.
+ */
+const PATH_CHARACTERS = /[\\/:]/;
+
+/** `.`, `..`, and the longer runs of dots Windows folds into them. */
+const ONLY_DOTS = /^\.+$/;
+
+/**
  * Joins a generated identifier onto a directory, refusing anything that escapes.
  *
  * The identifier is expected to be a UUID and a suffix this code chose. The check
@@ -85,25 +100,54 @@ export function resolveStorePaths(projectRoot: string, override?: string): Store
  * is writing a family's financial document somewhere outside the data directory.
  */
 export function safeJoin(root: string, ...segments: string[]): string {
+  return safeJoinOn(path, root, ...segments);
+}
+
+/**
+ * The rule behind `safeJoin`, with the platform made explicit.
+ *
+ * Every segment must be a single name, never a path. That is checked before
+ * anything is resolved, and it does not depend on which separators the host
+ * understands — which is the point. `..\..\windows` is a traversal on Windows
+ * and an ordinary, if peculiar, file name on Linux; the same data directory can
+ * be reached from both, so the only consistent answer is to refuse it on both.
+ * The containment check that follows is the second lock, in case a platform
+ * has a spelling of "up" that the first one does not know.
+ *
+ * Exported so the tests can prove the rule on `path.posix` and `path.win32`
+ * alike, whichever machine happens to be running them.
+ */
+export function safeJoinOn(
+  platform: PlatformPath,
+  root: string,
+  ...segments: string[]
+): string {
+  if (segments.length === 0) {
+    throw new PathEscapeError('(none)', root);
+  }
   for (const segment of segments) {
     if (segment.length === 0) {
       throw new PathEscapeError('(empty)', root);
     }
-    if (isAbsolute(segment)) {
+    if (segment.includes('\0')) {
       throw new PathEscapeError(segment, root);
     }
-    if (segment.includes('\0')) {
+    if (PATH_CHARACTERS.test(segment) || ONLY_DOTS.test(segment)) {
+      throw new PathEscapeError(segment, root);
+    }
+    if (platform.isAbsolute(segment)) {
       throw new PathEscapeError(segment, root);
     }
   }
 
-  const candidate = resolve(root, join(...segments));
-  const normalisedRoot = normalize(resolve(root));
-  const withSeparator = normalisedRoot.endsWith(sep)
+  const normalisedRoot = platform.resolve(root);
+  const candidate = platform.resolve(normalisedRoot, ...segments);
+  const withSeparator = normalisedRoot.endsWith(platform.sep)
     ? normalisedRoot
-    : `${normalisedRoot}${sep}`;
+    : `${normalisedRoot}${platform.sep}`;
 
-  if (candidate !== normalisedRoot && !candidate.startsWith(withSeparator)) {
+  // Strictly below the root: a name was joined, so equality would itself be wrong.
+  if (!candidate.startsWith(withSeparator)) {
     throw new PathEscapeError(candidate, normalisedRoot);
   }
 
