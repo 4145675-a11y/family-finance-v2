@@ -580,3 +580,77 @@ describe('create_household_invitation â€” a token minted once, under the memberâ
     expect(error?.code).toBe(PERMISSION_DENIED);
   });
 });
+
+describe('a first-time person accepting an invitation gets a profile (2026-09-15 migration)', () => {
+  test('membership and profile are created together; the name comes from the session', async () => {
+    const fresh = randomUUID();
+    await ownerClient().query(
+      `insert into auth.users (id, email, aud, role) values ($1, $2, 'authenticated', 'authenticated')`,
+      [fresh, `fresh-${fresh}@example.test`],
+    );
+    const token = await asUser(
+      alice,
+      async (client) =>
+        (
+          await client.query<{ t: string }>(
+            `select public.create_household_invitation($1, 'fresh@example.test') as t`,
+            [householdA],
+          )
+        ).rows[0]?.t ?? '',
+      { keep: true },
+    );
+
+    // The claims carry an email here, as a real session would.
+    const outcome = await asUser({ id: fresh, email: '' }, async (client) => {
+      await client.query("select set_config('request.jwt.claims', $1, true)", [
+        JSON.stringify({ sub: fresh, role: 'authenticated', email: 'dana.levi@example.test' }),
+      ]);
+      const joined = (
+        await client.query<{ hid: string }>(
+          'select public.accept_household_invitation($1) as hid',
+          [token],
+        )
+      ).rows[0]?.hid;
+      const profile = (
+        await client.query<{ display_name: string }>(
+          'select display_name from public.profiles where id = $1',
+          [fresh],
+        )
+      ).rows[0];
+      const member = (
+        await client.query<{ status: string }>(
+          'select status from public.household_members where household_id = $1 and profile_id = $2',
+          [householdA, fresh],
+        )
+      ).rows[0];
+      return { joined, profile, member };
+    });
+    expect(outcome.joined).toBe(householdA);
+    expect(outcome.profile).toEqual({ display_name: 'dana.levi' });
+    expect(outcome.member).toEqual({ status: 'active' });
+  });
+
+  test('a person who already has a profile keeps it', async () => {
+    const token = await asUser(
+      alice,
+      async (client) =>
+        (
+          await client.query<{ t: string }>(
+            `select public.create_household_invitation($1, 'mallory@example.test') as t`,
+            [householdA],
+          )
+        ).rows[0]?.t ?? '',
+      { keep: true },
+    );
+    const name = await asUser(mallory, async (client) => {
+      await client.query('select public.accept_household_invitation($1)', [token]);
+      return (
+        await client.query<{ display_name: string }>(
+          'select display_name from public.profiles where id = $1',
+          [mallory.id],
+        )
+      ).rows[0]?.display_name;
+    });
+    expect(name).toBe(mallory.email.split('@')[0]);
+  });
+});

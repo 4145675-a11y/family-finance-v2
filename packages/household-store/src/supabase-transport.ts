@@ -116,6 +116,11 @@ export class SupabaseHouseholdTransport implements HouseholdTransport {
     if (failure === 'permission_denied' && /not a member/i.test(error.message ?? '')) {
       return new TransportError('not_a_member', `${operation}: not a member of this household`);
     }
-    return new TransportError(failure, `${operation} failed (${failure})`);
+    // The SQLSTATE / PostgREST code is diagnostic, never sensitive; the
+    // message text stays behind.
+    return new TransportError(
+      failure,
+      `${operation} failed (${failure}, code ${error.code ?? 'none'})`,
+    );
   }
 }

@@ -61,7 +61,7 @@
 | GEM-FORECAST-001 | Financial | local-store/src/projection.ts | integration | 8 | **Verified in M8** — פריט אחד לכל צ׳ק, לפי מזהה הצ׳ק |
 | GEM-MATCH-001 | Architecture | local-store/src/check-match.ts | unit/integration | 8 | **Verified in M8** — יבוא חוזר של אותו דף אינו פורע צ׳ק פעמיים |
 | PROD-DATASOURCE-001 | Architecture | apps/web/lib/dashboard/source.ts + lib/config/deployment.ts | unit + fail-closed gate | PDL | **Verified in PDL** — 24 unit + fail-closed gate |
-| PROD-AUTHDB-001 | Security | lib/supabase/server.ts + SQL functions (security invoker) | integration (real DB) | PDL | **Verified in PDL** — 17 real-DB store tests as the signed-in person; live JWT run pending the publishable key |
+| PROD-AUTHDB-001 | Security | lib/supabase/server.ts + SQL functions (security invoker) | integration (real DB) | PDL | **Verified in PDL** — 17 real-DB store tests as the signed-in person; live run through Supabase Auth/PostgREST 13/13 |
 | PROD-SECRET-BOUNDARY-001 | Security | check:client-secrets + deployment.ts + auth modules | gate + unit | PDL | **Verified in PDL** — client-secrets gate, health tests, boundary tests |
 | PROD-RLS-BEHAVIOUR-001 | Security | supabase/tests/*.integration.test.ts | negative integration (32 tables) | PDL | **Verified in PDL** — 7 suites, 214 tests, rollback |
 | PROD-DOMAIN-PERSIST-001 | Architecture | packages/supabase-store + migration 20260914* | integration + parity | PDL | **Verified in PDL** — 9 domains, 17 real-DB + 16 in-memory |

@@ -49,7 +49,7 @@
 ## השלכות
 
 - חיוביות: RLS מוכח נשאר הסמכות; שכבת דומיין אחת; אטומיות מהמסד; פריסה חלקית לא יכולה להיראות תקינה; החנות המקומית ממשיכה לעבוד למפתח.
-- הוכח בפועל (2026-09-15): 231 בדיקות אינטגרציה ב־rollback, 17 מהן דרך ה־store על תשעת התחומים; `verify` exit 0; fail-closed 9/9. הריצה החיה דרך Supabase Auth/PostgREST כתובה וממתינה ל־publishable key מקומי (`docs/checkpoints/production-data-layer.md`).
+- הוכח בפועל (2026-09-15): 231 בדיקות אינטגרציה ב־rollback, 17 מהן דרך ה־store על תשעת התחומים; `verify` exit 0; fail-closed 9/9. הריצה החיה דרך Supabase Auth/PostgREST: 13/13 (`npm run validate:production-path`, `docs/checkpoints/production-data-layer.md`).
 - שליליות ועלות: כל פעולה טוענת את מסמך המשק (סדר גודל של אלפי שורות — כמו היום מהקובץ); פונקציית apply ב־plpgsql דורשת מיפוי מפורש לכל טבלה; הוספת חבר = הזמנה באימייל (זהות אמיתית), לא יצירת פרופיל מקומי; שחזור מגיבוי לתוך המסד אינו נתמך במילסטון הזה (רשומות כסף אינן ניתנות להחלפה) ומדווח כך במפורש.
 - מה נדרש לאמת בבדיקות: allow/deny לכל 32 הטבלאות; load/apply לכל תחום ב־rollback; parity מול local-store; fail-closed ב־resolution וב־health; היעדר local-store בנתיב ייצור; ניקיון המסד אחרי כל ריצה.
 

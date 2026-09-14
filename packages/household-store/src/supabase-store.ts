@@ -136,14 +136,16 @@ export class SupabaseHouseholdStore implements HouseholdStorePort {
 
   /** Invitations of the household, for the members screen. */
   async invitations(): Promise<HouseholdInvitation[]> {
-    const loaded = await this.guarded(() => this.transport.load(this.requireHousehold()));
+    const householdId = await this.resolveHousehold();
+    const loaded = await this.guarded(() => this.transport.load(householdId));
     if (loaded === null) throw new StoreNotInitialisedError();
     return invitationsFromLoaded(loaded);
   }
 
   /** Mints an invitation. The token is shown once and never stored. */
   async invite(email: string): Promise<string> {
-    return this.guarded(() => this.transport.createInvitation(this.requireHousehold(), email));
+    const householdId = await this.resolveHousehold();
+    return this.guarded(() => this.transport.createInvitation(householdId, email));
   }
 
   async acceptInvitation(token: string): Promise<string> {
@@ -155,6 +157,18 @@ export class SupabaseHouseholdStore implements HouseholdStorePort {
   private requireHousehold(): string {
     if (this.householdId === null) throw new StoreNotInitialisedError();
     return this.householdId;
+  }
+
+  /**
+   * The household, looked up when this store has not read anything yet. A
+   * store lives for one request and starts empty; the first call on it — a
+   * read, or an invitation — is what resolves the membership.
+   */
+  private async resolveHousehold(): Promise<string> {
+    if (this.householdId === null && !(await this.exists())) {
+      throw new StoreNotInitialisedError();
+    }
+    return this.requireHousehold();
   }
 
   private async load(): Promise<{ document: StoreDocument; version: number }> {

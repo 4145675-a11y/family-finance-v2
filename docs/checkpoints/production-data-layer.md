@@ -1,6 +1,6 @@
 # CHECKPOINT — Production Data Layer
 
-- **Result**: **PASS — implemented, verified against the real database, one external input pending for the live end-to-end validation**
+- **Result**: **PASS — implemented, verified against the real database, and validated live end to end through Supabase Auth and PostgREST**
 - **Branch**: `production-data-layer` (מסתעף מ־`main` ב־`a55a257`) · commits `e13124a`, `d682700` ומעלה
 - **Environment**: local (Windows 11, Node v24.19.0 — `.nvmrc` נועל 24.18.1, פער מתועד; npm 11.17.0) · Supabase PostgreSQL 17.6
 - **Date**: 2026-09-14 → 2026-09-15
@@ -8,7 +8,7 @@
 
 > **מה הושג**: האפליקציה קוראת וכותבת את משק הבית דרך Supabase כמשתמש מחובר, ו־RLS הוא הסמכות בכל statement. הדלת (`householdStore()`) לא זזה; מה שעומד מאחוריה נקבע מתצורת הפריסה בלבד, ותהליך המוגדר למסד לעולם אינו בונה את חנות הקובץ. כל 32 הטבלאות מוכחות התנהגותית. שום דבר לא מוזג ל־`main` ולא נפרס.
 >
-> **מה ממתין לך**: מפתח ה־publishable של הפרויקט ב־`apps/web/.env.local` (הערך הנוכחי שם אינו במבנה `sb_publishable_…`), ואז `npm run validate:production-path` — הריצה החיה מקצה לקצה דרך Supabase Auth ו־PostgREST. ראה "חסימה".
+> **הריצה החיה (2026-09-15)**: `npm run validate:production-path` — **13/13**: כניסה דרך Supabase Auth, הקמת משק בית, תנועות, יבוא ואישור, תקציב/חוב/גמ״ח/משימה, ייצוא תחת אימות־מחדש, הזמנה והצטרפות, בידוד בין משקי בית על המסך ודרך ה־transport, יציאה — והמסד נקי אחריה. שני פגמים נמצאו ותוקנו (ראה "אירועים" 7–8).
 
 ## Scope
 
@@ -26,7 +26,6 @@
 
 ### לא הושלם, סיבה והשפעה
 
-- **הריצה החיה מקצה לקצה** (`supabase/validation/production-path.validation.ts`): כתובה, מריצה את השרת הבנוי במצב ייצור מול המסד, נכנסת דרך Supabase Auth, מריצה את כל המסלול הקריטי דרך ה־transport של הייצור, בודקת עמודים מרונדרים ובידוד, ומנקה אחריה. **לא רצה**: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ב־`apps/web/.env.local` אינו במבנה `sb_publishable_…`, ולכן `readDeploymentConfig` מסרב (בצדק) להעלות את השרת. השפעה: ההוכחה מול GoTrue/PostgREST החי — כניסה, cookies, RLS דרך JWT אמיתי — ממתינה. הנתיב עצמו הוכח דרך אותן פונקציות SQL ואותן policies ב־`pg` (rollback), ו־supabase-js transport נבדק ביחידה.
 - **טפסי server actions** (כניסה, יצירת חשבון וכו׳) לא הופעלו אוטומטית; הריצה החיה בודקת עמודים מרונדרים ואת ה־transport, לא לחיצות. אימות ידני בדפדפן נשאר.
 - **Passkeys בייצור** — נדחה במפורש (החלטה 2). **ארכוב/אנונימיזציה** — נדחה (החלטה 11). **שחזור מגיבוי לתוך המסד** — מסורב בשם (`unsupported_in_backend`), ראה ADR-0032 §השלכות. **גיבוי בייצור** — הורדה (`/api/export/backup.json`) ולא כתיבה לדיסק.
 
@@ -55,22 +54,22 @@
 | Format | `npm run format:check` | **PASS** | exit 0 |
 | Typecheck | `npm run typecheck` | **PASS** | שורש + 8 workspaces |
 | Lint | `npm run lint` | **PASS** | `--max-warnings=0` |
-| Unit | `npm run unit` | **PASS** | **1805 passed**, 53 קבצים, 0 מדולגות |
+| Unit | `npm run unit` | **PASS** | **1810 passed**, 53 קבצים, 0 מדולגות |
 | Property | `npm run property` | **PASS** | **41/41** |
 | Build | `npm run build` | **PASS** | כולל `ƒ Proxy (Middleware)` ומסלולי `/login` `/reauth` `/join` `/account` |
 | Built-shell | `npm run check:shell` | **PASS** | 14/14 מול השרת הרץ |
 | **Fail-closed** | `npm run check:fail-closed` | **PASS** | **9/9** — כולל "not ready when the database cannot be reached" ו־"without naming the project or host" |
 | Client secrets | `npm run check:client-secrets` | **PASS** | 0 ממצאים (bundle + source) |
 | No env files | `npm run check:no-env-files` | **PASS** | 0 במעקב, 0 ב־build |
-| RLS coverage | `npm run check:rls-coverage` | **PASS** | 32/32, 16 מיגרציות |
-| Manual bundle | `npm run db:check` | **PASS** | 16 מיגרציות |
+| RLS coverage | `npm run check:rls-coverage` | **PASS** | 32/32, 17 מיגרציות |
+| Manual bundle | `npm run db:check` | **PASS** | 17 מיגרציות |
 | Forbidden scan | `npm run scan:forbidden` | **PASS** | 0 |
 | Traceability | `npm run check:traceability` | **PASS** | 66 דרישות |
 | **Aggregate** | `npm run verify` | **PASS** | exit 0 אמיתי |
-| **Integration (real DB)** | `npm run integration` | **PASS** | **8 קבצים, 231 בדיקות**, ~6 דקות; rollback בלבד |
+| **Integration (real DB)** | `npm run integration` | **PASS** | **8 קבצים, 233 בדיקות**, ~6 דקות; rollback בלבד |
 | **DB cleanliness** | `npm run db:cleanliness` | **PASS** | 0 households · 0 profiles · 0 `@example.test` · 0 audit · 32/32 RLS forced · guards 2/2 + void-guards 2/2 |
-| **Migration apply** | `npm run db:apply supabase/migrations/20260914120000_production_data_layer.sql` | **applied** | sha256 מודפס, טרנזקציה אחת |
-| Production-path validation | `npm run validate:production-path` | **NOT RUN** | חסום — מפתח publishable (ראה חסימה) |
+| **Migration apply** | `npm run db:apply` ×2: `20260914120000_production_data_layer.sql`, `20260915090000_invitation_bootstraps_profile.sql` | **applied** | sha256 מודפס, טרנזקציה אחת לכל קובץ |
+| **Production-path validation (live)** | `npm run validate:production-path` | **PASS** | **13/13**, ~24s; Supabase Auth + PostgREST + עמודים מרונדרים; ניקוי עצמי אומת |
 | **CI (GitHub Actions)** | push של `e13124a`, `d682700` | **success** | שני הריצות ירוקות |
 
 ## Negative verification
@@ -84,7 +83,7 @@
 | `removePlannedItem` | `removed_at` נסמן; `load_household_document` אינו מחזיר את השורה; השורה קיימת |
 | `reverseBatch` | תנועות `void`; batch `reversed` ושומר `approvedAt` |
 | שרת ייצור עם URL־מסד שאין מאחוריו מסד | עולה, `/api/health` **503 not_ready**, `database: unreachable`, ללא host |
-| `/`, `/accounts`, `/setup`, `/account`, `/backup`, `/reports` ללא session (בריצה החיה, כתוב) | redirect ל־`/login` |
+| `/`, `/accounts`, `/setup`, `/account`, `/backup`, `/reports` ללא session (בריצה החיה) | redirect ל־`/login` |
 | `lib/auth/store.ts` תחת backend supabase | זורק `unsupported_backend` — קובץ הכניסה לא נפתח |
 
 ## אירועים — מה המסד לימד
@@ -95,6 +94,9 @@
 4. **ביטול יבוא לא היה ניתן לשמירה מקומית** — החוזה דרש `approvedAt === null` לכל מה שאינו `approved`; הבדיקות המקומיות מעולם לא פירסרו batch מבוטל. תוקן בחוזה + בדיקה.
 5. **אין מסלול שבו יוצר household הופך לחבר** — `household_members` בלי INSERT policy בכוונה, וללא פונקציית יצירה. `create_household()` נוספה.
 6. **החוזים והסכמה סטו** (`operating_reserve_minor`, שדות משימות, `dismissed` מול `dropped`, summary של batch) — מיושר במיגרציה, החוזים לא שונו.
+7. **הזמנה על store טרי** (הריצה החיה): `SupabaseHouseholdStore.invite()`/`invitations()` דרשו household שכבר נטען, ו־store של בקשה חדשה מתחיל ריק → `StoreNotInitialisedError` מפעולת ההזמנה. תוקן (`resolveHousehold`) + 2 בדיקות יחידה.
+8. **מוזמן ללא פרופיל** (הריצה החיה): אדם שנרשם ב־Supabase Auth ומעולם לא הקים משק בית אין לו שורת `profiles`; `accept_household_invitation()` נכשל ב־FK (`23503`). כל הבדיקות הקודמות זרעו פרופילים. מיגרציה קדימה `20260915090000`: הפונקציה יוצרת את הפרופיל (שם מ־`display_name` ב־user_metadata, אחרת החלק המקומי של האימייל) לפני החברות. הוחלה; 2 בדיקות אינטגרציה.
+9. **תצורה מקומית**: `apps/web/.env.local` הכיל URL עם project ref שאינו קיים ב־DNS ושורת מפתח עם טקסט נלווה. תוקן מקומית (הקובץ ב־`.gitignore`, שום ערך לא הודפס): ה־URL נגזר מה־ref של חיבור המסד ואומת (`/rest/v1/rpc` כ־anon → `42501`), שורת המפתח נחתכה לטוקן הראשון.
 
 ## החלטות שהתקבלו כאן (מסמכי הסמכות תומכים)
 
@@ -103,24 +105,20 @@
 - **הבייטים של מסמך מיובא לא נשמרים** בשרת מארח (`retention_state = purged` על `import_source_files`); Supabase Storage — נדחה.
 - **הוספת חבר = הזמנה באימייל** (זהות אמיתית), קוד חד־פעמי מוצג פעם אחת.
 
-## 🔴 חסימה — נדרשת פעולה שלך (אחת)
+## החסימה הוסרה
 
-**מה**: ב־`apps/web/.env.local` (מקומי, ב־`.gitignore`) יש להציב את ה־**publishable key** של הפרויקט: Supabase Studio → Project Settings → API Keys → `sb_publishable_…`. הערך הקיים שם אינו במבנה הזה (לא נבדק מעבר לכך ולא הודפס).
-
-**ואז**: `npm run build && npm run validate:production-path`. הסקריפט יוצר שלושה משתמשים סינתטיים (`@example.test`, סיסמאות שנוצרות ולא מודפסות), עובר את המסלול הקריטי דרך ה־transport של הייצור, בודק עמודים מרונדרים ובידוד, ומוחק את מה שיצר בטרנזקציה צרה עם הפעלה מחדש ואימות של ה־guards. אחריו `npm run db:cleanliness`.
-
-**תנאי חיצוני שייבדק בריצה**: ספק Email/Password ב־Supabase Auth מופעל (ברירת מחדל). אם לא — הודעה בסגנון `sign-in failed … status 400` ואז Authentication → Providers → Email.
+המפתח סופק ב־2026-09-15; הריצה החיה עברה 13/13 (ראה למעלה). ספק Email/Password ב־Supabase Auth פעיל (הכניסה הצליחה).
 
 ## Risks & rollback
 
 | סיכון | חומרה | טיפול |
 |---|---|---|
 | טעינת מסמך שלם לכל פעולה | נמוכה למשק אחד; תיבדק תחת נתונים אמיתיים | ADR-0032 § תנאי ביטול |
-| policy נכונה לחמש טבלאות M2 בלבד הוכחה דרך JWT אמיתי; 27 האחרות דרך `pg` עם אותם claims | נמוכה — אותה מכניקה | הריצה החיה תסגור |
+| policy הוכחה דרך JWT אמיתי לתחומים שהריצה החיה עוברת; היתר דרך `pg` עם אותם claims | נמוכה — אותה מכניקה | — |
 | `local_json` עדיין מוחק פיזית בביטול יבוא | מקומי בלבד | מתועד ב־ADR-0032 |
 
 **Rollback**: הענף לא מוזג; `git checkout main`. המיגרציה קדימה בלבד; ביטולה = מיגרציה נוספת (העמודות והפונקציות אינן משפיעות על הקוד ב־`main`, שאינו קורא להן).
 
 ## Stop declaration
 
-**לא מוזג ל־`main`. לא נפרס. לא יובאו נתונים אמיתיים. המסד ריק ומוגן.**
+**לא מוזג ל־`main`. לא נפרס. לא יובאו נתונים אמיתיים. המסד ריק ומוגן (אומת אחרי הריצה החיה: 0/0/0, identities 0, invitations 0).**

@@ -3,9 +3,9 @@
 ## מה יש כאן
 
 ```
-migrations/   16 קבצי SQL, מיושמים לפי סדר שם הקובץ
+migrations/   17 קבצי SQL, מיושמים לפי סדר שם הקובץ
 manual/       חבילה מיוצרת להדבקה ידנית + אבחון קריאה־בלבד
-tests/        בידוד ו־store — 8 קבצים, 231 בדיקות מול DB אמיתי, rollback בלבד
+tests/        בידוד ו־store — 8 קבצים, 233 בדיקות מול DB אמיתי, rollback בלבד
 validation/   הריצה החיה מקצה לקצה (npm run validate:production-path)
 ```
 
@@ -20,7 +20,7 @@ validation/   הריצה החיה מקצה לקצה (npm run validate:production
 | `20260822100100_debt_domain.sql` | `debts`, `debt_events`, `debt_rollovers` + אימות קישורי גלגול |
 | `20260822100200_financial_row_security.sql` | RLS ל־10 הטבלאות החדשות + עוזרי בעלות על הפניות |
 
-הטבלה מתארת את שמונת הקבצים של M2–M4. שני קבצי `20260823*` (תקציב) וחמשת קבצי `20260908*` (M9: גמ״ח וצ׳קים, יבוא ומסמכים, הגדרות ומשימות, גישה והתראות, RLS לטבלאות החדשות) מתועדים ב־checkpoints של המילסטונים שלהם. `20260914120000_production_data_layer.sql` (ADR-0032): תיקוני פגמים שנמצאו בהרצה, עמודות שהחוזים דורשים, provenance של יבוא, `voided_at`/`removed_at`, `create_household()`, `create_household_invitation()`, ושתי נקודות הכניסה של האפליקציה — `load_household_document()` ו־`apply_household_changes()` (שתיהן `security invoker`).
+הטבלה מתארת את שמונת הקבצים של M2–M4. שני קבצי `20260823*` (תקציב) וחמשת קבצי `20260908*` (M9: גמ״ח וצ׳קים, יבוא ומסמכים, הגדרות ומשימות, גישה והתראות, RLS לטבלאות החדשות) מתועדים ב־checkpoints של המילסטונים שלהם. `20260914120000_production_data_layer.sql` (ADR-0032): תיקוני פגמים שנמצאו בהרצה, עמודות שהחוזים דורשים, provenance של יבוא, `voided_at`/`removed_at`, `create_household()`, `create_household_invitation()`, ושתי נקודות הכניסה של האפליקציה — `load_household_document()` ו־`apply_household_changes()` (שתיהן `security invoker`). `20260915090000_invitation_bootstraps_profile.sql`: `accept_household_invitation()` יוצרת פרופיל למוזמן שמעולם לא הקים משק בית (נמצא בריצה החיה).
 
 **הסדר מחייב.** קובץ מאוחר מסתמך על אובייקטים של קודמו.
 

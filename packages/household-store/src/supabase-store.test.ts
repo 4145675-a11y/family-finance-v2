@@ -276,6 +276,22 @@ describe('writing sends exactly the difference', () => {
   });
 });
 
+describe('invitations on a store that has not read anything yet', () => {
+  test('the household is resolved from the membership before inviting', async () => {
+    // A per-request store starts without a household id; the invitation
+    // action may be its first call. Found by the live validation.
+    const { store } = storeWith(seed());
+    expect(await store.invite('bob@example.test')).toHaveLength(64);
+    expect(await store.invitations()).toEqual([]);
+  });
+
+  test('a person with no membership cannot invite anybody', async () => {
+    const { store, transport } = storeWith(null);
+    transport.memberOf = [];
+    await expect(store.invite('x@example.test')).rejects.toThrow(StoreNotInitialisedError);
+  });
+});
+
 describe('what the store refuses to do here', () => {
   test('restore, and writing a backup to the server', async () => {
     const { store } = storeWith(seed());

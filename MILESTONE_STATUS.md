@@ -43,7 +43,7 @@
 | 13 | Summaries, Notifications & Reports | **In progress** | [milestone-7](docs/checkpoints/milestone-7-local-product.md) | דוחות וייצוא קיימים; התראות מקומיות בלבד |
 | 14 | Hardening & Production | **In progress** | [milestone-8](docs/checkpoints/milestone-8-access-and-gemach.md) | נעילת גישה מקומית עובדת; אירוח, TLS ו־RPO/RTO עדיין פתוחים |
 | — | **Local Access & Gemach** | **Complete — evidenced** | [milestone-8](docs/checkpoints/milestone-8-access-and-gemach.md) | **WebAuthn מול Windows Hello; גמ״ח וצ׳קים דחויים** |
-| — | **Production Data Layer** | **Implemented — evidenced; live validation pending one input** | [production-data-layer](docs/checkpoints/production-data-layer.md) | **האפליקציה קוראת וכותבת דרך Supabase כמשתמש מחובר; RLS מוכח על 32 טבלאות; לא מוזג** |
+| — | **Production Data Layer** | **Complete — evidenced (on branch, not merged)** | [production-data-layer](docs/checkpoints/production-data-layer.md) | **האפליקציה קוראת וכותבת דרך Supabase כמשתמש מחובר; RLS מוכח על 32 טבלאות; ריצה חיה 13/13; ממתין למיזוג** |
 
 ## שערי איכות — מצב נוכחי
 
@@ -55,7 +55,7 @@
 | Format | Active | `prettier --check .`, exit 0 |
 | Typecheck | Active | שורש + 7 workspaces |
 | Lint | Active | `--max-warnings=0`, type-aware |
-| **Unit** | Active | **1805/1805**, 53 קבצים, 0 מדולגות |
+| **Unit** | Active | **1810/1810**, 53 קבצים, 0 מדולגות |
 | **Property** | Active | **41/41**, כולל אינווריאנטים של צ׳קים תחת רצפי פעולות שרירותיים |
 | Build | Active | 26 מסלולים |
 | **Built-shell** | Active | **14/14 מול השרת הרץ** — 5 מסלולים, משק בית מוזרע (`ADR-0027`) |
@@ -63,7 +63,8 @@
 | Manual bundle | Active | 10 מיגרציות, תואם למקורות (`ADR-0019`) |
 | Forbidden scan | Active | 177 קבצים, 0 errors |
 | Traceability | Active | 66/66 |
-| **Integration / RLS** | Active (מקומי, `npm run integration`) | **231/231 מול Supabase** (8 קבצים, 32 טבלאות, 9 תחומי store), 2026-09-15; לא חלק מ־`verify` — דורש `SUPABASE_DB_URL` מקומי |
+| **Integration / RLS** | Active (מקומי, `npm run integration`) | **233/233 מול Supabase** (8 קבצים, 32 טבלאות, 9 תחומי store), 2026-09-15; לא חלק מ־`verify` — דורש `SUPABASE_DB_URL` מקומי |
+| **Production path (live)** | Active (מקומי, `npm run validate:production-path`) | **13/13** דרך Supabase Auth + PostgREST, 2026-09-15 |
 | **Fail-closed + readiness** | Active | **9/9** |
 | E2E / axe אוטומטי | Defined, לא פעיל | Playwright לא מותקן; ביקורת מבנית הורצה במקום ומוצהרת ככזו |
 
@@ -74,7 +75,7 @@
 | 1 | דרישות ב־`04`, `05`, `07`, `08`, `11` ללא תוויות מזהה | traceability חלקי מחוץ ל־46 המזהים הרשומים | כל milestone רושם מזהים למה שהוא מממש — `ADR-0004` |
 | 2 | `UX-DEBT-001` אינו מוקצה | אין | המזהה שמור |
 | 3 | CI ירוק ב־GitHub Actions על `main` ועל `production-data-layer`; בדיקות האינטגרציה מול המסד אינן ב־CI | RLS מוכח מקומית בלבד | סוד DB ל־CI — החלטה לפני שילוב |
-| 11 | `apps/web/.env.local`: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` אינו במבנה `sb_publishable_…` | הריצה החיה (`validate:production-path`) לא רצה | להציב את המפתח מ־Project Settings → API Keys |
+| 11 | אין UI לעריכת שם הפרופיל של מוזמן (השם נגזר מהאימייל בהצטרפות) | קוסמטי | מסך פרופיל — milestone הבא |
 | 4 | axe ומקלדת אוטומטיים לא הורצו | `UX-A11Y-001` חלקי | ביקורת מבנית על 17 מסלולים × 4 רוחבים הורצה; axe דורש Playwright |
 | 5 | גופני Assistant/Heebo לא מוטמעים | טקסט עברי נופל לגופן מערכת | milestone עיצוב; קשור ל־`ADR-0026` |
 | 6 | `.nvmrc` נועל Node 24.18.1; המכונה מריצה 24.19.0 | CI ירוץ על גרסה אחרת מהמקומית | נדרשת החלטה; לא שונה בלי ADR |

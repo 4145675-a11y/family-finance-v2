@@ -367,7 +367,9 @@ describe('the production path', () => {
     expect(home.status === 200 || (home.location ?? '').includes('/setup')).toBe(true);
     const setup = await page('/setup', alice);
     expect(setup.status).toBe(200);
-    expect(setup.html).toContain('שם משק הבית');
+    // The creation form: its two fields, and nothing of a household that does not exist.
+    expect(setup.html).toContain('name="householdName"');
+    expect(setup.html).toContain('name="profileName"');
   });
 
   test('bootstrap: create the household, an account, a transaction', async () => {
@@ -416,12 +418,16 @@ describe('the production path', () => {
   test('the rendered dashboard and account screens show the household', async () => {
     const home = await page('/', alice);
     expect(home.status).toBe(200);
-    expect(home.html).toContain('משפחת בדיקה');
+    // The dashboard shows figures, not the household's name: the safe-until
+    // caption only exists when the engine had a real household to compute.
+    expect(home.html).toContain('עד ');
+    expect(home.html).not.toContain('עוד לא הוקם');
     const accounts = await page('/accounts', alice);
     expect(accounts.status).toBe(200);
     expect(accounts.html).toContain('עו״ש בדיקה');
     const setup = await page('/setup', alice);
-    expect(setup.html).toContain('הזמנת');
+    // With a household, the members card offers an invitation by email.
+    expect(setup.html).toContain('יצירת הזמנה');
   });
 
   test('import: stage, review, approve — through the production transport', async () => {
@@ -561,7 +567,7 @@ describe('the production path', () => {
       ['/debts', 'גמ״ח בדיקה'],
       ['/gemach', 'גמ״ח בדיקה'],
       ['/tasks', 'משימת בדיקה'],
-      ['/reports', 'משפחת בדיקה'],
+      ['/reports', 'לשמור עותק'],
       ['/activity', 'נרשמה'],
     ] as const) {
       const rendered = await page(path, alice);
@@ -588,7 +594,10 @@ describe('the production path', () => {
     expect(joined).toBe(householdA);
     const bobHome = await page('/', bob);
     expect(bobHome.status).toBe(200);
-    expect(bobHome.html).toContain('משפחת בדיקה');
+    expect(bobHome.html).not.toContain('עוד לא הוקם');
+    // The same household: Bob's account screen lists Alice's account.
+    const bobAccounts = await page('/accounts', bob);
+    expect(bobAccounts.html).toContain('עו״ש בדיקה');
   });
 
   test('isolation: Carol’s household never sees Alice’s, on screen or through the transport', async () => {
