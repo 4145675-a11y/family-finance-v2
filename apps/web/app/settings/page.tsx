@@ -6,6 +6,7 @@ import { Card, Notice } from '../../components/ui';
 import { screens } from '../../lib/copy/screens';
 import { toAmountInput } from '../../lib/format';
 import { loadDashboardView } from '../../lib/dashboard/load';
+import { accountScreen } from '../../lib/copy/security';
 import { dataDirectory } from '../../lib/store/server';
 
 /**
@@ -114,7 +115,7 @@ export default async function SettingsPage() {
       <Card title={screens.settings.dataTitle}>
         <p className="text-text-secondary">{screens.settings.dataLocationHint}</p>
         <p className="mt-2 rounded-control bg-surface-muted p-3 text-small">
-          <bdi dir="ltr">{dataDirectory()}</bdi>
+          <bdi dir="ltr">{dataDirectory() ?? accountScreen.storedInDatabase}</bdi>
         </p>
         <div className="mt-4">
           <Notice tone="primary">{screens.setup.privacyBody}</Notice>

@@ -1,5 +1,11 @@
 import { cell, writeWorkbook, type WriteSheet } from '@family-finance/document-import';
-import { balanceOf, isRealTransaction } from '@family-finance/local-store';
+import {
+  balanceOf,
+  backupFileName,
+  createBackup,
+  isRealTransaction,
+  serialiseBackup,
+} from '@family-finance/local-store';
 
 import { assertRecentlyVerified } from '../../../../lib/auth/session';
 import { authScreen } from '../../../../lib/copy/security';
@@ -76,6 +82,20 @@ export async function GET(
 
   const { document, snapshot } = view;
   const stamp = view.asOf.slice(0, 10);
+
+  if (kind === 'backup.json') {
+    // The same envelope the backup screen writes to disk under the file
+    // backend, handed to the browser instead. Nothing is kept on the server.
+    const now = view.asOf;
+    const body = serialiseBackup(createBackup(document, now));
+    return new Response(body, {
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'content-disposition': `attachment; filename="${backupFileName(now)}"`,
+        'cache-control': 'no-store',
+      },
+    });
+  }
 
   if (kind === 'transactions.csv') {
     const accountName = (accountId: string): string =>

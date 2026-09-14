@@ -2,7 +2,10 @@ import 'server-only';
 
 import { redirect } from 'next/navigation';
 
+import { activeBackend } from './backend';
+import { AuthError } from './model';
 import { assertUnlockedSession, sessionContext } from './session';
+import { currentUser } from './supabase';
 
 /**
  * The two ways the lock is enforced, and why there are two.
@@ -25,6 +28,12 @@ import { assertUnlockedSession, sessionContext } from './session';
 
 /** Handed to the household store. Throws when the application is locked. */
 export async function assertUnlocked(): Promise<void> {
+  if (activeBackend() === 'supabase') {
+    if ((await currentUser()) === null) {
+      throw new AuthError('not_signed_in', 'no signed-in person');
+    }
+    return;
+  }
   await assertUnlockedSession();
 }
 
@@ -36,6 +45,12 @@ export async function assertUnlocked(): Promise<void> {
  * swallows errors.
  */
 export async function requireUnlocked(): Promise<void> {
+  // With the database as the backend the door is Supabase Auth: no session, no
+  // household, and the only honest screen is the sign-in one.
+  if (activeBackend() === 'supabase') {
+    if ((await currentUser()) === null) redirect('/login');
+    return;
+  }
   const context = await sessionContext();
   if (!context.locked) return;
   if (context.session !== null) return;

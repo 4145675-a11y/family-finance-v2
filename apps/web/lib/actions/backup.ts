@@ -59,7 +59,7 @@ export async function createBackupAction(
     return describe(error);
   }
 
-  const store = householdStore();
+  const store = await householdStore();
 
   try {
     const document = await store.readDocument();
@@ -94,7 +94,7 @@ export async function previewRestoreAction(
   }
 
   const text = await file.text();
-  const store = householdStore();
+  const store = await householdStore();
   const current = await store.readDocumentOrNull();
 
   try {
@@ -157,7 +157,7 @@ export async function applyRestoreAction(
     return describe(error);
   }
 
-  const store = householdStore();
+  const store = await householdStore();
 
   try {
     const current = await store.readDocumentOrNull();

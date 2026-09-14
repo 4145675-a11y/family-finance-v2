@@ -63,6 +63,9 @@ export interface CreateHouseholdInput {
 }
 
 export class HouseholdStore {
+  /** Which backend stands behind the door. The file, here. */
+  readonly backend = 'local_json' as const;
+
   private readonly files: FileStore;
   private readonly guard: StoreGuard | null;
 

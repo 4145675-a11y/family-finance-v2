@@ -1,4 +1,4 @@
-import { deploymentProblems, readDeploymentConfig } from '../../../lib/config/deployment';
+import { healthReport } from '../../../lib/health';
 
 /**
  * Is this deployment alive and configured?
@@ -14,42 +14,22 @@ import { deploymentProblems, readDeploymentConfig } from '../../../lib/config/de
  *   - **never** a stack trace or a library version, which only helps somebody
  *     deciding what to try next.
  *
- * What it does say is whether the process considers itself correctly configured.
+ * What it does say is whether the process considers itself correctly configured,
+ * and — for the database backend — whether the data layer behind it can be
+ * used: configuration present, database reachable, schema compatible, the
+ * authenticated path available, and an overall readiness (PROD-HEALTH-002).
  * A misconfigured deployment reports `misconfigured` with the *names* of the
  * settings at fault and never their values — enough for the person deploying to
- * fix it, useless to anybody else.
+ * fix it, useless to anybody else. See lib/health.ts for how the probe works
+ * without a session and without exposing anything.
  */
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(): Promise<Response> {
-  const problems = deploymentProblems();
-
-  if (problems.length > 0) {
-    return Response.json(
-      {
-        status: 'misconfigured',
-        // Variable names only. `deploymentProblems` never includes a value.
-        problems,
-      },
-      {
-        status: 503,
-        headers: { 'cache-control': 'no-store' },
-      },
-    );
-  }
-
-  const config = readDeploymentConfig();
-
-  return Response.json(
-    {
-      status: 'ok',
-      // Deliberately coarse. Enough to confirm the right build is running with
-      // the right backend, and nothing that describes a household.
-      backend: config.backend,
-      environment: config.nodeEnv,
-      aiEnabled: config.aiEnabled,
-    },
-    { headers: { 'cache-control': 'no-store' } },
-  );
+  const { report, httpStatus } = await healthReport();
+  return Response.json(report, {
+    status: httpStatus,
+    headers: { 'cache-control': 'no-store' },
+  });
 }

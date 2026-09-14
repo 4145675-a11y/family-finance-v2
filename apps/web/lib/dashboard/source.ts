@@ -21,7 +21,7 @@ import type { BudgetInput, EngineInput, FoodWeekInput } from '@family-finance/fi
  * matter what the environment says.
  */
 
-export type DataSourceKind = 'none' | 'local_store' | 'development_fixture';
+export type DataSourceKind = 'none' | 'local_store' | 'supabase' | 'development_fixture';
 
 export interface DataSourceDescriptor {
   readonly kind: DataSourceKind;
@@ -45,6 +45,13 @@ export interface EnvironmentFacts {
    * a file on disk from being served as a family's money.
    */
   readonly backend?: 'local_json' | 'supabase' | undefined;
+  /**
+   * With the database backend: whether the request carries a signed-in person
+   * and whether that person has a household. Both are decided by the
+   * application from the session, never assumed. Absent means "no".
+   */
+  readonly authenticated?: boolean | undefined;
+  readonly hasSupabaseHousehold?: boolean | undefined;
 }
 
 export const DEV_DATA_FLAG = 'NEXT_PUBLIC_DEV_DATA_SOURCE';
@@ -66,12 +73,40 @@ export function resolveDataSource(env: EnvironmentFacts): DataSourceDescriptor {
    * the second lock on the same door, for the case where the process was started
    * before the configuration changed under it.
    */
-  if (env.backend === 'supabase' && env.hasLocalStore) {
+  if (env.backend === 'supabase') {
+    // A file on disk is never the answer; neither is the fixture. The only
+    // real source is the database, as a signed-in person with a household —
+    // and anything short of that is 'none', with the reason named
+    // (PROD-PARTIAL-FAILCLOSED-001).
+    if (env.hasLocalStore) {
+      return {
+        kind: 'none',
+        label: 'אין מקור נתונים',
+        isRealData: false,
+        reason: 'ההתקנה הזו מוגדרת לעבוד מול מסד הנתונים, ולכן קובץ מקומי לא ישמש כמקור אמת.',
+      };
+    }
+    if (env.authenticated !== true) {
+      return {
+        kind: 'none',
+        label: 'אין מקור נתונים',
+        isRealData: false,
+        reason: 'צריך להיכנס לחשבון כדי לראות את הנתונים של משק הבית.',
+      };
+    }
+    if (env.hasSupabaseHousehold !== true) {
+      return {
+        kind: 'none',
+        label: 'אין מקור נתונים',
+        isRealData: false,
+        reason: 'עוד לא הוקם משק בית לחשבון הזה. אפשר להתחיל בהגדרה, או להצטרף דרך הזמנה.',
+      };
+    }
     return {
-      kind: 'none',
-      label: 'אין מקור נתונים',
-      isRealData: false,
-      reason: 'ההתקנה הזו מוגדרת לעבוד מול מסד הנתונים, ולכן קובץ מקומי לא ישמש כמקור אמת.',
+      kind: 'supabase',
+      label: 'הנתונים שלכם',
+      isRealData: true,
+      reason: 'המספרים כאן מגיעים ממה שהזנתם ואישרתם, ונשמרים במסד הנתונים של משק הבית.',
     };
   }
 
@@ -112,8 +147,16 @@ export function resolveDataSource(env: EnvironmentFacts): DataSourceDescriptor {
 }
 
 /** Reads the current process environment. Kept apart so the rule above is testable. */
-export function currentEnvironment(hasLocalStore: boolean): EnvironmentFacts {
+export function currentEnvironment(
+  hasLocalStore: boolean,
+  session: { authenticated: boolean; hasSupabaseHousehold: boolean } = {
+    authenticated: false,
+    hasSupabaseHousehold: false,
+  },
+): EnvironmentFacts {
   return {
+    authenticated: session.authenticated,
+    hasSupabaseHousehold: session.hasSupabaseHousehold,
     nodeEnv: process.env.NODE_ENV,
     // Referenced as a complete literal: Next only inlines NEXT_PUBLIC_* when it
     // can see the whole expression at build time.

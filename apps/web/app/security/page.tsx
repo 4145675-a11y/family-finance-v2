@@ -7,6 +7,9 @@ import {
   turnOffLockAction,
   updateLockSettingsAction,
 } from '../../lib/actions/passkeys';
+import { redirect } from 'next/navigation';
+
+import { activeBackend } from '../../lib/auth/backend';
 import { configuredAuthOrigin } from '../../lib/auth/origin';
 import { sessionContext } from '../../lib/auth/session';
 import { authFilePath } from '../../lib/auth/store';
@@ -31,6 +34,9 @@ import { formatDateTime } from '../../lib/format';
 export const dynamic = 'force-dynamic';
 
 export default async function SecurityPage() {
+  // Passkeys and the local lock belong to the file backend. With the database
+  // the door is the account, and that screen is /account.
+  if (activeBackend() === 'supabase') redirect('/account');
   const context = await sessionContext();
   const origin = configuredAuthOrigin();
   const state = context.state;

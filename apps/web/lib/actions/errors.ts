@@ -1,3 +1,4 @@
+import { PersistenceError } from '@family-finance/household-store';
 import { CommandError } from '@family-finance/local-store';
 import { revalidatePath } from 'next/cache';
 
@@ -55,6 +56,12 @@ export function describe(error: unknown): FormState {
   if (error instanceof CommandError) {
     return failed(MESSAGES[error.code] ?? 'לא הצלחנו לשמור את השינוי.');
   }
+  // The database refused, or cannot do this. The code is the whole story the
+  // screen gets; the database's own message stays on the server.
+  if (error instanceof PersistenceError) {
+    return failed(PERSISTENCE_MESSAGES[error.code]);
+  }
+
   if (error instanceof Error && error.name === 'StoreNotInitialisedError') {
     return failed('עוד לא הוקם משק בית. אפשר להתחיל בהגדרה.');
   }
@@ -71,6 +78,16 @@ export function describe(error: unknown): FormState {
  * home screen keeps showing the old picture, which is exactly the quiet staleness
  * this product exists to avoid.
  */
+const PERSISTENCE_MESSAGES: Readonly<Record<PersistenceError['code'], string>> = {
+  not_authenticated: 'צריך להיכנס לחשבון כדי להמשיך.',
+  not_a_member: 'החשבון הזה אינו חבר במשק הבית הזה.',
+  permission_denied: 'הפעולה הזו לא מותרת בחשבון הזה.',
+  unsupported_in_backend: 'הפעולה הזו לא זמינה כשהנתונים נשמרים במסד הנתונים.',
+  invalid_document: 'הנתונים שנשמרו לא נקראו כמו שצריך. כדאי לרענן ולנסות שוב.',
+  invitation_invalid: 'ההזמנה הזו לא תקפה יותר. אפשר לבקש הזמנה חדשה.',
+  unavailable: 'מסד הנתונים לא זמין כרגע. אפשר לנסות שוב בעוד רגע.',
+};
+
 const MONEY_PATHS = [
   '/',
   '/accounts',

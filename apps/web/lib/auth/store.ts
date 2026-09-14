@@ -6,6 +6,7 @@ import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { resolveStorePaths, type StorePaths } from '@family-finance/local-store';
 
 import { findProjectRoot } from '../project-root';
+import { activeBackend } from './backend';
 import { configuredAuthOrigin } from './origin';
 import { AuthError, authStateSchema, emptyAuthState, type AuthState } from './model';
 
@@ -37,6 +38,17 @@ let cachedPaths: StorePaths | null = null;
  * the same directory from the same function, which is the one fact they share.
  */
 function paths(): StorePaths {
+  // The one place the authentication file's path is resolved, and therefore
+  // the one place to refuse it. A process serving the database backend has no
+  // local sessions, no local passkeys and no business opening this file — and
+  // a page that forgot to branch on the backend fails here, closed, rather than
+  // quietly reading a file that means nothing to it (ADR-0032 §6).
+  if (activeBackend() === 'supabase') {
+    throw new AuthError(
+      'unsupported_backend',
+      'the local authentication file is not used with the database backend',
+    );
+  }
   if (cachedPaths === null) cachedPaths = resolveStorePaths(findProjectRoot());
   return cachedPaths;
 }

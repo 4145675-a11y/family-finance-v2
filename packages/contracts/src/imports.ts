@@ -373,10 +373,18 @@ export const importBatchSchema = z
     message: 'a failed batch states why, and only a failed batch carries a reason',
     path: ['failureCode'],
   })
-  .refine((batch) => (batch.status === 'approved') === (batch.approvedAt !== null), {
-    message: 'an approved batch records when it was approved',
-    path: ['approvedAt'],
-  })
+  // A reversed batch was approved first and keeps that record: reversal is a
+  // second fact, not the erasure of the first. Same rule as the database's
+  // import_batches_approved_status constraint.
+  .refine(
+    (batch) =>
+      (batch.approvedAt !== null) ===
+      (batch.status === 'approved' || batch.status === 'reversed'),
+    {
+      message: 'an approved batch records when it was approved, and a reversed one keeps it',
+      path: ['approvedAt'],
+    },
+  )
   .refine((batch) => (batch.status === 'reversed') === (batch.reversedAt !== null), {
     message: 'a reversed batch records when it was reversed',
     path: ['reversedAt'],

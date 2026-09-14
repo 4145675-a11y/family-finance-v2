@@ -1,0 +1,19 @@
+{
+  "name": "@family-finance/household-store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@family-finance/contracts": "*",
+    "@family-finance/finance-engine": "*",
+    "@family-finance/local-store": "*",
+    "@supabase/supabase-js": "2.112.3",
+    "zod": "4.4.3"
+  }
+}

@@ -132,7 +132,7 @@ export async function uploadDocumentAction(
 
   const displayName = sanitiseFileName(file.name);
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const store = householdStore();
+  const store = await householdStore();
 
   // The extension is only used to name the stored copy; what the file *is* was
   // decided from its bytes inside `extractDocument`.
@@ -232,7 +232,9 @@ export async function reviewRowAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       reviewProposal(
         document,
         {
@@ -278,7 +280,9 @@ export async function matchCheckAction(
   }
 
   try {
-    await householdStore().run((document, context) =>
+    await (
+      await householdStore()
+    ).run((document, context) =>
       reviewProposal(document, { proposalId, targetCheckId: checkId }, context),
     );
   } catch (error) {
@@ -330,7 +334,9 @@ export async function correctRowAction(
   }
 
   try {
-    await householdStore().run((document, context) => {
+    await (
+      await householdStore()
+    ).run((document, context) => {
       const existing = document.importProposals.find(
         (candidate) => candidate.id === proposalId,
       );
@@ -387,7 +393,9 @@ export async function reviewAllAction(
 
   let touched = 0;
   try {
-    touched = await householdStore().run((document, context) =>
+    touched = await (
+      await householdStore()
+    ).run((document, context) =>
       reviewAll(document, { batchId, reviewState, onlyPending }, context),
     );
   } catch (error) {
@@ -408,7 +416,7 @@ export async function approveBatchAction(
   const batchId = reader.id('batchId', 'יבוא', { required: true });
   if (!reader.ok || batchId === null) return failed('לא נבחר יבוא.', reader.errors);
 
-  const store = householdStore();
+  const store = await householdStore();
 
   let created = 0;
   try {
@@ -438,9 +446,9 @@ export async function rejectBatchAction(
   if (!reader.ok || batchId === null) return failed('לא נבחר יבוא.', reader.errors);
 
   try {
-    await householdStore().run((document, context) =>
-      rejectBatch(document, { batchId }, context),
-    );
+    await (
+      await householdStore()
+    ).run((document, context) => rejectBatch(document, { batchId }, context));
   } catch (error) {
     return describe(error);
   }
@@ -465,9 +473,9 @@ export async function reverseBatchAction(
 
   let voided = 0;
   try {
-    const outcome = await householdStore().run((document, context) =>
-      reverseBatch(document, { batchId, reason }, context),
-    );
+    const outcome = await (
+      await householdStore()
+    ).run((document, context) => reverseBatch(document, { batchId, reason }, context));
     voided = outcome.transactionsVoided;
   } catch (error) {
     return describe(error);
@@ -487,7 +495,7 @@ export async function reverseBatchAction(
  * audit needs and is not a copy of the family's statement.
  */
 async function removeStoredFile(batchId: string): Promise<void> {
-  const store = householdStore();
+  const store = await householdStore();
   try {
     const document = await store.readDocument();
     const batch = document.importBatches.find((candidate) => candidate.id === batchId);

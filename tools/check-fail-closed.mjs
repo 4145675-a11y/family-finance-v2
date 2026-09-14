@@ -17,7 +17,9 @@
  *
  *   A. hosted origin + local JSON store -> must exit non-zero, must not listen
  *   B. production + supabase, no URL    -> must exit non-zero, must not listen
- *   C. production + complete config     -> must listen, /api/health must say ok
+ *   C. production + complete config     -> must listen; /api/health must name the
+ *                                          backend and, with no database behind
+ *                                          the placeholder URL, say not_ready
  *
  * Case A is keyed on the origin rather than on NODE_ENV, because that is where
  * the risk actually is. A copy running on the household's own machine at
@@ -108,7 +110,9 @@ async function startServer(env) {
     if (exited) break;
     try {
       const response = await fetch(`http://${HOST}:${PORT}/api/health`, {
-        signal: AbortSignal.timeout(1500),
+        // The health route probes the database (up to a few seconds against a
+        // host that does not exist) before it answers.
+        signal: AbortSignal.timeout(9_000),
       });
       // Any answer at all means it is listening; the body is checked by the caller.
       output += `\n[gate] /api/health -> ${response.status} ${await response.text()}`;
@@ -222,6 +226,23 @@ async function main() {
       'and the health endpoint reveals nothing financial',
       !/household|balance|shekel|₪|transaction|debt/i.test(output.split('[gate]')[1] ?? ''),
       'health response carries no financial vocabulary',
+    );
+
+    // The placeholder URL has no database behind it. A ready answer here would
+    // mean readiness is being assumed rather than checked (PROD-HEALTH-002).
+    const health = output.split('[gate] /api/health -> ')[1] ?? '';
+    record(
+      'and reports the data layer as not ready when the database cannot be reached',
+      health.startsWith('503') &&
+        health.includes('"readiness":"not_ready"') &&
+        health.includes('"database":"unreachable"') &&
+        health.includes('"configuration":"present"'),
+      'health names configuration present, database unreachable, not ready',
+    );
+    record(
+      'without naming the project or host',
+      !health.includes('exampleprojectref') && !health.includes('supabase.co'),
+      'no host or project reference in the health body',
     );
   }
 

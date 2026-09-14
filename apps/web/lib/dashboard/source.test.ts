@@ -128,3 +128,50 @@ describe('loadDashboardSource', () => {
     expect(source.descriptor.isRealData).toBe(false);
   });
 });
+
+describe('the database backend never falls back (PROD-DATASOURCE-001, PROD-PARTIAL-FAILCLOSED-001)', () => {
+  const supabase = (overrides: Partial<Parameters<typeof resolveDataSource>[0]> = {}) =>
+    facts({ backend: 'supabase', nodeEnv: 'production', ...overrides });
+
+  test('a file on disk is refused even when it exists', () => {
+    const source = resolveDataSource(supabase({ hasLocalStore: true, authenticated: true }));
+    expect(source.kind).toBe('none');
+    expect(source.isRealData).toBe(false);
+    expect(source.reason).toContain('קובץ מקומי');
+  });
+
+  test('no session means no source, and says so', () => {
+    const source = resolveDataSource(supabase({ authenticated: false }));
+    expect(source.kind).toBe('none');
+    expect(source.reason).toContain('להיכנס');
+  });
+
+  test('a signed-in person with no household has no source yet', () => {
+    const source = resolveDataSource(
+      supabase({ authenticated: true, hasSupabaseHousehold: false }),
+    );
+    expect(source.kind).toBe('none');
+    expect(source.reason).toContain('משק בית');
+  });
+
+  test('a signed-in member of a household reads real data from the database', () => {
+    const source = resolveDataSource(
+      supabase({ authenticated: true, hasSupabaseHousehold: true }),
+    );
+    expect(source.kind).toBe('supabase');
+    expect(source.isRealData).toBe(true);
+  });
+
+  test('the development fixture is unreachable, whatever the flag says', () => {
+    for (const nodeEnv of ['development', 'test', 'production']) {
+      const source = resolveDataSource(supabase({ nodeEnv, flag: 'on', authenticated: false }));
+      expect(source.kind).toBe('none');
+    }
+  });
+
+  test('the loader hands the screens nothing when the source is none', async () => {
+    const source = await loadDashboardSource(supabase({ flag: 'on', authenticated: true }));
+    expect(source.input).toBeNull();
+    expect(source.descriptor.kind).toBe('none');
+  });
+});

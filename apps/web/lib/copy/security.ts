@@ -14,6 +14,50 @@
  * stolen.
  */
 
+/**
+ * The sign-in screens of the database backend: email and password through
+ * Supabase Auth (ADR-0032). Plain Hebrew, no jargon, and never a hint about
+ * whether an address exists.
+ */
+export const accountScreen = {
+  signInTitle: 'כניסה לחשבון',
+  signInIntro: 'הנתונים של משק הבית שמורים במסד נתונים מאובטח. כדי לראות אותם צריך להיכנס.',
+  email: 'אימייל',
+  password: 'סיסמה',
+  signIn: 'כניסה',
+  signOut: 'יציאה מהחשבון',
+  signedOut: 'יצאתם מהחשבון.',
+  noAccountYet: 'עוד אין לכם חשבון? מי שהקים את משק הבית יכול לשלוח לכם הזמנה.',
+  reauthTitle: 'אישור זהות',
+  reauthIntro: 'הפעולה הזו נוגעת לכל הנתונים שלכם, ולכן מבקשים את הסיסמה שוב.',
+  reauthConfirm: 'אישור והמשך',
+  reauthNeeded: 'צריך להזין את הסיסמה שוב לפני הפעולה הזו.',
+  joinTitle: 'הצטרפות למשק בית',
+  joinIntro: 'קיבלתם הזמנה? הדביקו כאן את קוד ההזמנה כדי להצטרף.',
+  joinCode: 'קוד הזמנה',
+  join: 'הצטרפות',
+  signedInAs: (email: string) => `מחוברים כ־${email}`,
+  inviteTitle: 'הזמנת בן/בת זוג',
+  inviteIntro:
+    'הזינו את האימייל של מי שאתם רוצים לצרף. תקבלו קוד הזמנה חד־פעמי למסירה — הוא תקף לשבוע.',
+  inviteEmail: 'אימייל של המוזמן/ת',
+  invite: 'יצירת הזמנה',
+  inviteCreated: 'ההזמנה נוצרה. הקוד מוצג פעם אחת בלבד — שמרו אותו ומסרו אותו ישירות.',
+  inviteCodeLabel: 'קוד ההזמנה',
+  pendingInvitations: 'הזמנות שנשלחו',
+  invitationAccepted: 'התקבלה',
+  invitationOpen: 'ממתינה',
+  invitationExpired: 'פג תוקפה',
+  invitationRevoked: 'בוטלה',
+  membersTitle: 'חברי משק הבית',
+  storedInDatabase: 'במסד הנתונים של משק הבית (Supabase), לא על המחשב הזה',
+  backupDownload: 'הורדת קובץ גיבוי',
+  backupDownloadIntro:
+    'כשהנתונים נשמרים במסד הנתונים, הגיבוי מורד ישירות למכשיר שלכם ולא נשמר בשרת.',
+  restoreUnavailable:
+    'שחזור מקובץ גיבוי לתוך מסד הנתונים עוד לא נתמך: רשומות כספיות אינן מוחלפות. הגיבוי נשמר אצלכם.',
+} as const;
+
 export const authScreen = {
   /** What the passkey is called inside Windows Hello's own prompt. */
   credentialUserName: 'משק הבית',
@@ -158,6 +202,10 @@ export const authScreen = {
 
   errors: {
     locked: 'צריך להיכנס שוב.',
+    not_signed_in: 'צריך להיכנס לחשבון כדי להמשיך.',
+    unsupported_backend: 'הפעולה הזו שייכת לכניסה המקומית ואינה זמינה כאן.',
+    invalid_credentials: 'האימייל או הסיסמה לא נכונים.',
+    auth_unavailable: 'שירות הכניסה לא זמין כרגע. אפשר לנסות שוב בעוד רגע.',
     session_idle: 'עבר זמן בלי פעילות, אז נעלנו. אפשר להיכנס שוב.',
     reauthentication_required: 'צריך לאשר עם Windows Hello לפני הפעולה הזו.',
     unknown_challenge: 'הבקשה כבר נוצלה או שפג תוקפה. אפשר לנסות שוב.',
