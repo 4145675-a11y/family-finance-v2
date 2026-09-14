@@ -36,7 +36,9 @@
     "db:copy:schema": "node tools/copy-sql.mjs apply-all.sql",
     "auth:reset": "node tools/auth-reset.mjs",
     "verify:m0": "npm run unit && npm run scan:forbidden && npm run check:traceability",
-    "verify": "npm run format:check && npm run typecheck && npm run lint && npm run unit && npm run property && npm run build && npm run check:shell && npm run check:fail-closed && npm run check:client-secrets && npm run check:no-env-files && npm run check:rls-coverage && npm run db:check && npm run scan:forbidden && npm run check:traceability"
+    "verify": "npm run format:check && npm run typecheck && npm run lint && npm run unit && npm run property && npm run build && npm run check:shell && npm run check:fail-closed && npm run check:client-secrets && npm run check:no-env-files && npm run check:rls-coverage && npm run db:check && npm run scan:forbidden && npm run check:traceability",
+    "db:apply": "node tools/apply-migration.mjs",
+    "db:cleanliness": "node tools/db-cleanliness.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

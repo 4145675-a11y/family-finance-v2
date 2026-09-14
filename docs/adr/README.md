@@ -44,3 +44,4 @@
 | [0029](0029-passkeys-live-at-localhost-not-at-an-address.md) | מפתחות הכניסה חיים ב־localhost, לא בכתובת IP | Accepted | 8 |
 | [0030](0030-a-check-is-not-a-payment.md) | צ׳ק שנמסר אינו תשלום | Accepted | 8 |
 | [0031](0031-production-refuses-the-local-store.md) | ייצור מסרב לעלות עם החנות המקומית | Accepted | 9 |
+| [0032](0032-supabase-as-the-production-data-layer.md) | Supabase כשכבת הנתונים של הייצור | Accepted | PDL |

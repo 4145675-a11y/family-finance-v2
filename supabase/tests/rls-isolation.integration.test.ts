@@ -32,177 +32,17 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { Client } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
+import { beforeAll, describe, expect, test } from 'vitest';
 
-const DB_URL = process.env.SUPABASE_DB_URL;
+import {
+  asUser,
+  expectRejection,
+  ownerClient,
+  PERMISSION_DENIED,
+  useHouseholdFixture,
+} from './harness';
 
-if (!DB_URL) {
-  throw new Error(
-    [
-      'SUPABASE_DB_URL is not set, so household isolation cannot be verified.',
-      '',
-      'This suite proves that one family cannot read or modify another family’s',
-      'data. It is not optional and it does not skip.',
-      '',
-      'Provide a connection string locally (never in chat, never committed):',
-      '  1. Supabase Studio → Project Settings → Database → Connection string (URI)',
-      '  2. Put it in .env.integration.local at the repository root:',
-      '       SUPABASE_DB_URL=postgresql://postgres:...@...:5432/postgres',
-      '  3. Run: npm run integration',
-      '',
-      '.env.integration.local is git-ignored.',
-    ].join('\n'),
-  );
-}
-
-/** A person in the fixture: an auth user plus their profile. */
-interface Person {
-  id: string;
-  email: string;
-}
-
-/** Who a statement runs as: a signed-in person, the anonymous role, or the table owner. */
-type Actor = Person | 'anon' | 'owner';
-
-const alice: Person = { id: randomUUID(), email: `alice-${randomUUID()}@example.test` };
-const bob: Person = { id: randomUUID(), email: `bob-${randomUUID()}@example.test` };
-const carol: Person = { id: randomUUID(), email: `carol-${randomUUID()}@example.test` };
-const mallory: Person = { id: randomUUID(), email: `mallory-${randomUUID()}@example.test` };
-
-const householdA = randomUUID();
-const householdB = randomUUID();
-
-/** The one connection. Owner rights, one transaction, rolled back at the end. */
-let admin: Client;
-let transactionOpen = false;
-
-/** Switches the current transaction to act as `actor` until the enclosing savepoint ends. */
-async function impersonate(actor: Actor): Promise<void> {
-  if (actor === 'owner') return;
-  const role = actor === 'anon' ? 'anon' : 'authenticated';
-  const claims =
-    actor === 'anon' ? '' : JSON.stringify({ sub: actor.id, role: 'authenticated' });
-  await admin.query("select set_config('role', $1, true)", [role]);
-  await admin.query("select set_config('request.jwt.claims', $1, true)", [claims]);
-}
-
-/**
- * Returns to the owner. Needed after a released savepoint: a local setting made
- * inside a subtransaction survives its release and would otherwise leak into
- * every later statement of the test.
- */
-async function backToOwner(): Promise<void> {
-  await admin.query("select set_config('role', 'none', true)");
-  await admin.query("select set_config('request.jwt.claims', '', true)");
-}
-
-/**
- * Runs a callback as the given actor inside a savepoint.
- *
- * By default the savepoint is rolled back, so nothing the callback did — not a
- * write, not a failed statement — survives it. With `keep: true` the savepoint
- * is released instead and the writes stay visible for the rest of the test.
- */
-async function asUser<T>(
-  actor: Actor,
-  run: (client: Client) => Promise<T>,
-  { keep = false }: { keep?: boolean } = {},
-): Promise<T> {
-  await admin.query('savepoint impersonation');
-  let result: T;
-  try {
-    await impersonate(actor);
-    result = await run(admin);
-  } catch (error) {
-    await admin.query('rollback to savepoint impersonation');
-    await admin.query('release savepoint impersonation');
-    await backToOwner();
-    throw error;
-  }
-  if (keep) {
-    await admin.query('release savepoint impersonation');
-  } else {
-    await admin.query('rollback to savepoint impersonation');
-    await admin.query('release savepoint impersonation');
-  }
-  await backToOwner();
-  return result;
-}
-
-/** Asserts that a statement is rejected, and returns the error for inspection. */
-async function expectRejection(actor: Actor, sql: string, params: unknown[] = []) {
-  return asUser(actor, async (client) => {
-    try {
-      await client.query(sql, params);
-      return null;
-    } catch (error) {
-      return error as Error & { code?: string };
-    }
-  });
-}
-
-beforeAll(async () => {
-  admin = new Client({ connectionString: DB_URL });
-  await admin.connect();
-  await admin.query('begin');
-  transactionOpen = true;
-
-  for (const person of [alice, bob, carol, mallory]) {
-    await admin.query(
-      `insert into auth.users (id, email, aud, role)
-       values ($1, $2, 'authenticated', 'authenticated')
-       on conflict (id) do nothing`,
-      [person.id, person.email],
-    );
-    await admin.query(
-      `insert into public.profiles (id, display_name)
-       values ($1, $2)
-       on conflict (id) do nothing`,
-      [person.id, person.email.split('@')[0]],
-    );
-  }
-
-  // Household A: Alice and Bob.  Household B: Carol alone.  Mallory: no household.
-  await admin.query(
-    `insert into public.households (id, name, created_by) values ($1, $2, $3)`,
-    [householdA, 'Household A', alice.id],
-  );
-  await admin.query(
-    `insert into public.households (id, name, created_by) values ($1, $2, $3)`,
-    [householdB, 'Household B', carol.id],
-  );
-  await admin.query(
-    `insert into public.household_members (household_id, profile_id) values ($1, $2), ($1, $3), ($4, $5)`,
-    [householdA, alice.id, bob.id, householdB, carol.id],
-  );
-
-  await admin.query(
-    `insert into public.audit_events (household_id, actor_profile_id, action, entity_type)
-     values ($1, $2, 'household.created', 'households'), ($3, $4, 'household.created', 'households')`,
-    [householdA, alice.id, householdB, carol.id],
-  );
-}, 60_000);
-
-afterAll(async () => {
-  if (!admin) return;
-  // The fixture was never committed. Rolling back is the whole teardown, and it
-  // cannot leave anything behind — including when a test failed halfway.
-  if (transactionOpen) await admin.query('rollback');
-  await admin.end();
-}, 60_000);
-
-// Each test starts from the pristine fixture and cannot poison the next one:
-// a statement that fails outside a savepoint would otherwise abort the outer
-// transaction and turn every later test into the same misleading error.
-beforeEach(async () => {
-  await admin.query('savepoint test_case');
-});
-
-afterEach(async () => {
-  await admin.query('rollback to savepoint test_case');
-  await admin.query('release savepoint test_case');
-});
+const { alice, bob, carol, mallory, householdA, householdB } = useHouseholdFixture();
 
 describe('RLS is enabled and forced on every private table', () => {
   test.each([
@@ -212,7 +52,7 @@ describe('RLS is enabled and forced on every private table', () => {
     'household_invitations',
     'audit_events',
   ])('%s has rowsecurity and forcerowsecurity', async (table) => {
-    const { rows } = await admin.query(
+    const { rows } = await ownerClient().query(
       `select relrowsecurity, relforcerowsecurity
        from pg_class where oid = ('public.' || $1)::regclass`,
       [table],
@@ -268,9 +108,10 @@ describe('households: cross-household writes change nothing', () => {
     );
     expect(changed).toBe(0);
 
-    const { rows } = await admin.query('select name from public.households where id = $1', [
-      householdA,
-    ]);
+    const { rows } = await ownerClient().query(
+      'select name from public.households where id = $1',
+      [householdA],
+    );
     expect(rows[0].name).toBe('Household A');
   });
 
@@ -287,7 +128,9 @@ describe('households: cross-household writes change nothing', () => {
     const error = await expectRejection(alice, 'delete from public.households where id = $1', [
       householdA,
     ]);
-    expect(error?.code, 'no DELETE policy exists, so the verb is denied').toBe('42501');
+    expect(error?.code, 'no DELETE policy exists, so the verb is denied').toBe(
+      PERMISSION_DENIED,
+    );
   });
 });
 
@@ -299,9 +142,9 @@ describe('household_members: membership cannot be self-granted', () => {
       [householdA, mallory.id],
     );
     expect(error, 'there is no INSERT policy; joining requires an invitation').not.toBeNull();
-    expect(error?.code).toBe('42501');
+    expect(error?.code).toBe(PERMISSION_DENIED);
 
-    const { rows } = await admin.query(
+    const { rows } = await ownerClient().query(
       'select 1 from public.household_members where household_id = $1 and profile_id = $2',
       [householdA, mallory.id],
     );
@@ -352,7 +195,7 @@ describe('household_members: membership cannot be self-granted', () => {
 
   test('the revoke policy cannot be used to re-activate a membership', async () => {
     // The per-test savepoint undoes this revocation once the test is over.
-    await admin.query(
+    await ownerClient().query(
       `update public.household_members set status = 'revoked', revoked_at = now()
        where household_id = $1 and profile_id = $2`,
       [householdB, carol.id],
@@ -374,7 +217,7 @@ describe('household_members: membership cannot be self-granted', () => {
     });
     expect(changed, 'the update must not reach the revoked row').toBe(0);
 
-    const { rows } = await admin.query(
+    const { rows } = await ownerClient().query(
       'select status from public.household_members where household_id = $1 and profile_id = $2',
       [householdB, carol.id],
     );
@@ -420,7 +263,7 @@ describe('household_invitations: tokens are hashed and single use', () => {
   let invitationId: string;
 
   beforeAll(async () => {
-    const { rows } = await admin.query(
+    const { rows } = await ownerClient().query(
       `insert into public.household_invitations
          (household_id, invited_email, token_hash, created_by, expires_at)
        values ($1, $2, extensions.digest($3, 'sha256'), $4, now() + interval '7 days')
@@ -431,14 +274,14 @@ describe('household_invitations: tokens are hashed and single use', () => {
   });
 
   test('the plaintext token is nowhere in the table', async () => {
-    const { rows } = await admin.query(
+    const { rows } = await ownerClient().query(
       `select count(*)::int as hits from public.household_invitations
        where id = $1 and token_hash = extensions.digest($2, 'sha256')`,
       [invitationId, plaintext],
     );
     expect(rows[0].hits, 'the row is found by hash').toBe(1);
 
-    const { rows: columns } = await admin.query(
+    const { rows: columns } = await ownerClient().query(
       `select column_name from information_schema.columns
        where table_schema = 'public' and table_name = 'household_invitations'`,
     );
@@ -476,7 +319,7 @@ describe('household_invitations: tokens are hashed and single use', () => {
     );
     expect(admitted).toBe(householdA);
 
-    const { rows: members } = await admin.query(
+    const { rows: members } = await ownerClient().query(
       'select status from public.household_members where household_id = $1 and profile_id = $2',
       [householdA, mallory.id],
     );
@@ -494,7 +337,7 @@ describe('household_invitations: tokens are hashed and single use', () => {
 
   test('an expired token is refused', async () => {
     const expired = `expired-${randomUUID()}${randomUUID()}`;
-    await admin.query(
+    await ownerClient().query(
       `insert into public.household_invitations
          (household_id, invited_email, token_hash, created_by, expires_at, created_at)
        values ($1, $2, extensions.digest($3, 'sha256'), $4, now() - interval '1 day', now() - interval '8 days')`,
@@ -510,7 +353,7 @@ describe('household_invitations: tokens are hashed and single use', () => {
 
   test('a revoked token is refused', async () => {
     const revoked = `revoked-${randomUUID()}${randomUUID()}`;
-    await admin.query(
+    await ownerClient().query(
       `insert into public.household_invitations
          (household_id, invited_email, token_hash, created_by, expires_at, revoked_at, revoked_by)
        values ($1, $2, extensions.digest($3, 'sha256'), $4, now() + interval '7 days', now(), $4)`,
@@ -532,7 +375,7 @@ describe('household_invitations: tokens are hashed and single use', () => {
     );
     // EXECUTE is revoked from anon, so the call is refused before the function
     // body runs — the token is never even compared.
-    expect(error?.code, 'anon has no EXECUTE on the function').toBe('42501');
+    expect(error?.code, 'anon has no EXECUTE on the function').toBe(PERMISSION_DENIED);
   });
 });
 
@@ -614,6 +457,126 @@ describe('anon reaches nothing', () => {
   ])('anon cannot select from %s', async (table) => {
     const error = await expectRejection('anon', `select * from public.${table} limit 1`);
     // Not "zero rows" — the grant itself is missing, so the statement is refused.
-    expect(error?.code, `anon must have no SELECT privilege on ${table}`).toBe('42501');
+    expect(error?.code, `anon must have no SELECT privilege on ${table}`).toBe(
+      PERMISSION_DENIED,
+    );
+  });
+});
+
+describe('create_household — the creator becomes the first member (ADR-0032)', () => {
+  test('a person with a profile creates a household and can read it, its settings and its setup', async () => {
+    const created = await asUser(mallory, async (client) => {
+      const { rows } = await client.query<{ id: string }>(
+        `select public.create_household('הבית של מלורי') as id`,
+      );
+      const id = rows[0]?.id ?? '';
+      const visible = await client.query('select name from public.households where id = $1', [
+        id,
+      ]);
+      const settings = await client.query(
+        'select currency from public.household_settings where household_id = $1',
+        [id],
+      );
+      const setup = await client.query(
+        'select household_named from public.setup_progress where household_id = $1',
+        [id],
+      );
+      const member = await client.query(
+        'select status from public.household_members where household_id = $1 and profile_id = $2',
+        [id, mallory.id],
+      );
+      const audit = await client.query(
+        `select action from public.audit_events where household_id = $1 and action = 'household.created'`,
+        [id],
+      );
+      return {
+        visible: visible.rows,
+        settings: settings.rows,
+        setup: setup.rows,
+        member: member.rows,
+        audit: audit.rows,
+      };
+    });
+    expect(created.visible).toEqual([{ name: 'הבית של מלורי' }]);
+    expect(created.settings).toEqual([{ currency: 'ILS' }]);
+    expect(created.setup).toEqual([{ household_named: true }]);
+    expect(created.member).toEqual([{ status: 'active' }]);
+    expect(created.audit).toHaveLength(1);
+  });
+
+  test('a person without a profile must name themselves; then the profile is created too', async () => {
+    const fresh = randomUUID();
+    await ownerClient().query(
+      `insert into auth.users (id, email, aud, role) values ($1, $2, 'authenticated', 'authenticated')`,
+      [fresh, `fresh-${fresh}@example.test`],
+    );
+    const nameless = await expectRejection(
+      { id: fresh, email: '' },
+      `select public.create_household('בית')`,
+    );
+    expect(nameless?.message).toMatch(/display name is required/);
+
+    // Two statements: the function's writes are visible only to a later one.
+    const profile = await asUser({ id: fresh, email: '' }, async (client) => {
+      await client.query(`select public.create_household('בית', 'דנה')`);
+      return (
+        await client.query<{ display_name: string }>(
+          'select display_name from public.profiles where id = $1',
+          [fresh],
+        )
+      ).rows;
+    });
+    expect(profile).toEqual([{ display_name: 'דנה' }]);
+  });
+
+  test('an unauthenticated caller cannot create a household', async () => {
+    const error = await expectRejection('anon', `select public.create_household('x')`);
+    expect(error?.code).toBe(PERMISSION_DENIED);
+  });
+});
+
+describe('create_household_invitation — a token minted once, under the member’s own policy', () => {
+  test('a member mints a token that admits the invitee exactly once', async () => {
+    const token = await asUser(
+      alice,
+      async (client) =>
+        (
+          await client.query<{ t: string }>(
+            `select public.create_household_invitation($1, 'mallory@example.test') as t`,
+            [householdA],
+          )
+        ).rows[0]?.t ?? '',
+      { keep: true },
+    );
+    expect(token).toMatch(/^[0-9a-f]{64}$/);
+
+    const admitted = await asUser(
+      mallory,
+      async (client) =>
+        (
+          await client.query<{ hid: string }>(
+            'select public.accept_household_invitation($1) as hid',
+            [token],
+          )
+        ).rows[0]?.hid,
+      { keep: true },
+    );
+    expect(admitted).toBe(householdA);
+
+    const replay = await expectRejection(
+      carol,
+      'select public.accept_household_invitation($1)',
+      [token],
+    );
+    expect(replay?.message).toMatch(/already accepted/);
+  });
+
+  test('a non-member cannot invite anyone into a household', async () => {
+    const error = await expectRejection(
+      carol,
+      `select public.create_household_invitation($1, 'x@example.test')`,
+      [householdA],
+    );
+    expect(error?.code).toBe(PERMISSION_DENIED);
   });
 });
