@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { sessionCookieOptions } from './lib/auth/cookies';
+
 /**
  * Keeps the Supabase session alive between requests.
  *
@@ -31,6 +33,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(url, key, {
+    cookieOptions: sessionCookieOptions(process.env.FAMILY_FINANCE_APP_ORIGIN),
     cookies: {
       getAll() {
         return request.cookies.getAll();

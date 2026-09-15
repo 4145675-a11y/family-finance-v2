@@ -69,6 +69,16 @@ export interface DeploymentConfig {
   readonly aiEnabled: boolean;
   /** True when the development fixture may be offered. Never in production. */
   readonly fixtureAllowed: boolean;
+  /**
+   * Whether session cookies must carry the Secure attribute: true on any https
+   * origin, false only for http://localhost. A production origin is always https.
+   */
+  readonly secureCookies: boolean;
+  /**
+   * The Supabase project this deployment talks to, taken from the URL's host.
+   * Present only with the database backend. Compared, never printed.
+   */
+  readonly supabaseProjectRef: string | null;
 }
 
 /**
@@ -92,6 +102,28 @@ export interface RawEnvironment {
 }
 
 const backendSchema = z.enum(['local_json', 'supabase']);
+
+/**
+ * A Supabase project URL is exactly `https://<ref>.supabase.co`: twenty lowercase
+ * letters, no path, no port. Anything else is a typo, a copied dashboard link,
+ * or a different service — and a wrong project is a wrong database.
+ */
+const SUPABASE_HOST = /^([a-z]{20})\.supabase\.co$/;
+
+export function supabaseProjectRefOf(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' || parsed.pathname !== '/' || parsed.search !== '') {
+    return null;
+  }
+  if (parsed.port !== '' || parsed.username !== '' || parsed.password !== '') return null;
+  const match = SUPABASE_HOST.exec(parsed.hostname);
+  return match?.[1] ?? null;
+}
 
 /** The one literal that turns a boolean environment flag on. Anything else is off. */
 const ON = 'on';
@@ -128,6 +160,8 @@ interface ParsedOrigin {
   readonly secure: boolean;
   readonly loopback: boolean;
   readonly ipAddress: boolean;
+  /** The value carried more than an origin: a path, a query, a fragment or credentials. */
+  readonly decorated: boolean;
 }
 
 function parseOrigin(candidate: string): ParsedOrigin | null {
@@ -137,9 +171,16 @@ function parseOrigin(candidate: string): ParsedOrigin | null {
   } catch {
     return null;
   }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
   return {
     origin: url.origin,
     rpId: url.hostname,
+    decorated:
+      url.pathname !== '/' ||
+      url.search !== '' ||
+      url.hash !== '' ||
+      url.username !== '' ||
+      url.password !== '',
     // `http://localhost` is a secure context; nothing else over http is.
     secure:
       url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost'),
@@ -207,15 +248,46 @@ export function readDeploymentConfig(env: RawEnvironment = process.env): Deploym
   }
 
   // --- the origin the family reaches --------------------------------------
-  const originValue =
-    env.FAMILY_FINANCE_APP_ORIGIN?.trim() ||
-    env.FAMILY_FINANCE_AUTH_ORIGIN?.trim() ||
-    'http://localhost:3100';
+  const statedOrigin =
+    env.FAMILY_FINANCE_APP_ORIGIN?.trim() || env.FAMILY_FINANCE_AUTH_ORIGIN?.trim() || '';
+  const originValue = statedOrigin || 'http://localhost:3100';
   const origin = parseOrigin(originValue);
+
+  // The localhost default is for a developer's machine. A production process on
+  // the database backend is a hosted one, and it must say where the family
+  // reaches it: cookie security and every auth redirect are derived from the
+  // origin, and "localhost" on a server would silently give the wrong answer
+  // to both (PROD-ORIGIN-001).
+  if (isProduction && backend === 'supabase' && statedOrigin === '') {
+    problems.push(
+      'FAMILY_FINANCE_APP_ORIGIN is not set. A hosted deployment must state the https origin the family reaches — it decides cookie security and where auth links return to.',
+    );
+  }
 
   if (origin === null) {
     problems.push(`FAMILY_FINANCE_APP_ORIGIN is not a usable URL: "${originValue}".`);
   } else {
+    if (origin.decorated) {
+      problems.push(
+        'FAMILY_FINANCE_APP_ORIGIN must be an origin only — scheme, host and port — with no path, query, fragment or credentials.',
+      );
+    }
+    if (/.supabase.co$/.test(origin.rpId)) {
+      problems.push(
+        'FAMILY_FINANCE_APP_ORIGIN names a Supabase host. The application origin is where the family reaches this server, never the database.',
+      );
+    }
+    const authOriginValue = env.FAMILY_FINANCE_AUTH_ORIGIN?.trim();
+    if (
+      authOriginValue !== undefined &&
+      authOriginValue !== '' &&
+      env.FAMILY_FINANCE_APP_ORIGIN?.trim() &&
+      parseOrigin(authOriginValue)?.origin !== origin.origin
+    ) {
+      problems.push(
+        'FAMILY_FINANCE_AUTH_ORIGIN and FAMILY_FINANCE_APP_ORIGIN disagree. A deployment has one origin; set one of them, or set both to the same value.',
+      );
+    }
     if (!origin.secure) {
       problems.push(
         `the application origin ${origin.origin} is not a secure context, so passkeys cannot work there. Use https, or http://localhost for development.`,
@@ -259,6 +331,10 @@ export function readDeploymentConfig(env: RawEnvironment = process.env): Deploym
       problems.push('NEXT_PUBLIC_SUPABASE_URL is required when the backend is supabase.');
     } else if (!env.NEXT_PUBLIC_SUPABASE_URL.startsWith('https://')) {
       problems.push('NEXT_PUBLIC_SUPABASE_URL must be https.');
+    } else if (supabaseProjectRefOf(env.NEXT_PUBLIC_SUPABASE_URL) === null) {
+      problems.push(
+        'NEXT_PUBLIC_SUPABASE_URL must be the project URL exactly: https://<project-ref>.supabase.co with no path or port. Copy it from Project Settings → API.',
+      );
     }
 
     const key = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -304,6 +380,9 @@ export function readDeploymentConfig(env: RawEnvironment = process.env): Deploym
     // The fixture is a development convenience and is unreachable in production
     // no matter what the environment says (ADR-0017).
     fixtureAllowed: !isProduction && env.NEXT_PUBLIC_DEV_DATA_SOURCE?.trim() === ON,
+    secureCookies: origin?.origin.startsWith('https://') ?? true,
+    supabaseProjectRef:
+      backend === 'supabase' ? supabaseProjectRefOf(env.NEXT_PUBLIC_SUPABASE_URL ?? '') : null,
   };
 }
 

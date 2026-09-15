@@ -23,6 +23,12 @@ import { deploymentProblems, readDeploymentConfig } from './config/deployment';
  */
 export interface DataLayerHealth {
   readonly configuration: 'present' | 'missing';
+  /**
+   * Whether the publishable key was accepted by the project the URL names. A
+   * key from another project is refused by the gateway before any SQL runs —
+   * the "wrong project" a deployment must never quietly talk to.
+   */
+  readonly credentials: 'accepted' | 'rejected' | 'unknown' | 'not_applicable';
   readonly authenticatedDataSource: 'available' | 'unavailable' | 'not_applicable';
   readonly database: 'reachable' | 'unreachable' | 'not_applicable';
   readonly schema: 'compatible' | 'incompatible' | 'unknown' | 'not_applicable';
@@ -48,7 +54,7 @@ const REQUIRED_FUNCTIONS = ['load_household_document', 'apply_household_changes'
 
 export type Probe = (
   fn: (typeof REQUIRED_FUNCTIONS)[number],
-) => Promise<'denied' | 'missing' | 'unreachable'>;
+) => Promise<'denied' | 'missing' | 'rejected' | 'unreachable'>;
 
 /** Probes through PostgREST as anon. Exported for the route; replaceable for tests. */
 export function postgrestProbe(url: string, publishableKey: string): Probe {
@@ -69,6 +75,9 @@ export function postgrestProbe(url: string, publishableKey: string): Probe {
       if (error === null) return 'denied'; // cannot happen for anon; treated as answered
       if (error.code === '42501' || error.code === '28000') return 'denied';
       if (error.code === 'PGRST202') return 'missing';
+      // The gateway answered instead of the database: this key does not belong
+      // to the project the URL names.
+      if (/invalid api key|api key/i.test(error.message ?? '')) return 'rejected';
       // PostgREST answered with something else (e.g. 401 on the API key):
       // the database is not usable as configured.
       return 'unreachable';
@@ -86,6 +95,7 @@ export async function dataLayerHealth(
   if (config.backend !== 'supabase') {
     return {
       configuration: 'present',
+      credentials: 'not_applicable',
       authenticatedDataSource: 'not_applicable',
       database: 'not_applicable',
       schema: 'not_applicable',
@@ -98,6 +108,7 @@ export async function dataLayerHealth(
   if (url === '' || key === '') {
     return {
       configuration: 'missing',
+      credentials: 'unknown',
       authenticatedDataSource: 'unavailable',
       database: 'unreachable',
       schema: 'unknown',
@@ -107,13 +118,17 @@ export async function dataLayerHealth(
 
   const outcomes = await Promise.all(REQUIRED_FUNCTIONS.map((fn) => probe(fn)));
   const unreachable = outcomes.some((o) => o === 'unreachable');
+  const rejected = outcomes.some((o) => o === 'rejected');
   const missing = outcomes.some((o) => o === 'missing');
   const database = unreachable ? 'unreachable' : 'reachable';
-  const schema = unreachable ? 'unknown' : missing ? 'incompatible' : 'compatible';
-  const available = database === 'reachable' && schema === 'compatible';
+  const credentials = unreachable ? 'unknown' : rejected ? 'rejected' : 'accepted';
+  const schema = unreachable || rejected ? 'unknown' : missing ? 'incompatible' : 'compatible';
+  const available =
+    database === 'reachable' && credentials === 'accepted' && schema === 'compatible';
 
   return {
     configuration: 'present',
+    credentials,
     authenticatedDataSource: available ? 'available' : 'unavailable',
     database,
     schema,
@@ -135,6 +150,7 @@ export async function healthReport(
         problems,
         data: {
           configuration: 'missing',
+          credentials: 'unknown',
           authenticatedDataSource: 'unavailable',
           database: 'unreachable',
           schema: 'unknown',
