@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     '@family-finance/design-system',
     '@family-finance/contracts',
     '@family-finance/finance-engine',
+    '@family-finance/household-store',
     '@family-finance/document-import',
     '@family-finance/local-store',
     '@family-finance/webauthn',

@@ -1,0 +1,59 @@
+# Render Blueprint — the hosting target (ADR-0033).
+#
+# This file describes the service; it does not create it. The owner applies it
+# from the Render dashboard (New → Blueprint) and enters the three `sync: false`
+# values there — by hand, once, into Render's own environment store. Nothing in
+# this file is a secret, and the gate `tools/render-blueprint.test.mjs` refuses a
+# value that looks like one.
+#
+# What "healthy" means here: `/api/health` answers 200 only when the process is
+# configured for the Supabase backend, the database is reachable, the schema is
+# the one this build expects and the publishable key is accepted (PROD-HEALTH-002).
+# A deploy whose health check does not pass never receives traffic — the
+# previous deploy keeps serving. That is the automatic rollback.
+#
+# Runbook: docs/HOSTING-RENDER.md.
+
+services:
+  - type: web
+    name: family-finance-web
+    runtime: node
+    region: frankfurt
+    # `free` is chosen on purpose: the default (`0.5c-512mb`, Starter) costs
+    # money, and spending is the owner's decision (ADR-0033). Free instances
+    # spin down after inactivity; the first request afterwards is slow.
+    plan: free
+    branch: main
+    # Deploy only after GitHub reports the commit's checks as passed — the CI
+    # gates run before Render builds, not instead of it.
+    autoDeployTrigger: checksPass
+    # Same install and build as CI (.github/workflows/ci.yml). Scripts are not
+    # executed at install (ADR-0001); the build runs through tools/next.mjs,
+    # which forces telemetry off.
+    buildCommand: npm ci --ignore-scripts && npm run build
+    # `next start` binds 0.0.0.0 and reads $PORT, which Render sets.
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      # The Node the repository is verified with (.nvmrc). Render reads this
+      # variable to pick the runtime; the blueprint test keeps it equal to .nvmrc.
+      - key: NODE_VERSION
+        value: 24.18.1
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: '1'
+      # A hosted deployment must say which store stands behind the household
+      # door; silence would mean the local file store, which is refused (ADR-0031).
+      - key: FAMILY_FINANCE_DATA_BACKEND
+        value: supabase
+      # The https origin the family reaches — set by the owner once the domain
+      # is known. Redirects and cookie security derive from it (PROD-ORIGIN-001).
+      - key: FAMILY_FINANCE_APP_ORIGIN
+        sync: false
+      # Supabase project URL and publishable key. Public by design, entered in
+      # Render rather than here so that rotation happens in one place.
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
