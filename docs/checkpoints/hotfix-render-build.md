@@ -58,7 +58,7 @@
 | Integration / RLS | `npm run integration` | **PASS** | 233/233, rollback |
 | Production path (live) | `npm run validate:production-path` | **PASS** | 18/18 |
 | DB cleanliness | `npm run db:cleanliness` | **PASS** | households 0 · profiles 0 · `@example.test` 0 · audit 0 · RLS 32/32 · guards 2/2 + 2/2 |
-| CI | GitHub Actions על הענף | **success** — run #14 על `c51536e` (סבב ראשון); סבב שני: ראו "סבב שני" | — |
+| CI | GitHub Actions על הענף | **success** — run #14 על `c51536e` (סבב ראשון), run #15 על `f92b6bc` (סבב שני) | — |
 
 ## Reviews
 
@@ -101,7 +101,7 @@
 | Production path (live) | `npm run validate:production-path` | **PASS** | 18/18 |
 | DB cleanliness (after validation) | `npm run db:cleanliness` | **PASS** | זהה — נקי ושמור |
 | CI (סבב ראשון) | GitHub Actions run #14 על `c51536e` | **success** | — |
-| CI (סבב שני) | GitHub Actions על ה־commits של הסבב השני | ראו סוף המסמך | — |
+| CI (סבב שני) | GitHub Actions run #15 על `f92b6bc` (ubuntu-latest) | **success** | כל הצעדים ירוקים: install `--include=dev` · cache-in-repo · format · typecheck · lint · unit · **Build (production-like, diagnostics are failures)** · shell · client-secrets · forbidden · traceability |
 
 **סודות**: אף ערך של משתנה סביבה, מפתח, URL עם credentials, cookie או סכום כספי לא הודפס, לא נקרא בקול ולא נכנס לקובץ במאגר. `.env.local`, `apps/web/.env.local`, `.env.integration.local` — ignored (`.gitignore:25`), לא במעקב (`check:no-env-files` PASS). לוגי הריצה נכתבו ל־`.tmp/` (ignored) ונמחקו בסוף.
 
@@ -109,4 +109,4 @@
 
 ## Stop declaration
 
-לא מוזג. לא הופעל deploy. לא שונתה הגדרה חיצונית.
+לא מוזג. לא הופעל deploy. לא שונתה הגדרה חיצונית. לא יובאו נתונים. הענף `hotfix/render-build-instrumentation` נדחף ו־CI ירוק עליו; הפעולה הבאה — תיקון `FAMILY_FINANCE_APP_ORIGIN` בלוח Render **ואז** מיזוג — היא של הבעלים.
