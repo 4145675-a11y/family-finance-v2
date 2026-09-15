@@ -1,53 +1,29 @@
 /**
- * Startup validation.
+ * Startup announcement.
  *
- * Next calls `register` once, when the server process starts, before it serves
- * a request. That makes it the only place a configuration error can be turned
- * into a refusal to run rather than a surprise somebody meets mid-flow.
+ * Next calls `register` once, when the server process starts. The process
+ * decides here whether its configuration is safe (`lib/config/deployment.ts`)
+ * and says so in the log — one line when it is, the problems by name when it
+ * is not. Values are never printed.
  *
- * The rule this enforces is the one from `lib/config/deployment.ts`: a
- * production build configured for the local JSON store must not start. A server
- * that boots and looks healthy while reading a family's money from a file on an
- * ephemeral disk is the worst outcome available here — worse than not starting,
- * because not starting is visible.
+ * The decision is *enforced* elsewhere, on every request: `proxy.ts` answers
+ * 503 to everything while there are problems and `/api/health` reports
+ * `misconfigured`, so a hosted process with bad configuration serves nothing
+ * of the application and fails its health check (ADR-0034).
  *
- * Nothing is printed except the problems themselves, which name variables and
- * never their values. A configuration error report is one of the easiest ways
- * for a credential to reach a log.
+ * Why this file does so little: it is compiled for the Edge runtime as well as
+ * for Node — always — and the production build's static analysis refuses any
+ * Node API in its source. `process.exit` here failed the first Render build,
+ * and a throw from `register` is not a startup failure under `next start`; it
+ * leaves a listening process answering 500 to everything, health included.
+ * So: `process.env`, one dynamic import behind the runtime check, and nothing
+ * else. `tools/edge-safe.test.mjs` and `npm run check:build` hold it there.
  */
 export async function register(): Promise<void> {
-  // Only the Node.js server runtime validates. The edge runtime does not serve
-  // financial data here, and importing the config there would pull `zod` into a
-  // bundle that has no use for it.
+  // Only the Node.js server runtime reads the configuration. The edge variant
+  // of this function is dead code, folded away at compile time.
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 
-  const { readDeploymentConfig, DeploymentConfigError } =
-    await import('./lib/config/deployment');
-
-  try {
-    const config = readDeploymentConfig();
-
-    // One line, so an operator can see what the process decided it is. No
-    // secrets, no URLs with credentials in them, no household information.
-    console.info(
-      `[family-finance] starting: env=${config.nodeEnv} backend=${config.backend} origin=${config.appOrigin} ai=${config.aiEnabled ? 'on' : 'off'}`,
-    );
-  } catch (error) {
-    if (error instanceof DeploymentConfigError) {
-      console.error('[family-finance] refusing to start.\n');
-      for (const problem of error.problems) console.error(`  - ${problem}`);
-      console.error('\nFix the configuration and redeploy. Nothing was served.');
-    } else {
-      console.error('[family-finance] refusing to start: configuration could not be read.');
-    }
-
-    /*
-     * Exit rather than throw.
-     *
-     * A thrown error here is caught by the framework and the server carries on
-     * listening, which is precisely the state this file exists to prevent: a
-     * process that answers requests while being wrong about where the money is.
-     */
-    process.exit(1);
-  }
+  const { announceStartupVerdict } = await import('./lib/config/startup');
+  announceStartupVerdict();
 }
