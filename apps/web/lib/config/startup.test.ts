@@ -95,4 +95,22 @@ describe('announcing the verdict', () => {
     expect(log.lines.join('\n')).not.toContain(pasted);
     expect(log.lines.join('\n')).toContain('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
   });
+
+  test('nor the value of the origin or backend slot, whatever was put there', () => {
+    // The slots that are not keys are the ones a key gets pasted into by
+    // mistake. The refusal names the slot; what is in it stays out of the log.
+    const pasted = 'pasted-by-mistake-0000';
+    for (const env of [
+      { ...PRODUCTION, FAMILY_FINANCE_APP_ORIGIN: pasted },
+      { ...PRODUCTION, FAMILY_FINANCE_DATA_BACKEND: pasted },
+    ]) {
+      const log = capture();
+      const verdict = announceStartupVerdict(env, log);
+      expect(verdict.ok).toBe(false);
+      const output = log.lines.join('\n');
+      expect(output).toContain('refusing to serve');
+      expect(output).not.toContain(pasted);
+      expect(output).toMatch(/FAMILY_FINANCE_(APP_ORIGIN|DATA_BACKEND)/);
+    }
+  });
 });

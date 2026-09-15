@@ -58,7 +58,7 @@
 | Format | Active | `prettier --check .`, exit 0 |
 | Typecheck | Active | שורש + 7 workspaces |
 | Lint | Active | `--max-warnings=0`, type-aware |
-| **Unit** | Active | **1923/1923**, 59 קבצים, 0 מדולגות (כולל 39 על `render.yaml`, 10 על Edge-safety, 4 על שער ה־build) |
+| **Unit** | Active | **1937/1937**, 59 קבצים, 0 מדולגות (כולל 39 על `render.yaml`, 10 על Edge-safety, 4 על שער ה־build, 14 על "שם ולא ערך" בבעיות תצורה) |
 | **Property** | Active | **41/41**, כולל אינווריאנטים של צ׳קים תחת רצפי פעולות שרירותיים |
 | **Build** | Active (`check:build`) | 34 מסלולים; **`NODE_ENV=production` כמו ב־Render, אף אזהרה** (ADR-0034) |
 | **Built-shell** | Active | **14/14 מול השרת הרץ** — 5 מסלולים, משק בית מוזרע (`ADR-0027`) |
@@ -68,7 +68,7 @@
 | Traceability | Active | 67/67 |
 | **Integration / RLS** | Active (מקומי, `npm run integration`) | **233/233 מול Supabase** (8 קבצים, 32 טבלאות, 9 תחומי store), 2026-09-15; לא חלק מ־`verify` — דורש `SUPABASE_DB_URL` מקומי |
 | **Production path (live)** | Active (מקומי, `npm run validate:production-path`) | **18/18** דרך Supabase Auth + PostgREST, כולל קישורי auth ו־cookies על origin http ו־https, 2026-09-15 |
-| **Fail-closed + readiness** | Active | **22/22** — תצורה פגומה: התהליך רץ, כל בקשה 503, health `misconfigured` בשמות (ADR-0034) |
+| **Fail-closed + readiness** | Active | **27/27** — תצורה פגומה: התהליך רץ, כל בקשה 503, health `misconfigured` בשמות, ערך שהודבק אינו מופיע בשום מקום (ADR-0034) |
 | E2E / axe אוטומטי | Defined, לא פעיל | Playwright לא מותקן; ביקורת מבנית הורצה במקום ומוצהרת ככזו |
 
 ## פערים פתוחים

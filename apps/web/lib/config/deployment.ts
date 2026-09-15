@@ -217,6 +217,12 @@ export function publicPrefixedSecrets(env: Record<string, string | undefined>): 
  *
  * Throws rather than returning a partial answer. A configuration error is not
  * something a request should discover.
+ *
+ * Every problem names the variable and never what is in it — not the raw
+ * value, not a parsed form of it. The problems travel to the startup log, to
+ * the public `/api/health` body and into the thrown error's message, and a
+ * key pasted into the wrong slot must not travel with them. The name is what
+ * the person deploying needs; the value is what they already have.
  */
 export function readDeploymentConfig(env: RawEnvironment = process.env): DeploymentConfig {
   const problems: string[] = [];
@@ -240,7 +246,7 @@ export function readDeploymentConfig(env: RawEnvironment = process.env): Deploym
     const parsed = backendSchema.safeParse(declared);
     if (!parsed.success) {
       problems.push(
-        `FAMILY_FINANCE_DATA_BACKEND is "${declared}", which is not a backend this build knows. Use "supabase" or "local_json".`,
+        'FAMILY_FINANCE_DATA_BACKEND is not a backend this build knows. Use "supabase" or "local_json".',
       );
     } else {
       backend = parsed.data;
@@ -265,7 +271,9 @@ export function readDeploymentConfig(env: RawEnvironment = process.env): Deploym
   }
 
   if (origin === null) {
-    problems.push(`FAMILY_FINANCE_APP_ORIGIN is not a usable URL: "${originValue}".`);
+    problems.push(
+      'FAMILY_FINANCE_APP_ORIGIN is not a usable URL. It must be an http(s) origin: scheme, host and port.',
+    );
   } else {
     if (origin.decorated) {
       problems.push(
@@ -290,12 +298,12 @@ export function readDeploymentConfig(env: RawEnvironment = process.env): Deploym
     }
     if (!origin.secure) {
       problems.push(
-        `the application origin ${origin.origin} is not a secure context, so passkeys cannot work there. Use https, or http://localhost for development.`,
+        'FAMILY_FINANCE_APP_ORIGIN is not a secure context, so passkeys cannot work there. Use https, or http://localhost for development.',
       );
     }
     if (!origin.loopback && origin.ipAddress) {
       problems.push(
-        `this deployment is served at ${origin.origin}: a passkey relying party must be a domain name, and an IP address is not one (ADR-0029). Set FAMILY_FINANCE_APP_ORIGIN to the https domain.`,
+        'FAMILY_FINANCE_APP_ORIGIN is an IP address: a passkey relying party must be a domain name, and an address is not one (ADR-0029). Set it to the https domain.',
       );
     }
   }
@@ -321,7 +329,7 @@ export function readDeploymentConfig(env: RawEnvironment = process.env): Deploym
    */
   if (origin !== null && !origin.loopback && backend === 'local_json') {
     problems.push(
-      `this deployment is served at ${origin.origin}, which is not this machine, and is configured for the local JSON store. Hosted truth must live in PostgreSQL; set FAMILY_FINANCE_DATA_BACKEND=supabase.`,
+      'FAMILY_FINANCE_APP_ORIGIN is not this machine, and FAMILY_FINANCE_DATA_BACKEND is the local JSON store. Hosted truth must live in PostgreSQL; set FAMILY_FINANCE_DATA_BACKEND=supabase.',
     );
   }
 

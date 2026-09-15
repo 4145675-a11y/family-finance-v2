@@ -22,7 +22,7 @@
 | Manual bundle up to date | `npm run db:check` | כן | 3 | ✅ |
 | Integration + RLS negative | `npm run integration` | כן | 2 | ✅ מקומית (8 קבצים, 233 בדיקות, 32 טבלאות; דורש `SUPABASE_DB_URL` — לא ב־CI עדיין) |
 | Production path, live | `npm run validate:production-path` | לא (מקומי, מול המסד האמיתי) | PDL/HPO | ✅ 18/18 |
-| Fail-closed (misconfigured process serves nothing) + data-layer readiness | `npm run check:fail-closed` | כן | PDL/HPO | ✅ 22/22 |
+| Fail-closed (misconfigured process serves nothing) + data-layer readiness | `npm run check:fail-closed` | כן | PDL/HPO | ✅ 27/27 |
 | Render blueprint ↔ repository | בתוך `npm run unit` (`tools/render-blueprint.test.mjs`) | כן | HPO | ✅ 38/38 |
 | Property | `npm run property` | כן | 5 | ✅ (רץ מקומית; אין remote) |
 | E2E smoke | `npm run e2e -- --grep @smoke` | כן | 6 | — |

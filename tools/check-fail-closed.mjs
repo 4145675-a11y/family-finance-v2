@@ -24,12 +24,15 @@
  * and answers 500 to everything, health included, which is neither a refusal
  * nor a diagnosis.
  *
- * Four cases, and the last matters as much as the first three — a gate that only
+ * Five cases, and the last matters as much as the first four — a gate that only
  * ever asserts refusal would pass just as well if the server refused everything.
  *
  *   A. hosted origin + local JSON store  -> every request 503; health names the setting
  *   B. production + supabase, no URL     -> every request 503; health names the setting
  *   B2. production + supabase, no origin -> every request 503; health names the setting
+ *   D. production + supabase, a value    -> every request 503; health names the setting;
+ *      pasted into the origin slot         what was pasted appears nowhere — not in
+ *                                           the log, not in the public health body
  *   C. production + complete config      -> the application answers; /api/health
  *                                           names the backend and, with no database
  *                                           behind the placeholder URL, says not_ready
@@ -82,6 +85,13 @@ const VALID = {
   NEXT_PUBLIC_SUPABASE_URL: 'https://exampleprojectrefabc.supabase.co',
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_0000000000000000000000',
 };
+
+/**
+ * A value that belongs in no slot. Case D puts it where a key gets pasted by
+ * mistake — the origin — and every refusal case asserts it is never repeated.
+ * Not a credential and not shaped like one; the assertion is about echoing.
+ */
+const PASTED = 'pasted-by-mistake-0000';
 
 /**
  * The paths a misconfigured process must refuse: a page, the export route, an
@@ -251,8 +261,9 @@ function assertRefused(label, run, settingName) {
   record(
     `${label}: without printing any value`,
     !everything.includes('sb_publishable_0000000000000000000000') &&
-      !everything.includes('exampleprojectref'),
-    'no configured value, host or project reference appears anywhere',
+      !everything.includes('exampleprojectref') &&
+      !everything.includes(PASTED),
+    'no configured value, host, project reference or pasted value appears anywhere',
   );
 }
 
@@ -304,6 +315,16 @@ async function main() {
   assertRefused(
     'production + supabase, no origin',
     await startServer({ ...VALID, FAMILY_FINANCE_APP_ORIGIN: '' }),
+    'FAMILY_FINANCE_APP_ORIGIN',
+  );
+
+  // --- D. a value in the wrong slot is refused, and never repeated ---------
+  // The origin slot is the one a key gets pasted into by mistake. The process
+  // must refuse — what is there is not an origin — and neither the log nor the
+  // public health body may repeat it. Naming the slot is the whole diagnosis.
+  assertRefused(
+    'production + supabase, a value pasted into the origin slot',
+    await startServer({ ...VALID, FAMILY_FINANCE_APP_ORIGIN: PASTED }),
     'FAMILY_FINANCE_APP_ORIGIN',
   );
 

@@ -482,3 +482,82 @@ describe('the production-origin contract (PROD-ORIGIN-001)', () => {
     ).toBe(false);
   });
 });
+
+describe('a problem names the setting and never what was put in it', () => {
+  /*
+   * Every problem string reaches three places: the startup log, the public
+   * `/api/health` body, and the message of the error a page hits when it asks
+   * for the backend. A value pasted into the wrong variable — a key into the
+   * origin slot, say — must not travel with it. So the rule is total: no
+   * environment value, parsed or raw, appears in any problem. The variable's
+   * name is enough to fix it.
+   */
+  const PASTED = 'pasted-by-mistake-0000';
+
+  test.each<[string, RawEnvironment]>([
+    ['an unknown backend', { ...PRODUCTION, FAMILY_FINANCE_DATA_BACKEND: PASTED }],
+    ['an origin that is not a URL', { ...PRODUCTION, FAMILY_FINANCE_APP_ORIGIN: PASTED }],
+    [
+      'an origin with a non-http scheme',
+      { ...PRODUCTION, FAMILY_FINANCE_APP_ORIGIN: `ftp://${PASTED}.example` },
+    ],
+    [
+      'an origin with credentials in it',
+      {
+        ...PRODUCTION,
+        FAMILY_FINANCE_APP_ORIGIN: `https://${PASTED}:${PASTED}@finance.example.com`,
+      },
+    ],
+    [
+      'a plain-http origin',
+      { ...PRODUCTION, FAMILY_FINANCE_APP_ORIGIN: `http://${PASTED}.example` },
+    ],
+    [
+      'an IP-address origin',
+      { ...PRODUCTION, FAMILY_FINANCE_APP_ORIGIN: 'https://203.0.113.7' },
+    ],
+    [
+      'a hosted origin on the local store',
+      {
+        ...PRODUCTION,
+        FAMILY_FINANCE_DATA_BACKEND: 'local_json',
+        FAMILY_FINANCE_APP_ORIGIN: `https://${PASTED}.example`,
+      },
+    ],
+    [
+      'a Supabase host as the origin',
+      { ...PRODUCTION, FAMILY_FINANCE_APP_ORIGIN: `https://${PASTED}12345678.supabase.co` },
+    ],
+    [
+      'two origins that disagree',
+      { ...PRODUCTION, FAMILY_FINANCE_AUTH_ORIGIN: `https://${PASTED}.example` },
+    ],
+    [
+      'a wrong Supabase URL',
+      { ...PRODUCTION, NEXT_PUBLIC_SUPABASE_URL: `https://${PASTED}.example` },
+    ],
+    [
+      'a secret-shaped publishable key',
+      { ...PRODUCTION, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: `sb_secret_${PASTED}` },
+    ],
+  ])('%s: refused, named, value withheld', (_label, env) => {
+    const problems = problemsFor(env);
+    expect(problems.length).toBeGreaterThan(0);
+    const text = problems.join('\n');
+    expect(text).not.toContain(PASTED);
+    expect(text).not.toContain('203.0.113.7');
+    // The name of at least one of the settings involved is there to act on.
+    expect(text).toMatch(/FAMILY_FINANCE_|NEXT_PUBLIC_SUPABASE_/);
+  });
+
+  test('the thrown error carries the same names and the same silence', () => {
+    let message = '';
+    try {
+      readDeploymentConfig({ ...PRODUCTION, FAMILY_FINANCE_APP_ORIGIN: PASTED });
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toContain('FAMILY_FINANCE_APP_ORIGIN');
+    expect(message).not.toContain(PASTED);
+  });
+});

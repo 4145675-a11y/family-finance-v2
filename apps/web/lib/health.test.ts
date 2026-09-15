@@ -90,6 +90,26 @@ describe('health with the database backend', () => {
     expect(JSON.stringify(report)).not.toContain('should_never_be_here');
     expect(report.data.readiness).toBe('not_ready');
   });
+
+  test('a value pasted into the origin or backend slot never reaches the public report', async () => {
+    // The health route answers anybody. A key that landed in the wrong
+    // variable would otherwise be published by the very report meant to say
+    // that something is wrong.
+    const pasted = 'pasted-by-mistake-0000';
+    for (const env of [
+      { ...PRODUCTION, FAMILY_FINANCE_APP_ORIGIN: pasted },
+      { ...PRODUCTION, FAMILY_FINANCE_DATA_BACKEND: pasted },
+      { ...PRODUCTION, FAMILY_FINANCE_APP_ORIGIN: `http://${pasted}.example` },
+    ]) {
+      const { report, httpStatus } = await healthReport(env, scripted('denied'));
+      expect(httpStatus).toBe(503);
+      expect(report.status).toBe('misconfigured');
+      expect(report.data.readiness).toBe('not_ready');
+      const text = JSON.stringify(report);
+      expect(text).not.toContain(pasted);
+      expect(text).toMatch(/FAMILY_FINANCE_(APP_ORIGIN|DATA_BACKEND)/);
+    }
+  });
 });
 
 describe('health with the file backend', () => {
