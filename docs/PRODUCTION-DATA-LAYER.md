@@ -22,7 +22,7 @@
 | שם | ציבורי? | מתי |
 |---|---|---|
 | `FAMILY_FINANCE_DATA_BACKEND` | לא | `local_json` (ברירת מחדל בפיתוח) או `supabase`. ייצור **חייב** להצהיר |
-| `FAMILY_FINANCE_APP_ORIGIN` | לא | ה־origin שהמשפחה מגיעה אליו. https; `localhost` הוא ה־http היחיד שנחשב מאובטח |
+| `FAMILY_FINANCE_APP_ORIGIN` | לא | ה־origin שהמשפחה מגיעה אליו. https; `localhost` הוא ה־http היחיד שנחשב מאובטח. **חובה** בייצור עם `supabase` — אין ברירת מחדל למארח (`PROD-ORIGIN-001`) |
 | `NEXT_PUBLIC_SUPABASE_URL` | כן (מוטמע ב־bundle) | Project Settings → API |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | כן | חייב להתחיל ב־`sb_publishable_`. מפתח סודי נדחה לפי צורתו |
 | `SUPABASE_DB_URL` | **סוד, שרת/פיתוח בלבד** | רק לבדיקות אינטגרציה ולכלי המיגרציה (`.env.integration.local`). **לעולם לא** לאפליקציה הרצה |
@@ -51,6 +51,8 @@
 - `lib/auth/store.ts` (קובץ הכניסה המקומי) **מסרב** להיפתח תחת `supabase`.
 
 ## הפעלה ראשונה של פריסה (סדר)
+
+> האירוח עצמו — Render, `render.yaml`, ה־origin, cookies, קישורי הזמנה/שחזור והצ׳קליסט של Supabase Auth — מתועד ב־`docs/HOSTING-RENDER.md` (`ADR-0033`). הסעיף כאן הוא הסדר הלוגי; הצעדים המדויקים לבעלים נמצאים שם.
 
 1. הסכמה מוחלת: `npm run db:cleanliness` מדווח 32/32 ו־guards 2/2; `apply-all.sql` מכיל 16 מיגרציות. מיגרציה חדשה: `npm run db:apply supabase/migrations/<file>.sql`.
 2. Supabase Auth: ספק Email מופעל; "Confirm email" לפי החלטתכם (משתמש שנוצר ב־Studio עם אישור — נכנס מיד).

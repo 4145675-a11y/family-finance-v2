@@ -45,3 +45,4 @@
 | [0030](0030-a-check-is-not-a-payment.md) | צ׳ק שנמסר אינו תשלום | Accepted | 8 |
 | [0031](0031-production-refuses-the-local-store.md) | ייצור מסרב לעלות עם החנות המקומית | Accepted | 9 |
 | [0032](0032-supabase-as-the-production-data-layer.md) | Supabase כשכבת הנתונים של הייצור | Accepted | PDL |
+| [0033](0033-render-web-service-as-the-hosting-target.md) | Render Web Service כיעד האירוח; `render.yaml` בשורש, בריאות = מוכנות | Accepted | HPO |
