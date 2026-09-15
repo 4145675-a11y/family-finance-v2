@@ -45,4 +45,5 @@
 | [0030](0030-a-check-is-not-a-payment.md) | צ׳ק שנמסר אינו תשלום | Accepted | 8 |
 | [0031](0031-production-refuses-the-local-store.md) | ייצור מסרב לעלות עם החנות המקומית | Accepted | 9 |
 | [0032](0032-supabase-as-the-production-data-layer.md) | Supabase כשכבת הנתונים של הייצור | Accepted | PDL |
-| [0033](0033-render-web-service-as-the-hosting-target.md) | Render Web Service כיעד האירוח; `render.yaml` בשורש, בריאות = מוכנות | Accepted | HPO |
+| [0033](0033-render-web-service-as-the-hosting-target.md) | Render Web Service כיעד האירוח; `render.yaml` בשורש, בריאות = מוכנות | Accepted (תוקן: בלי `NODE_ENV`, `--include=dev`) | HPO |
+| [0034](0034-a-misconfigured-process-serves-refusals.md) | תהליך עם תצורה פגומה מגיש סירובים (503 + health `misconfigured`), לא exit ולא throw; ה־build של הייצור הוא שער | Accepted | HPO hotfix |

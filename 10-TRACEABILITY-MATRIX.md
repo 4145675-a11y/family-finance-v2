@@ -67,11 +67,11 @@
 | PROD-DOMAIN-PERSIST-001 | Architecture | packages/supabase-store + migration 20260914* | integration + parity | PDL | **Verified in PDL** — 9 domains, 17 real-DB + 16 in-memory |
 | PROD-PARTIAL-FAILCLOSED-001 | Architecture | resolveDataSource + instrumentation.ts | unit + fail-closed gate | PDL | **Verified in PDL** — 503 not_ready, never a file or fixture |
 | PROD-ORIGIN-001 | Security | apps/web/lib/config/deployment.ts + lib/auth/redirect.ts | unit + fail-closed gate + live | HPO | **Verified in HPO** — 47 unit, gate 11/11, live redirects on the configured origin |
-| PROD-HOSTING-001 | Operations | render.yaml + tools/render-blueprint.mjs + root `start` | blueprint test (38) + local start on $PORT | HPO | **Prepared in HPO** — not deployed; service creation is an owner action (ADR-0033) |
+| PROD-HOSTING-001 | Operations | render.yaml + tools/render-blueprint.mjs + tools/check-build.mjs + root `start` | blueprint test (39) + check:build + local start on $PORT | HPO | **Prepared in HPO; first deploy failed at build, fixed (ADR-0034)** — devDependencies included, no NODE_ENV, production-build gate in verify and CI |
 | PROD-COOKIE-001 | Security | apps/web/lib/auth/cookies.ts (server client + proxy) | unit + live (http and https origin) | HPO | **Verified in HPO** — Secure/HttpOnly/SameSite=Lax observed on Set-Cookie |
 | PROD-AUTHURL-001 | Security | app/auth/{callback,set-password,forgot} + lib/auth/redirect.ts | unit (25) + live (planted token) | HPO | **Verified in HPO** — 18/18 live; Supabase email templates are an owner action |
 | PROD-HEALTH-002 | Operations | apps/web/app/api/health/route.ts | unit + gate | PDL | **Verified in PDL** — 6 unit + 2 gate checks |
-| PROD-FAILCLOSED-001 | Architecture | apps/web/lib/config/deployment.ts + instrumentation.ts | unit/gate | 9 | **Verified in M9** — השרת הבנוי מסרב לעלות; התצורה התקינה כן עולה |
+| PROD-FAILCLOSED-001 | Architecture | apps/web/lib/config/{deployment,startup}.ts + proxy.ts + instrumentation.ts | unit/gate | 9 | **Verified in M9** — השרת הבנוי מסרב לעלות; התצורה התקינה כן עולה |
 | PROD-HEALTH-001 | Operations | apps/web/app/api/health/route.ts | gate | 9 | **Verified in M9** — שמות הגדרות בלבד, לעולם לא ערכים |
 | PROD-NOENV-001 | Security | tools/check-no-env-files.mjs | gate | 9 | **Verified in M9** — נמצא כש־.env.local סיפק תצורה בשקט לשער אחר |
 | PROD-SCHEMA-001 | Architecture | supabase/migrations/20260908* | migration | 9 | **Applied (2026-09-14)** — 32 טבלאות, 94 policies קיימות במסד; בדיקות התנהגות ל־M9 טרם |

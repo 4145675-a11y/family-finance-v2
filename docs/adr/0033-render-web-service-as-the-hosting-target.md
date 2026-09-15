@@ -1,6 +1,6 @@
 # ADR-0033: Render Web Service כיעד האירוח
 
-- **Status**: Accepted
+- **Status**: Accepted — **תוקן אחרי הפריסה הראשונה** (2026-09-15, `ADR-0034`): `NODE_ENV` הוסר מה־blueprint, ההתקנה היא `npm ci --ignore-scripts --include=dev`
 - **Date**: 2026-09-15
 - **Milestone**: Hosting & Production Origin
 - **Requirement IDs**: `PROD-ORIGIN-001`, `PROD-HOSTING-001`, `PROD-COOKIE-001`, `PROD-AUTHURL-001`
@@ -42,7 +42,7 @@
 ## השלכות
 
 - חיוביות: אפס קונפיגורציית Docker; אותו `npm run build` כמו מקומית ו־CI; בריאות = מוכנות אמיתית; שום סוד אינו נדרש בפלטפורמה.
-- שליליות ועלות: Free plan נרדם (הבחירה בין Free ל־Starter היא של הבעלים); Render מגדיר `NODE_ENV=production` רק אם נאמר לו — ולכן נאמר לו ב־render.yaml; Turbopack build על Free plan עלול להיות איטי — נמדד בפריסה הראשונה.
+- שליליות ועלות: Free plan נרדם (הבחירה בין Free ל־Starter היא של הבעלים); ~~Render מגדיר `NODE_ENV=production` רק אם נאמר לו — ולכן נאמר לו ב־render.yaml~~ **בוטל**: `next build`/`next start` מגדירים אותו בעצמם, ובסביבה הוא גורם ל־`npm ci` להשמיט devDependencies (הפריסה הראשונה נכשלה על כך — `ADR-0034`); Turbopack build על Free plan עלול להיות איטי — נמדד בפריסה הראשונה.
 - מה נדרש לאמת: `render.yaml` תקין מבנית (בדיקה); `npm run start` נקשר ל־`$PORT`; health מחזיר 503 בלי מסד ו־200 איתו (`check:fail-closed`, הריצה החיה); cookies של session עם `Secure; HttpOnly; SameSite=Lax` על origin https (`PROD-COOKIE-001`).
 
 ## תנאי ביטול

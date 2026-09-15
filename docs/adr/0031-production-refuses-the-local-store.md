@@ -1,6 +1,6 @@
 # ADR-0031: ייצור מסרב לעלות עם החנות המקומית
 
-- **Status**: Accepted
+- **Status**: Accepted — **מנגנון הסירוב תוקן ב־`ADR-0034`** (2026-09-15): לא `process.exit`, אלא תהליך שרץ ומסרב לכל בקשה
 - **Date**: 2026-09-08
 - **Milestone**: 9 — Production Readiness
 - **Requirement IDs**: `PROD-FAILCLOSED-001`, `PROD-HEALTH-001`, `PROD-NOENV-001`
@@ -51,6 +51,10 @@
 - **`instrumentation.ts`** — Next קורא ל־`register` פעם אחת, לפני הבקשה הראשונה. שם ההצהרה
   הופכת לסירוב לרוץ. הקוד עושה `process.exit(1)` ולא `throw`: שגיאה שנזרקת נתפסת ע"י ה־framework
   והשרת ממשיך להאזין — בדיוק המצב שהקובץ נועד למנוע.
+  > **תוקן ב־`ADR-0034`.** ה־`process.exit` הפיל את ה־build ב־Render: הקובץ מקומפל גם ל־Edge
+  > והניתוח הסטטי מסרב ל־Node API במקור. ההבחנה לגבי `throw` נמדדה שוב ונכונה (Next ממשיך
+  > להאזין ועונה 500 לכול). המנגנון היום: `register` רק מכריז על הפסק־הדין בלוג; `proxy.ts`
+  > עונה 503 לכל בקשה ו־`/api/health` מדווח `misconfigured` — התהליך רץ ואינו מגיש דבר.
 - **`resolveDataSource`** — מנעול שני על אותה דלת, למקרה שהתצורה השתנתה תחת תהליך שכבר רץ.
 - **`/api/health`** — מדווח `misconfigured` עם **שמות** ההגדרות הפגומות ולעולם לא ערכיהן.
 

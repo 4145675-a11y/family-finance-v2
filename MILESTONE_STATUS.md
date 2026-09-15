@@ -3,7 +3,7 @@
 מצב הפרויקט מול `09-MILESTONES.md`. מתעדכן בסוף כל milestone, לפני העצירה לאישור.
 
 - **תאריך עדכון אחרון**: 2026-09-15
-- **Milestone פעיל**: Hosting & Production-Origin (ADR-0033) — ענף `hosting-production-origin`, מוכן; ממתין לאישור, למיזוג ולפעולות הבעלים ב־`docs/HOSTING-RENDER.md`
+- **Milestone פעיל**: Hosting & Production-Origin (ADR-0033, ממוזג) — **hotfix** `hotfix/render-build-instrumentation` (ADR-0034) אחרי שהפריסה הראשונה ב־Render נכשלה ב־build; ממתין לאישור ולמיזוג, ואז לפעולות הבעלים ב־`docs/HOSTING-RENDER.md`
 - **סטטוס**: **מוצר מקומי שלם ושמיש, עם נעילה אמיתית.** משפחה יכולה להקים משק בית, להזין
   הכול ידנית, להעלות קובץ בנק, לעבור עליו ולאשר, לראות תמונה יומית, לנהל תקציב וחובות,
   לנהל הלוואת גמ״ח שנפרעת בצ׳קים דחויים, להפיק דוחות, לייצא ולגבות — הכול על המחשב הזה,
@@ -46,7 +46,7 @@
 | 14 | Hardening & Production | **In progress** | [hosting-production-origin](docs/checkpoints/hosting-production-origin.md) | שכבת נתונים ואירוח מוכנים; הפריסה, CSP/HSTS ו־RPO/RTO עדיין פתוחים |
 | — | **Local Access & Gemach** | **Complete — evidenced** | [milestone-8](docs/checkpoints/milestone-8-access-and-gemach.md) | **WebAuthn מול Windows Hello; גמ״ח וצ׳קים דחויים** |
 | — | **Production Data Layer** | **Complete — evidenced, merged to `main`** | [production-data-layer](docs/checkpoints/production-data-layer.md) | **האפליקציה קוראת וכותבת דרך Supabase כמשתמש מחובר; RLS מוכח על 32 טבלאות; ריצה חיה** |
-| — | **Hosting & Production-Origin** | **Complete — evidenced (on branch; prepared, not deployed)** | [hosting-production-origin](docs/checkpoints/hosting-production-origin.md) | **`render.yaml` + בדיקה; origin חובה ומוכח; cookies Secure/HttpOnly/Lax; `/auth/callback` + קביעת סיסמה; ריצה חיה 18/18. יצירת השירות, Supabase Auth ודומיין — פעולות בעלים** |
+| — | **Hosting & Production-Origin** | **Complete — evidenced, merged; first deploy failed at build → hotfix on branch** | [hosting-production-origin](docs/checkpoints/hosting-production-origin.md) · [hotfix-render-build](docs/checkpoints/hotfix-render-build.md) | **`render.yaml` + בדיקה; origin חובה ומוכח; cookies Secure/HttpOnly/Lax; `/auth/callback` + קביעת סיסמה; ריצה חיה 18/18. יצירת השירות, Supabase Auth ודומיין — פעולות בעלים** |
 
 ## שערי איכות — מצב נוכחי
 
@@ -58,9 +58,9 @@
 | Format | Active | `prettier --check .`, exit 0 |
 | Typecheck | Active | שורש + 7 workspaces |
 | Lint | Active | `--max-warnings=0`, type-aware |
-| **Unit** | Active | **1898/1898**, 56 קבצים, 0 מדולגות (כולל 38 על `render.yaml`) |
+| **Unit** | Active | **1923/1923**, 59 קבצים, 0 מדולגות (כולל 39 על `render.yaml`, 10 על Edge-safety, 4 על שער ה־build) |
 | **Property** | Active | **41/41**, כולל אינווריאנטים של צ׳קים תחת רצפי פעולות שרירותיים |
-| Build | Active | 34 מסלולים (כולל `/auth/callback`, `/auth/set-password`, `/auth/forgot`) |
+| **Build** | Active (`check:build`) | 34 מסלולים; **`NODE_ENV=production` כמו ב־Render, אף אזהרה** (ADR-0034) |
 | **Built-shell** | Active | **14/14 מול השרת הרץ** — 5 מסלולים, משק בית מוזרע (`ADR-0027`) |
 | Client-secret boundary | Active | 0 ממצאים |
 | Manual bundle | Active | 10 מיגרציות, תואם למקורות (`ADR-0019`) |
@@ -68,7 +68,7 @@
 | Traceability | Active | 67/67 |
 | **Integration / RLS** | Active (מקומי, `npm run integration`) | **233/233 מול Supabase** (8 קבצים, 32 טבלאות, 9 תחומי store), 2026-09-15; לא חלק מ־`verify` — דורש `SUPABASE_DB_URL` מקומי |
 | **Production path (live)** | Active (מקומי, `npm run validate:production-path`) | **18/18** דרך Supabase Auth + PostgREST, כולל קישורי auth ו־cookies על origin http ו־https, 2026-09-15 |
-| **Fail-closed + readiness** | Active | **11/11** (כולל origin חסר) |
+| **Fail-closed + readiness** | Active | **22/22** — תצורה פגומה: התהליך רץ, כל בקשה 503, health `misconfigured` בשמות (ADR-0034) |
 | E2E / axe אוטומטי | Defined, לא פעיל | Playwright לא מותקן; ביקורת מבנית הורצה במקום ומוצהרת ככזו |
 
 ## פערים פתוחים
@@ -78,7 +78,7 @@
 | 1 | דרישות ב־`04`, `05`, `07`, `08`, `11` ללא תוויות מזהה | traceability חלקי מחוץ ל־46 המזהים הרשומים | כל milestone רושם מזהים למה שהוא מממש — `ADR-0004` |
 | 2 | `UX-DEBT-001` אינו מוקצה | אין | המזהה שמור |
 | 3 | CI ירוק ב־GitHub Actions על `main`; בדיקות האינטגרציה מול המסד אינן ב־CI | RLS מוכח מקומית בלבד | סוד DB ל־CI — החלטה לפני שילוב |
-| 12 | האירוח מוכן ולא נפרס: אין שירות ב־Render, Supabase Auth לא מכוון לדומיין, אין דומיין | המשפחה עדיין מגיעה לאפליקציה רק מקומית | פעולות בעלים לפי `docs/HOSTING-RENDER.md`, צעד אחד בכל פעם, אחרי המיזוג |
+| 12 | השירות נוצר ב־Render (`family-finance-web-l2gp`), הפריסה הראשונה נכשלה ב־build; תוקן בענף hotfix; `FAMILY_FINANCE_APP_ORIGIN` בלוח חסר את `-l2gp`; Supabase Auth לא מכוון לדומיין | המשפחה עדיין מגיעה לאפליקציה רק מקומית | מיזוג ה־hotfix → תיקון הערך בלוח → Manual Deploy → runbook סעיף ב |
 | 11 | אין UI לעריכת שם הפרופיל של מוזמן (השם נגזר מהאימייל בהצטרפות) | קוסמטי | מסך פרופיל — milestone הבא |
 | 4 | axe ומקלדת אוטומטיים לא הורצו | `UX-A11Y-001` חלקי | ביקורת מבנית על 17 מסלולים × 4 רוחבים הורצה; axe דורש Playwright |
 | 5 | גופני Assistant/Heebo לא מוטמעים | טקסט עברי נופל לגופן מערכת | milestone עיצוב; קשור ל־`ADR-0026` |
