@@ -1,6 +1,8 @@
 import 'server-only';
 
+import { readDeploymentConfig } from '../config/deployment';
 import { createClient } from '../supabase/server';
+import { absoluteOnOrigin } from './redirect';
 import { AuthError } from './model';
 
 /**
@@ -93,4 +95,48 @@ export async function signInWithPassword(
 export async function signOut(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
+}
+
+export async function updatePassword(password: string): Promise<{ ok: boolean }> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password });
+  return { ok: error === null };
+}
+
+/**
+ * Sends a recovery link. The link lands on this deployment's callback and
+ * then on the password screen; the origin comes from configuration, never
+ * from the request, so a hostile Host header cannot redirect the email.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const supabase = await createClient();
+  const redirectTo = absoluteOnOrigin(
+    readDeploymentConfig().appOrigin,
+    '/auth/callback?next=/auth/set-password',
+  );
+  // The outcome is deliberately not returned: the caller answers identically
+  // for a known and an unknown address.
+  await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+}
+
+export type LinkRedemption = { ok: true } | { ok: false };
+
+/** Turns a PKCE code from an auth link into a session (cookies written by the ssr client). */
+export async function redeemCode(code: string): Promise<LinkRedemption> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  return { ok: error === null };
+}
+
+/** Turns a token hash from an email template into a session. */
+export async function redeemTokenHash(
+  tokenHash: string,
+  type: string,
+): Promise<LinkRedemption> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash: tokenHash,
+    type: type as 'invite' | 'recovery' | 'email' | 'magiclink' | 'signup' | 'email_change',
+  });
+  return { ok: error === null };
 }

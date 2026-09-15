@@ -50,6 +50,18 @@ export const accountScreen = {
   invitationExpired: 'פג תוקפה',
   invitationRevoked: 'בוטלה',
   membersTitle: 'חברי משק הבית',
+  forgotLink: 'שכחתם את הסיסמה?',
+  forgotTitle: 'איפוס סיסמה',
+  forgotIntro:
+    'הזינו את האימייל של החשבון. אם הוא קיים אצלנו, יישלח אליו קישור לקביעת סיסמה חדשה.',
+  forgotSubmit: 'שליחת קישור',
+  forgotSent: 'אם האימייל הזה רשום אצלנו, נשלח אליו עכשיו קישור. בדקו גם את תיקיית הספאם.',
+  setPasswordTitle: 'קביעת סיסמה',
+  setPasswordIntro: 'בחרו סיסמה חדשה לחשבון. לפחות 10 תווים.',
+  newPassword: 'סיסמה חדשה',
+  setPasswordSubmit: 'שמירת הסיסמה',
+  passwordTooShort: 'הסיסמה צריכה להיות באורך 10 תווים לפחות.',
+  linkInvalid: 'הקישור הזה כבר לא תקף. אפשר לבקש קישור חדש.',
   storedInDatabase: 'במסד הנתונים של משק הבית (Supabase), לא על המחשב הזה',
   backupDownload: 'הורדת קובץ גיבוי',
   backupDownloadIntro:
