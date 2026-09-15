@@ -36,8 +36,8 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Install (reproducible, project-local)
-        run: npm ci --ignore-scripts
+      - name: Install (reproducible, project-local, devDependencies included)
+        run: npm ci --ignore-scripts --include=dev
 
       - name: Verify npm cache stays inside the repository
         run: |
@@ -61,8 +61,11 @@ jobs:
       - name: Unit tests
         run: npm run unit
 
-      - name: Build
-        run: npm run build
+      # The build Render runs: NODE_ENV=production, and any Turbopack
+      # diagnostic — warning or error — fails the step (the first deployment
+      # failed on a line CI had been printing as a warning).
+      - name: Build (production-like, diagnostics are failures)
+        run: npm run check:build
 
       - name: Built-shell contract (lang/dir/overflow/a11y)
         run: npm run check:shell

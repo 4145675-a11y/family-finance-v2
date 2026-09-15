@@ -104,9 +104,22 @@ describe('the blueprint describes one Node web service', () => {
 
 describe('build, start and health agree with the repository', () => {
   test('the build is the one CI runs: reproducible install without scripts, then the build', () => {
-    expect(service.buildCommand).toBe('npm ci --ignore-scripts && npm run build');
-    expect(CI_WORKFLOW).toContain('npm ci --ignore-scripts');
-    expect(CI_WORKFLOW).toMatch(/run:\s*npm run build/);
+    expect(service.buildCommand).toBe('npm ci --ignore-scripts --include=dev && npm run build');
+    expect(CI_WORKFLOW).toContain('npm ci --ignore-scripts --include=dev');
+    // CI builds through the gate that treats Turbopack diagnostics as failures.
+    expect(CI_WORKFLOW).toMatch(/run:\s*npm run check:build/);
+    expect(ROOT_MANIFEST.scripts['check:build']).toBe('node tools/check-build.mjs');
+  });
+
+  test('the install includes devDependencies, because the build needs them', () => {
+    // npm omits devDependencies whenever NODE_ENV=production is in the
+    // environment. TypeScript, Tailwind and PostCSS are devDependencies; a
+    // build without them is the first deployment's failure.
+    expect(service.buildCommand).toContain('--include=dev');
+    expect(ROOT_MANIFEST.devDependencies['typescript']).toBeDefined();
+    for (const tool of ['tailwindcss', '@tailwindcss/postcss', 'postcss']) {
+      expect(WEB_MANIFEST.devDependencies[tool], tool).toBeDefined();
+    }
   });
 
   test('the start command exists and reaches the web app through the launcher', () => {
@@ -168,9 +181,12 @@ describe('environment variables: names for the owner, values only where the code
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  test('the runtime is told it is production and telemetry is off', () => {
-    expect(envVar('NODE_ENV')?.value).toBe('production');
+  test('telemetry is off, and NODE_ENV is left to Next', () => {
     expect(envVar('NEXT_TELEMETRY_DISABLED')?.value).toBe('1');
+    // `next build` and `next start` set NODE_ENV=production themselves. Set in
+    // the environment it also reaches `npm ci`, which then drops the
+    // devDependencies the build needs. The first deployment had it set.
+    expect(envVar('NODE_ENV')).toBeUndefined();
   });
 
   test('the backend is fixed to supabase by the blueprint, not left to the dashboard', () => {

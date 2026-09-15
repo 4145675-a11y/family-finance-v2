@@ -28,9 +28,12 @@ services:
     # gates run before Render builds, not instead of it.
     autoDeployTrigger: checksPass
     # Same install and build as CI (.github/workflows/ci.yml). Scripts are not
-    # executed at install (ADR-0001); the build runs through tools/next.mjs,
-    # which forces telemetry off.
-    buildCommand: npm ci --ignore-scripts && npm run build
+    # executed at install (ADR-0001). `--include=dev` is not optional: the
+    # build needs TypeScript, Tailwind and PostCSS, which are devDependencies,
+    # and npm omits those whenever NODE_ENV=production is in the environment —
+    # the first deployment built without them. The build itself runs through
+    # tools/next.mjs, which forces telemetry off.
+    buildCommand: npm ci --ignore-scripts --include=dev && npm run build
     # `next start` binds 0.0.0.0 and reads $PORT, which Render sets.
     startCommand: npm run start
     healthCheckPath: /api/health
@@ -39,8 +42,9 @@ services:
       # variable to pick the runtime; the blueprint test keeps it equal to .nvmrc.
       - key: NODE_VERSION
         value: 24.18.1
-      - key: NODE_ENV
-        value: production
+      # NODE_ENV is deliberately not set here. `next build` and `next start`
+      # set it to production themselves; set in the environment it also turns
+      # `npm ci` into a devDependency-free install, which cannot build.
       - key: NEXT_TELEMETRY_DISABLED
         value: '1'
       # A hosted deployment must say which store stands behind the household
