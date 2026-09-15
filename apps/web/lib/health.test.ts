@@ -13,7 +13,7 @@ const PRODUCTION = {
   NODE_ENV: 'production',
   FAMILY_FINANCE_DATA_BACKEND: 'supabase',
   FAMILY_FINANCE_APP_ORIGIN: 'https://finance.example.com',
-  NEXT_PUBLIC_SUPABASE_URL: 'https://exampleprojectref.supabase.co',
+  NEXT_PUBLIC_SUPABASE_URL: 'https://exampleprojectrefabc.supabase.co',
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_0000000000000000000000',
 } as NodeJS.ProcessEnv;
 
@@ -30,6 +30,7 @@ describe('health with the database backend', () => {
     expect(report.status).toBe('ok');
     expect(report.data).toEqual({
       configuration: 'present',
+      credentials: 'accepted',
       authenticatedDataSource: 'available',
       database: 'reachable',
       schema: 'compatible',
@@ -46,6 +47,18 @@ describe('health with the database backend', () => {
     expect(report.data.authenticatedDataSource).toBe('unavailable');
   });
 
+  test('a key the project does not recognise is rejected, not ready (wrong project)', async () => {
+    const { report, httpStatus } = await healthReport(PRODUCTION, scripted('rejected'));
+    expect(httpStatus).toBe(503);
+    expect(report.data).toMatchObject({
+      database: 'reachable',
+      credentials: 'rejected',
+      schema: 'unknown',
+      authenticatedDataSource: 'unavailable',
+      readiness: 'not_ready',
+    });
+  });
+
   test('a database that does not answer is unreachable, not ready', async () => {
     const { report, httpStatus } = await healthReport(PRODUCTION, scripted('unreachable'));
     expect(httpStatus).toBe(503);
@@ -57,7 +70,7 @@ describe('health with the database backend', () => {
   });
 
   test('the report never carries the host, the project or a key', async () => {
-    for (const outcome of ['denied', 'missing', 'unreachable'] as const) {
+    for (const outcome of ['denied', 'missing', 'rejected', 'unreachable'] as const) {
       const { report } = await healthReport(PRODUCTION, scripted(outcome));
       const text = JSON.stringify(report);
       expect(text).not.toContain('exampleprojectref');
@@ -93,6 +106,7 @@ describe('health with the file backend', () => {
     expect(report.backend).toBe('local_json');
     expect(report.data).toEqual({
       configuration: 'present',
+      credentials: 'not_applicable',
       authenticatedDataSource: 'not_applicable',
       database: 'not_applicable',
       schema: 'not_applicable',

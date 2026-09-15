@@ -5,6 +5,7 @@ import {
   deploymentProblems,
   publicPrefixedSecrets,
   readDeploymentConfig,
+  supabaseProjectRefOf,
   type RawEnvironment,
 } from './deployment';
 
@@ -20,7 +21,7 @@ const PRODUCTION: RawEnvironment = {
   NODE_ENV: 'production',
   FAMILY_FINANCE_DATA_BACKEND: 'supabase',
   FAMILY_FINANCE_APP_ORIGIN: 'https://finance.example.com',
-  NEXT_PUBLIC_SUPABASE_URL: 'https://abcdefgh.supabase.co',
+  NEXT_PUBLIC_SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co',
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abcdefghijklmnop',
 };
 
@@ -352,5 +353,132 @@ describe('reporting without throwing', () => {
 
   test('it never throws, because a health check that crashes reports nothing', () => {
     expect(() => deploymentProblems({ FAMILY_FINANCE_APP_ORIGIN: '::::' })).not.toThrow();
+  });
+});
+
+describe('the production-origin contract (PROD-ORIGIN-001)', () => {
+  test('a hosted deployment must state its origin; localhost is not assumed for it', () => {
+    const withoutOrigin: RawEnvironment = {
+      ...PRODUCTION,
+      FAMILY_FINANCE_APP_ORIGIN: undefined,
+    };
+    expect(deploymentProblems(withoutOrigin).join(' ')).toContain(
+      'FAMILY_FINANCE_APP_ORIGIN is not set',
+    );
+    // The auth-origin spelling counts as stating it.
+    expect(
+      deploymentProblems({
+        ...withoutOrigin,
+        FAMILY_FINANCE_AUTH_ORIGIN: 'https://finance.example.com',
+      }),
+    ).toEqual([]);
+    // A developer's production-mode copy on the local store keeps the default.
+    expect(
+      deploymentProblems({ NODE_ENV: 'production', FAMILY_FINANCE_DATA_BACKEND: 'local_json' }),
+    ).toEqual([]);
+    // In development the default stands, so a developer's .env.local needs no origin.
+    const development: RawEnvironment = { ...withoutOrigin, NODE_ENV: 'development' };
+    expect(readDeploymentConfig(development).appOrigin).toBe('http://localhost:3100');
+  });
+
+  test('an origin is scheme, host and port — nothing more', () => {
+    for (const decorated of [
+      'https://finance.example.com/app',
+      'https://finance.example.com/?x=1',
+      'https://finance.example.com/#home',
+      'https://user:pw@finance.example.com',
+    ]) {
+      const problems = deploymentProblems({
+        ...PRODUCTION,
+        FAMILY_FINANCE_APP_ORIGIN: decorated,
+      });
+      expect(problems.join(' '), decorated).toContain('origin only');
+    }
+    expect(
+      deploymentProblems({
+        ...PRODUCTION,
+        FAMILY_FINANCE_APP_ORIGIN: 'https://finance.example.com:8443',
+      }),
+    ).toEqual([]);
+  });
+
+  test('a Supabase host is never the application origin', () => {
+    const problems = deploymentProblems({
+      ...PRODUCTION,
+      FAMILY_FINANCE_APP_ORIGIN: 'https://abcdefghijklmnopqrst.supabase.co',
+    });
+    expect(problems.join(' ')).toContain('names a Supabase host');
+  });
+
+  test('a scheme other than http(s) is refused', () => {
+    expect(
+      deploymentProblems({
+        ...PRODUCTION,
+        FAMILY_FINANCE_APP_ORIGIN: 'ftp://finance.example.com',
+      }).join(' '),
+    ).toContain('not a usable URL');
+  });
+
+  test('the Supabase URL must be the project URL exactly', () => {
+    for (const wrong of [
+      'https://abcdefgh.supabase.co',
+      'https://abcdefghijklmnopqrst.supabase.co/rest/v1',
+      'https://abcdefghijklmnopqrst.supabase.co:8443',
+      'https://abcdefghijklmnopqrst.supabase.com',
+      'https://supabase.com/dashboard/project/abcdefghijklmnopqrst',
+    ]) {
+      expect(
+        deploymentProblems({ ...PRODUCTION, NEXT_PUBLIC_SUPABASE_URL: wrong }).join(' '),
+        wrong,
+      ).toContain('project URL exactly');
+    }
+  });
+
+  test('the project ref is derived from the URL and exposed for consistency checks, never invented', () => {
+    expect(readDeploymentConfig(PRODUCTION).supabaseProjectRef).toBe('abcdefghijklmnopqrst');
+    expect(readDeploymentConfig({ NODE_ENV: 'development' }).supabaseProjectRef).toBeNull();
+    expect(supabaseProjectRefOf('https://abcdefghijklmnopqrst.supabase.co')).toBe(
+      'abcdefghijklmnopqrst',
+    );
+    expect(supabaseProjectRefOf('http://abcdefghijklmnopqrst.supabase.co')).toBeNull();
+    // Lookalike hosts: the dots are literal, and a subdomain is a different host.
+    expect(supabaseProjectRefOf('https://abcdefghijklmnopqrstxsupabase.co')).toBeNull();
+    expect(
+      supabaseProjectRefOf('https://abcdefghijklmnopqrst.supabase.co.evil.example'),
+    ).toBeNull();
+    expect(supabaseProjectRefOf('https://abcdefghijklmnopqrst.supabasexco')).toBeNull();
+  });
+
+  test('two origin settings that disagree are refused; agreeing or single ones are fine', () => {
+    expect(
+      deploymentProblems({
+        ...PRODUCTION,
+        FAMILY_FINANCE_AUTH_ORIGIN: 'https://other.example.com',
+      }).join(' '),
+    ).toContain('disagree');
+    expect(
+      deploymentProblems({
+        ...PRODUCTION,
+        FAMILY_FINANCE_AUTH_ORIGIN: 'https://finance.example.com',
+      }),
+    ).toEqual([]);
+    expect(
+      deploymentProblems({
+        NODE_ENV: 'development',
+        FAMILY_FINANCE_AUTH_ORIGIN: 'http://localhost:3100',
+      }),
+    ).toEqual([]);
+  });
+
+  test('session cookies are Secure on every https origin and only there (PROD-COOKIE-001)', () => {
+    expect(readDeploymentConfig(PRODUCTION).secureCookies).toBe(true);
+    expect(readDeploymentConfig({ NODE_ENV: 'development' }).secureCookies).toBe(false);
+    expect(
+      readDeploymentConfig({
+        ...PRODUCTION,
+        NODE_ENV: 'development',
+        FAMILY_FINANCE_APP_ORIGIN: 'http://localhost:3100',
+      }).secureCookies,
+    ).toBe(false);
   });
 });

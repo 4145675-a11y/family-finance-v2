@@ -3,6 +3,8 @@ import 'server-only';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+import { sessionCookieOptions } from '../auth/cookies';
+import { readDeploymentConfig } from '../config/deployment';
 import { readPublicEnv } from '../env';
 
 /**
@@ -25,6 +27,8 @@ export async function createClient() {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
+      // Secure on https, HttpOnly always: lib/auth/cookies.ts.
+      cookieOptions: sessionCookieOptions(readDeploymentConfig().appOrigin),
       cookies: {
         getAll() {
           return cookieStore.getAll();

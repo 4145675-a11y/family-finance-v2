@@ -24,6 +24,7 @@ Package manager: **npm**, נעול לפי `ADR-0001`. אין להחליף בלי
 | 7 | lint | `npm run lint` → `eslint . --max-warnings=0` (flat config) | Lint | 1 | **Active** |
 | 8 | dev | `npm run dev` → `node tools/next.mjs dev` ב־`apps/web` | — (לא שער) | 1 | **Active** |
 | 9 | build | `npm run build` → `node tools/next.mjs build` ב־`apps/web` | Build | 1 | **Active** |
+| 9a | start | `npm run start` → `node tools/next.mjs start` ב־`apps/web` | — (לא שער): השרת הבנוי, נקשר ל־`0.0.0.0:$PORT`. זו פקודת ה־start של Render (`render.yaml`) | HPO | **Active** |
 | 10 | verify (aggregate) | `npm run verify` | כל השערים הפעילים ברצף | 1 | **Active** |
 | 11 | verify (M0 subset) | `npm run verify:m0` | שערי M0 בלבד — נשמר כדי ש־checkpoint M0 יישאר משחזר | 0 | **Active** |
 | 12 | property | `npm run property` → `vitest run --config vitest.property.config.ts` (fast-check, seed קבוע) | Property | 5 | **Active** |
@@ -33,13 +34,14 @@ Package manager: **npm**, נעול לפי `ADR-0001`. אין להחליף בלי
 | 16 | built shell | `npm run check:shell` → `node tools/check-built-shell.mjs` | Hebrew RTL, landmarks ו־manifest **על השרת הרץ** (`ADR-0027`) | 1/7 | **Active** |
 | 17 | client secrets | `npm run check:client-secrets` → `node tools/check-client-secrets.mjs` | גבול service role | 2 | **Active** |
 | 18 | manual bundle | `npm run db:build` / `db:check` → `node tools/build-manual-bundle.mjs [--check]` | חבילת ההחלה תואמת למיגרציות | 3 | **Active** |
-| 19b | fail-closed gate | `npm run check:fail-closed` → `node tools/check-fail-closed.mjs` | מריץ את ה־build האמיתי ומוודא שתצורת ייצור שגויה **אינה עולה**, ושתצורה תקינה כן | 9 | **Active** |
+| 19b | fail-closed gate | `npm run check:fail-closed` → `node tools/check-fail-closed.mjs` | מריץ את ה־build האמיתי ומוודא שתצורת ייצור שגויה **אינה עולה** (חנות מקומית, בלי URL, בלי origin), ושתצורה תקינה כן — 11 בדיקות | 9/HPO | **Active** |
 | 19c | env-file gate | `npm run check:no-env-files` → `node tools/check-no-env-files.mjs` | אף קובץ סביבה במעקב git או בתוך `.next` | 9 | **Active** |
 | 19a | auth reset | `npm run auth:reset` → `node tools/auth-reset.mjs` | מסיר את מפתחות הכניסה והסשנים. **אינו נוגע בנתונים הכספיים.** דורש גישה למחשב; אין מסלול HTTP. עם `NODE_ENV=production` מסרב אלא אם נמסר `--i-am-at-the-machine` | 8 | **Active** |
 | 19 | copy SQL | `npm run db:copy:diagnostic` · `npm run db:copy:schema` → `node tools/copy-sql.mjs <file>` | — (כלי החלה ידנית) | 2 | **Active** |
 | 20 | apply migration | `npm run db:apply <supabase/migrations/file.sql>` → `node tools/apply-migration.mjs` | מחיל קובץ מיגרציה בטרנזקציה אחת מול `SUPABASE_DB_URL` (מהסביבה או `.env.integration.local`); מדפיס שם, sha256 ותוצאה בלבד | PDL | **Active** |
 | 21 | db cleanliness | `npm run db:cleanliness` → `node tools/db-cleanliness.mjs` | קריאה בלבד: ספירות (households, profiles, `@example.test`, audit), RLS forced 32/32, guards פעילים. exit 1 אם לא נקי | PDL | **Active** |
-| 22 | production-path validation | `npm run validate:production-path` → `vitest run --config vitest.validation.config.ts` | שרת ייצור בנוי מול המסד האמיתי: Supabase Auth, המסלול הקריטי דרך ה־transport של הייצור, עמודים מרונדרים, בידוד, ניקוי עצמי. דורש build + publishable key ב־`apps/web/.env.local` | PDL | **Active** (לא חלק מ־`verify`) |
+| 22 | production-path validation | `npm run validate:production-path` → `vitest run --config vitest.validation.config.ts` | שרת ייצור בנוי מול המסד האמיתי: Supabase Auth, המסלול הקריטי דרך ה־transport של הייצור, עמודים מרונדרים, בידוד, קישורי auth (token שנשתל למשתמש סינתטי), cookies על origin http ו־https, ניקוי עצמי. דורש build + publishable key ב־`apps/web/.env.local` | PDL/HPO | **Active** (לא חלק מ־`verify`) |
+| 23 | render blueprint | חלק מ־`npm run unit`: `tools/render-blueprint.test.mjs` | `render.yaml` תואם למאגר: Node = `.nvmrc`, build = CI, health route קיים, כל משתנה נדרש מוצהר, אף ערך שנראה כסוד | HPO | **Active** |
 
 `unit` רץ על Vitest בלבד מ־Milestone 1 (`ADR-0009`). ב־Milestone 0 הוא רץ על `node --test` כי לא הותקנה שום תלות.
 

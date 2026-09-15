@@ -17,6 +17,7 @@
  *
  *   A. hosted origin + local JSON store -> must exit non-zero, must not listen
  *   B. production + supabase, no URL    -> must exit non-zero, must not listen
+ *   B2. production + supabase, no origin -> must exit non-zero, must not listen
  *   C. production + complete config     -> must listen; /api/health must name the
  *                                          backend and, with no database behind
  *                                          the placeholder URL, say not_ready
@@ -66,7 +67,7 @@ const VALID = {
   NODE_ENV: 'production',
   FAMILY_FINANCE_DATA_BACKEND: 'supabase',
   FAMILY_FINANCE_APP_ORIGIN: 'https://finance.example.com',
-  NEXT_PUBLIC_SUPABASE_URL: 'https://exampleprojectref.supabase.co',
+  NEXT_PUBLIC_SUPABASE_URL: 'https://exampleprojectrefabc.supabase.co',
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_0000000000000000000000',
 };
 
@@ -204,6 +205,28 @@ async function main() {
       'a production server with no database URL refuses to start',
       refused,
       refused ? `exited ${exitCode}` : `listened=${listened} exit=${exitCode}`,
+    );
+  }
+
+  // --- B2. a hosted deployment must state where the family reaches it ------
+  // Cookie security and every auth redirect derive from the origin. Left
+  // unset, the developer default (localhost) would quietly stand in for it on
+  // a server (PROD-ORIGIN-001). Empty rather than deleted, as in B.
+  {
+    const { listened, exitCode, output } = await startServer({
+      ...VALID,
+      FAMILY_FINANCE_APP_ORIGIN: '',
+    });
+    const refused = !listened && exitCode !== 0;
+    record(
+      'a production server with no stated origin refuses to start',
+      refused,
+      refused ? `exited ${exitCode}` : `listened=${listened} exit=${exitCode}`,
+    );
+    record(
+      'and names the origin setting',
+      output.includes('FAMILY_FINANCE_APP_ORIGIN'),
+      'startup output names FAMILY_FINANCE_APP_ORIGIN',
     );
   }
 

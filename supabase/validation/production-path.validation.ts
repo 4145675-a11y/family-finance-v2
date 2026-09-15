@@ -8,6 +8,12 @@
  * supabase-js through PostgREST as the signed-in person, and the pages as the
  * browser would receive them. Only the origin is local.
  *
+ * Since the Hosting & Production-Origin milestone it also walks the auth-link
+ * path an invitation or recovery email takes — `/auth/callback` with a
+ * token hash planted for a synthetic user, the password screen, the cookies'
+ * attributes on an http and on an https origin (PROD-COOKIE-001,
+ * PROD-AUTHURL-001) — without sending a single email.
+ *
  * Identities and data are synthetic and created by this file; everything it
  * creates is removed in `afterAll`, in one narrow transaction, and the
  * database is counted clean afterwards. The synthetic passwords are generated
@@ -168,11 +174,20 @@ function storeFor(session: Session): SupabaseHouseholdStore {
   );
 }
 
+interface PageResult {
+  status: number;
+  html: string;
+  location: string | null;
+  /** Raw Set-Cookie headers, for asserting attributes — never printed. */
+  setCookies: string[];
+}
+
 async function page(
   path: string,
-  session?: Session,
-): Promise<{ status: number; html: string; location: string | null }> {
-  const response = await fetch(`${ORIGIN}${path}`, {
+  session?: { cookieHeader: string },
+  origin = ORIGIN,
+): Promise<PageResult> {
+  const response = await fetch(`${origin}${path}`, {
     redirect: 'manual',
     headers: session ? { cookie: session.cookieHeader } : {},
     signal: AbortSignal.timeout(20_000),
@@ -181,41 +196,129 @@ async function page(
     status: response.status,
     html: await response.text(),
     location: response.headers.get('location'),
+    setCookies: response.headers.getSetCookie(),
   };
 }
 
-async function startServer(): Promise<void> {
-  server = spawn(
+/**
+ * Submits a server-action form the way a browser without JavaScript does: the
+ * page is fetched, its hidden action fields are echoed back, and the fields
+ * are posted as multipart to the same path. Next's action CSRF check wants the
+ * Origin header to match the Host, so it is the server's own address.
+ */
+async function submitForm(
+  path: string,
+  fields: Record<string, string>,
+  session?: { cookieHeader: string },
+): Promise<PageResult> {
+  const { html, status } = await page(path, session);
+  if (status !== 200) throw new Error(`form page ${path} answered ${status}`);
+  const decode = (text: string) => text.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  const body = new FormData();
+  for (const match of html.matchAll(
+    /<input[^>]*type="hidden"[^>]*name="([^"]+)"(?:[^>]*value="([^"]*)")?[^>]*>/g,
+  )) {
+    body.set(match[1] ?? '', decode(match[2] ?? ''));
+  }
+  for (const [name, value] of Object.entries(fields)) body.set(name, value);
+  const response = await fetch(`${ORIGIN}${path}`, {
+    method: 'POST',
+    body,
+    redirect: 'manual',
+    headers: { origin: ORIGIN, ...(session ? { cookie: session.cookieHeader } : {}) },
+    signal: AbortSignal.timeout(20_000),
+  });
+  return {
+    status: response.status,
+    html: await response.text(),
+    location: response.headers.get('location'),
+    setCookies: response.headers.getSetCookie(),
+  };
+}
+
+/** The cookie header a browser would send back after these Set-Cookie headers. */
+function cookieHeaderFrom(setCookies: string[]): string {
+  const jar = new Map<string, string>();
+  for (const header of setCookies) {
+    const [pair] = header.split(';');
+    const separator = pair?.indexOf('=') ?? -1;
+    if (pair === undefined || separator <= 0) continue;
+    const name = pair.slice(0, separator);
+    const value = pair.slice(separator + 1);
+    if (value === '' || /max-age=0/i.test(header)) jar.delete(name);
+    else jar.set(name, value);
+  }
+  return [...jar.entries()].map(([n, v]) => `${n}=${v}`).join('; ');
+}
+
+/**
+ * Plants a recovery token for a synthetic user, exactly as Supabase Auth
+ * stores one after sending a recovery email — the hash in
+ * `auth.one_time_tokens`, the timestamp the expiry check reads on the user.
+ * The hash is random: nothing is derived from a real email flow, and no email
+ * is sent. Redeeming it through `/auth/callback` consumes it.
+ */
+async function plantRecoveryToken(person: SyntheticPerson): Promise<string> {
+  const tokenHash = randomBytes(28).toString('hex');
+  await owner.query('begin');
+  try {
+    await owner.query(
+      "delete from auth.one_time_tokens where user_id = $1 and token_type = 'recovery_token'",
+      [person.id],
+    );
+    await owner.query(
+      `insert into auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to, created_at, updated_at)
+       values (gen_random_uuid(), $1, 'recovery_token', $2, $3, now(), now())`,
+      [person.id, tokenHash, person.email],
+    );
+    await owner.query(
+      'update auth.users set recovery_token = $2, recovery_sent_at = now() where id = $1',
+      [person.id, tokenHash],
+    );
+    await owner.query('commit');
+  } catch (error) {
+    await owner.query('rollback').catch(() => undefined);
+    throw error;
+  }
+  return tokenHash;
+}
+
+/** Session cookies by name: the ones @supabase/ssr writes. */
+const sessionCookies = (setCookies: string[]) =>
+  setCookies.filter((header) => /^sb-[^=]*-auth-token/.test(header));
+
+async function startServer(port = PORT, appOrigin = APP_ORIGIN): Promise<ChildProcess> {
+  const child = spawn(
     process.execPath,
-    [resolveNextBin(), 'start', '--hostname', HOST, '--port', String(PORT)],
+    [resolveNextBin(), 'start', '--hostname', HOST, '--port', String(port)],
     {
       cwd: WEB_ROOT,
       env: {
         ...nextEnv(),
         NODE_ENV: 'production',
         FAMILY_FINANCE_DATA_BACKEND: 'supabase',
-        FAMILY_FINANCE_APP_ORIGIN: APP_ORIGIN,
+        FAMILY_FINANCE_APP_ORIGIN: appOrigin,
         NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE_KEY,
         NEXT_PUBLIC_DEV_DATA_SOURCE: '',
-        PORT: String(PORT),
+        PORT: String(port),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
-  server.stdout?.on('data', (chunk) => {
+  child.stdout?.on('data', (chunk) => {
     serverOutput += String(chunk);
   });
-  server.stderr?.on('data', (chunk) => {
+  child.stderr?.on('data', (chunk) => {
     serverOutput += String(chunk);
   });
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${ORIGIN}/api/health`, {
+      const response = await fetch(`http://${HOST}:${port}/api/health`, {
         signal: AbortSignal.timeout(8_000),
       });
-      if (response.status > 0) return;
+      if (response.status > 0) return child;
     } catch {
       await delay(400);
     }
@@ -235,15 +338,18 @@ beforeAll(async () => {
   owner = new Client({ connectionString: DB_URL });
   await owner.connect();
   for (const person of Object.values(people)) await provision(person);
-  await startServer();
+  server = await startServer();
 }, 120_000);
 
+async function stopServer(child: ChildProcess | null): Promise<void> {
+  if (child === null) return;
+  child.kill('SIGTERM');
+  await delay(600);
+  if (child.exitCode === null) child.kill('SIGKILL');
+}
+
 afterAll(async () => {
-  if (server !== null) {
-    server.kill('SIGTERM');
-    await delay(600);
-    if (server.exitCode === null) server.kill('SIGKILL');
-  }
+  await stopServer(server);
   await cleanup();
   await owner.end();
 }, 120_000);
@@ -283,6 +389,7 @@ async function cleanup(): Promise<void> {
       await owner.query('delete from public.households where id = any($1)', [households]);
     }
     await owner.query('delete from public.profiles where id = any($1)', [ids]);
+    await owner.query('delete from auth.one_time_tokens where user_id = any($1)', [ids]);
     await owner.query('delete from auth.identities where user_id = any($1)', [ids]);
     await owner.query('delete from auth.users where id = any($1)', [ids]);
     await owner.query(
@@ -335,6 +442,7 @@ describe('the production path', () => {
     expect(report.backend).toBe('supabase');
     expect(report.data).toMatchObject({
       configuration: 'present',
+      credentials: 'accepted',
       database: 'reachable',
       schema: 'compatible',
       authenticatedDataSource: 'available',
@@ -633,11 +741,124 @@ describe('the production path', () => {
     expect(afterwards.location).toContain('/login');
   });
 
+  test('auth links: no link, or one that cannot be redeemed, lands on sign-in — on the configured origin', async () => {
+    const none = await page('/auth/callback');
+    expect(none.status).toBe(303);
+    expect(none.location).toBe(`${APP_ORIGIN}/login`);
+    expect(sessionCookies(none.setCookies)).toEqual([]);
+
+    const bogus = await page(
+      '/auth/callback?token_hash=' +
+        'f'.repeat(56) +
+        '&type=recovery&next=https://evil.example',
+    );
+    expect(bogus.status).toBe(303);
+    expect(bogus.location).toBe(`${APP_ORIGIN}/login?link=invalid`);
+    expect(sessionCookies(bogus.setCookies)).toEqual([]);
+
+    const invalidNotice = await page('/login?link=invalid');
+    expect(invalidNotice.status).toBe(200);
+    expect(invalidNotice.html).toContain('כבר לא תקף');
+
+    const withoutSession = await page('/auth/set-password');
+    expect(withoutSession.status).toBeGreaterThanOrEqual(300);
+    expect(withoutSession.location).toContain('/login');
+
+    const forgot = await page('/auth/forgot');
+    expect(forgot.status).toBe(200);
+    expect(forgot.html).toContain('name="email"');
+  });
+
+  let recovered: { cookieHeader: string };
+  const newPassword = `Recovered-${randomBytes(18).toString('base64url')}`;
+
+  test('a recovery link redeems for a session; a hostile next stays on this site', async () => {
+    const tokenHash = await plantRecoveryToken(people.alice);
+    const landed = await page(
+      `/auth/callback?token_hash=${tokenHash}&type=recovery&next=https://evil.example/steal`,
+    );
+    expect(landed.status).toBe(303);
+    expect(landed.location).toBe(`${APP_ORIGIN}/`);
+    const cookies = sessionCookies(landed.setCookies);
+    expect(cookies.length).toBeGreaterThan(0);
+    for (const header of cookies) {
+      expect(header).toMatch(/;\s*HttpOnly/i);
+      expect(header).toMatch(/;\s*SameSite=lax/i);
+      expect(header).toMatch(/;\s*Path=\//i);
+      // http://localhost is the one http origin the config accepts, and it is not https.
+      expect(header).not.toMatch(/;\s*Secure/i);
+    }
+    recovered = { cookieHeader: cookieHeaderFrom(landed.setCookies) };
+
+    // The token was consumed: the same link is now invalid.
+    const again = await page(`/auth/callback?token_hash=${tokenHash}&type=recovery`);
+    expect(again.location).toBe(`${APP_ORIGIN}/login?link=invalid`);
+  });
+
+  test('the link the email template builds lands on the password screen', async () => {
+    const tokenHash = await plantRecoveryToken(people.alice);
+    const landed = await page(
+      `/auth/callback?token_hash=${tokenHash}&type=recovery&next=%2Fauth%2Fset-password`,
+    );
+    expect(landed.status).toBe(303);
+    expect(landed.location).toBe(`${APP_ORIGIN}/auth/set-password`);
+    recovered = { cookieHeader: cookieHeaderFrom(landed.setCookies) };
+
+    const screen = await page('/auth/set-password', recovered);
+    expect(screen.status).toBe(200);
+    expect(screen.html).toContain('name="password"');
+    expect(screen.html).not.toContain(tokenHash);
+  });
+
+  test('a new password is set through the form, and only the new one signs in', async () => {
+    const short = await submitForm('/auth/set-password', { password: 'short' }, recovered);
+    expect(short.status).toBe(200);
+    expect(short.html).toContain('10 תווים');
+
+    const done = await submitForm('/auth/set-password', { password: newPassword }, recovered);
+    expect(done.status).toBeGreaterThanOrEqual(300);
+    expect(done.location).toBe('/');
+
+    const old = await signIn(people.alice).catch((error: Error) => error);
+    expect(old).toBeInstanceOf(Error);
+    const fresh = await signIn({ ...people.alice, password: newPassword });
+    expect(fresh.cookieHeader).toMatch(/sb-.*-auth-token/);
+    await fresh.client.auth.signOut();
+  });
+
+  test('on an https origin the session cookies are Secure (PROD-COOKIE-001)', async () => {
+    const port = PORT + 1;
+    const secureOrigin = 'https://finance.example.test';
+    const secure = await startServer(port, secureOrigin);
+    try {
+      const tokenHash = await plantRecoveryToken(people.bob);
+      const landed = await page(
+        `/auth/callback?token_hash=${tokenHash}&type=recovery&next=%2Fauth%2Fset-password`,
+        undefined,
+        `http://${HOST}:${port}`,
+      );
+      expect(landed.status).toBe(303);
+      expect(landed.location).toBe(`${secureOrigin}/auth/set-password`);
+      const cookies = sessionCookies(landed.setCookies);
+      expect(cookies.length).toBeGreaterThan(0);
+      for (const header of cookies) {
+        expect(header).toMatch(/;\s*Secure/i);
+        expect(header).toMatch(/;\s*HttpOnly/i);
+        expect(header).toMatch(/;\s*SameSite=lax/i);
+      }
+      const health = await page('/api/health', undefined, `http://${HOST}:${port}`);
+      expect(health.status).toBe(200);
+    } finally {
+      await stopServer(secure);
+    }
+  });
+
   test('the server never wrote a secret or a household figure to its output', () => {
     expect(serverOutput).not.toContain(PUBLISHABLE_KEY);
     expect(serverOutput).not.toContain(SUPABASE_URL);
     for (const person of Object.values(people))
       expect(serverOutput).not.toContain(person.password);
+    expect(serverOutput).not.toContain(newPassword);
     expect(serverOutput).not.toContain('משפחת בדיקה');
   });
 });
