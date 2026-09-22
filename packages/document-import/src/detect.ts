@@ -1,5 +1,6 @@
 import type { DocumentType } from '@family-finance/contracts';
 
+import { detectDebtTable } from './debt-table';
 import { normaliseHeader, type TableShape } from './table';
 
 /**
@@ -123,6 +124,17 @@ export interface DetectionInput {
   /** Text found above or beside the table: titles, account lines, the file name. */
   readonly context: readonly string[];
   readonly shape: TableShape | null;
+  /**
+   * The rows below the header.
+   *
+   * Only consulted when the words have failed: a file whose headers are
+   * `שדה1 | שדה2` says nothing about itself, and the values are then the only
+   * evidence there is. Supplying this never changes a document type that the
+   * phrases above already recognised — see the guard in `detectDocumentType`.
+   */
+  readonly dataRows?: readonly (readonly string[])[];
+  /** The header row itself, used as supporting evidence for a placeholder header. */
+  readonly headerRow?: readonly string[];
 }
 
 export function detectDocumentType(input: DetectionInput): DetectionResult {
@@ -154,6 +166,25 @@ export function detectDocumentType(input: DetectionInput): DetectionResult {
   }
 
   if (best.confidenceBp < RECOGNITION_THRESHOLD) {
+    /*
+     * The words said nothing. Before falling back to the generic mapper, ask the
+     * values: a column of names beside a column of amounts is a debt list, and
+     * that shape is recognisable even when every header is `שדה1`.
+     *
+     * This runs only here, below the recognition threshold, so a file the
+     * phrases already identified keeps the type it had.
+     */
+    if (input.dataRows !== undefined && input.dataRows.length > 0) {
+      const debts = detectDebtTable(input.dataRows, input.headerRow ?? []);
+      if (debts.detected) {
+        return {
+          type: 'private_debt_list',
+          confidenceBp: debts.confidenceBp,
+          evidence: debts.evidence.slice(0, 6),
+        };
+      }
+    }
+
     // A table we can read but cannot name is still useful: the generic mapper
     // handles it, and the reviewer says what it is.
     if (

@@ -2,8 +2,8 @@
 
 מצב הפרויקט מול `09-MILESTONES.md`. מתעדכן בסוף כל milestone, לפני העצירה לאישור.
 
-- **תאריך עדכון אחרון**: 2026-09-15
-- **Milestone פעיל**: Hosting & Production-Origin (ADR-0033, ממוזג) — **hotfix** `hotfix/render-build-instrumentation` (ADR-0034) אחרי שהפריסה הראשונה ב־Render נכשלה ב־build; ממתין לאישור ולמיזוג, ואז לפעולות הבעלים ב־`docs/HOSTING-RENDER.md`
+- **תאריך עדכון אחרון**: 2026-09-22
+- **Milestone פעיל**: **Debt Import & Dual Calendar** (ADR-0035) על `feature/debt-import-hebrew-calendar` — **שכבת היסוד בלבד הושלמה**: זיהוי חובות לפי ערכים, לוח עברי/לועזי, וקריאת שורות. **החנות, המיגרציה וה־UI טרם נבנו** ולכן ה־milestone אינו `Complete`. ה־hotfix של Render (ADR-0034) מוזג ל־`main` ב־`a42ca8c`, CI ירוק; הפריסה חסומה בצד Render — ראה למטה.
 - **סטטוס**: **מוצר מקומי שלם ושמיש, עם נעילה אמיתית.** משפחה יכולה להקים משק בית, להזין
   הכול ידנית, להעלות קובץ בנק, לעבור עליו ולאשר, לראות תמונה יומית, לנהל תקציב וחובות,
   לנהל הלוואת גמ״ח שנפרעת בצ׳קים דחויים, להפיק דוחות, לייצא ולגבות — הכול על המחשב הזה,
@@ -46,6 +46,7 @@
 | 14 | Hardening & Production | **In progress** | [hosting-production-origin](docs/checkpoints/hosting-production-origin.md) | שכבת נתונים ואירוח מוכנים; הפריסה, CSP/HSTS ו־RPO/RTO עדיין פתוחים |
 | — | **Local Access & Gemach** | **Complete — evidenced** | [milestone-8](docs/checkpoints/milestone-8-access-and-gemach.md) | **WebAuthn מול Windows Hello; גמ״ח וצ׳קים דחויים** |
 | — | **Production Data Layer** | **Complete — evidenced, merged to `main`** | [production-data-layer](docs/checkpoints/production-data-layer.md) | **האפליקציה קוראת וכותבת דרך Supabase כמשתמש מחובר; RLS מוכח על 32 טבלאות; ריצה חיה** |
+| — | **Debt Import & Dual Calendar** | **In progress — foundation evidenced** | ADR-0035 | **חבילה `hebrew-calendar` (69 בדיקות) + זיהוי חובות לפי ערכים (28 בדיקות); `verify` exit 0, unit 2037/2037.** טרם: חוזי due-date מובְנים, סוג אירוע `note`, מיגרציה, חנות, מסך סקירה, כרטיס מלווה |
 | — | **Hosting & Production-Origin** | **Complete — evidenced, merged; first deploy failed at build → hotfix on branch** | [hosting-production-origin](docs/checkpoints/hosting-production-origin.md) · [hotfix-render-build](docs/checkpoints/hotfix-render-build.md) | **`render.yaml` + בדיקה; origin חובה ומוכח; cookies Secure/HttpOnly/Lax; `/auth/callback` + קביעת סיסמה; ריצה חיה 18/18. יצירת השירות, Supabase Auth ודומיין — פעולות בעלים** |
 
 ## שערי איכות — מצב נוכחי

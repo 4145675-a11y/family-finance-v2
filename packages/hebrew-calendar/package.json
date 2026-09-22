@@ -1,5 +1,5 @@
 {
-  "name": "@family-finance/document-import",
+  "name": "@family-finance/hebrew-calendar",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "@family-finance/contracts": "*",
-    "@family-finance/hebrew-calendar": "*"
+    "@hebcal/core": "6.9.3"
   }
 }

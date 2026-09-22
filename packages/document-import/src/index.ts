@@ -101,6 +101,18 @@ export {
 } from './detect';
 
 export {
+  detectDebtTable,
+  readDebtRow,
+  readDebtTable,
+  type DebtColumnMapping,
+  type DebtRowExcluded,
+  type DebtRowExclusion,
+  type DebtRowProposal,
+  type DebtRowReading,
+  type DebtTableDetection,
+} from './debt-table';
+
+export {
   extractDocument,
   findDateRange,
   type Cell,
