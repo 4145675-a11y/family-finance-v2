@@ -24,6 +24,36 @@ export interface DebtBalance {
 }
 
 /**
+ * How one event moves one balance, as a signed amount.
+ *
+ * The single definition. Everything that walks debt events — the totals, the
+ * per-lender ledger, anything added later — goes through this function, so there
+ * is exactly one answer to "does this line add or subtract" and no screen can
+ * hold a second opinion.
+ *
+ * A UI that reimplemented this drifted from it: it clamped at every step while
+ * the totals clamped once at the end, and the two disagreed on any debt that had
+ * dipped below zero and recovered. That is the mistake this export exists to
+ * make unrepeatable.
+ */
+export function debtEventDeltaMinor(event: DebtEventRecord): number {
+  assertStoredAmount(event.amountMinor, `event ${event.id}`);
+
+  const effect =
+    event.kind === 'balance_correction'
+      ? event.correctionEffect
+      : DEBT_EVENT_BALANCE_EFFECT[event.kind];
+
+  if (effect === null || effect === undefined) {
+    throw new Error(`debt event ${event.id} has kind ${event.kind} with no balance effect`);
+  }
+
+  if (effect === 'increase') return event.amountMinor;
+  if (effect === 'decrease') return -event.amountMinor;
+  return 0;
+}
+
+/**
  * Replays events into balances.
  *
  * A balance is never stored, so this is the only definition of what is owed.
@@ -38,35 +68,86 @@ export function replayDebtBalances(
 
   for (const event of events) {
     if (!isOnOrBefore(event.occurredOn, asOf)) continue;
-    assertStoredAmount(event.amountMinor, `event ${event.id}`);
-
-    const effect =
-      event.kind === 'balance_correction'
-        ? event.correctionEffect
-        : DEBT_EVENT_BALANCE_EFFECT[event.kind];
-
-    if (effect === null || effect === undefined) {
-      throw new Error(`debt event ${event.id} has kind ${event.kind} with no balance effect`);
-    }
-
     const current = balances.get(event.debtId) ?? 0;
-    const delta =
-      effect === 'increase'
-        ? event.amountMinor
-        : effect === 'decrease'
-          ? -event.amountMinor
-          : 0;
-    balances.set(event.debtId, current + delta);
+    balances.set(event.debtId, current + debtEventDeltaMinor(event));
   }
 
   // A balance below zero means more was repaid than was ever owed, which is a
   // data error rather than a credit. It is clamped so it cannot silently offset
   // another debt in the total, and the gap surfaces through data quality.
+  //
+  // Clamped once, at the end, and nowhere else. Clamping each step instead would
+  // turn a dip below zero into a permanent gift: 100 in, 150 out, 100 in is 50
+  // owed, but step-clamping reports 100.
   for (const [debtId, balance] of balances) {
     if (balance < 0) balances.set(debtId, 0);
   }
 
   return balances;
+}
+
+/** One line of a debt's history, with the balance it left behind. */
+export interface DebtLedgerLine {
+  readonly event: DebtEventRecord;
+  /** Signed, from `debtEventDeltaMinor`. Zero for a line that moves no money. */
+  readonly deltaMinor: number;
+  /**
+   * The running balance after this line.
+   *
+   * Not clamped. A running total that hid its dip below zero would not add up to
+   * the figure the totals report, and a column that does not add up to its own
+   * heading is worse than one showing an uncomfortable number. A negative here
+   * is a real signal: more has been repaid than was ever recorded as owed.
+   */
+  readonly balanceAfterMinor: number;
+}
+
+/**
+ * Replays one debt's events into the running history a lender card shows.
+ *
+ * Built on the same delta function as `replayDebtBalances`, and clamped the same
+ * way — which is to say not at all until the end. `finalBalanceOf` below is the
+ * one place the two meet, and it is asserted in the tests: the last line of this
+ * series, clamped once, is exactly what the totals say is owed.
+ *
+ * Events are ordered by the day they happened and then by the order they were
+ * recorded, so two events on the same date do not swap places between renders
+ * and make the column appear to change.
+ */
+export function replayDebtLedger(
+  events: readonly DebtEventRecord[],
+  debtId: string,
+  asOf: BusinessDate,
+): readonly DebtLedgerLine[] {
+  const mine = events
+    .filter((event) => event.debtId === debtId && isOnOrBefore(event.occurredOn, asOf))
+    .sort((a, b) =>
+      a.occurredOn !== b.occurredOn
+        ? a.occurredOn < b.occurredOn
+          ? -1
+          : 1
+        : a.id < b.id
+          ? -1
+          : 1,
+    );
+
+  let running = 0;
+  return mine.map((event) => {
+    const deltaMinor = debtEventDeltaMinor(event);
+    running += deltaMinor;
+    return { event, deltaMinor, balanceAfterMinor: running };
+  });
+}
+
+/**
+ * What the ledger says is owed at the end — the totals' answer, from the series.
+ *
+ * The clamp lives here and only here, so the number under a lender's name and the
+ * number in `replayDebtBalances` cannot be produced by two different rules.
+ */
+export function finalBalanceOf(lines: readonly DebtLedgerLine[]): number {
+  const last = lines[lines.length - 1];
+  return last === undefined ? 0 : clampAtZero(last.balanceAfterMinor).resultMinor;
 }
 
 export interface DebtTotals {

@@ -2,7 +2,7 @@ import 'server-only';
 
 import type { Debt, DebtEventKind, DueDate } from '@family-finance/contracts';
 import { normaliseLenderName } from '@family-finance/contracts';
-import { replayDebtBalances } from '@family-finance/finance-engine';
+import { finalBalanceOf, replayDebtLedger } from '@family-finance/finance-engine';
 import type { StoreDocument } from '@family-finance/local-store';
 
 /**
@@ -13,9 +13,14 @@ import type { StoreDocument } from '@family-finance/local-store';
  * lender rather than two. Building it this way rather than as a table means there
  * is no second place a name can live and disagree with the debts themselves.
  *
- * Every balance on this page is replayed from the events by `replayDebtBalances`.
- * None is stored, so none can drift: the number shown and the lines that explain
- * it are computed from the same list, in the same pass.
+ * **No balance is calculated here.** Every figure on the card comes from the
+ * finance engine: `replayDebtLedger` walks the events and `finalBalanceOf` says
+ * what is left at the end, both over the same signed delta the totals use. This
+ * file once did its own arithmetic and clamped at every step while the engine
+ * clamped once at the end — so a debt that had dipped below zero and recovered
+ * showed one number in the heading and another in the last row of the column
+ * beneath it. There is now one calculation, and the heading is the last row by
+ * construction.
  */
 
 export interface LedgerLine {
@@ -25,9 +30,15 @@ export interface LedgerLine {
   readonly kind: DebtEventKind;
   readonly occurredOn: string;
   readonly amountMinor: number;
-  /** How this line moved the balance: +1, -1 or 0. */
-  readonly direction: 1 | -1 | 0;
-  /** The running balance after this line, in the order the events happened. */
+  /**
+   * How this line moved the balance, signed, from the engine's own delta.
+   *
+   * Carried rather than recomputed: the screen shows a sign beside the amount,
+   * and deriving that sign here would be the second opinion this file exists to
+   * no longer hold.
+   */
+  readonly deltaMinor: number;
+  /** The running balance after this line, straight from `replayDebtLedger`. */
   readonly balanceAfterMinor: number;
   readonly note: string | null;
   /** The import this line came from, when it came from a file. */
@@ -52,46 +63,19 @@ export interface LenderCard {
   readonly ledger: readonly LedgerLine[];
 }
 
-/** How each kind of event moves a balance, as a sign. */
-function directionOf(
-  kind: DebtEventKind,
-  correction: 'increase' | 'decrease' | null,
-): 1 | -1 | 0 {
-  if (kind === 'balance_correction') return correction === 'increase' ? 1 : -1;
-  switch (kind) {
-    case 'opening_balance':
-    case 'new_principal':
-    case 'interest_charge':
-    case 'fee_charge':
-      return 1;
-    case 'principal_payment':
-    case 'write_off':
-      return -1;
-    case 'interest_paid':
-    case 'fee_paid':
-    case 'note':
-      return 0;
-  }
-}
-
 /**
- * Orders events the way a ledger has to be read.
+ * Orders lines the way a ledger has to be read.
  *
- * By date, and within a date by the order they were recorded. Two events on the
- * same day must not swap places between one render and the next, or the running
- * balance column changes while the total does not.
+ * By date, then by identifier — the same tie-break `replayDebtLedger` uses, so
+ * merging two of a lender's debts into one list cannot reorder either of them
+ * against the running balance the engine computed for it.
  */
-function chronologically(
-  a: { occurredOn: string; createdAt: string; id: string },
-  b: { occurredOn: string; createdAt: string; id: string },
-): number {
+function chronologically(a: LedgerLine, b: LedgerLine): number {
   if (a.occurredOn !== b.occurredOn) return a.occurredOn < b.occurredOn ? -1 : 1;
-  if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
-  return a.id < b.id ? -1 : 1;
+  return a.eventId < b.eventId ? -1 : 1;
 }
 
 export function lenderCards(document: StoreDocument, today: string): readonly LenderCard[] {
-  const balances = replayDebtBalances(document.debtEvents, today);
   const grouped = new Map<string, Debt[]>();
 
   for (const debt of document.debts) {
@@ -111,34 +95,41 @@ export function lenderCards(document: StoreDocument, today: string): readonly Le
     if (first === undefined) continue;
 
     const names = [...new Set(ordered.map((debt) => debt.creditorName.trim()))];
-    const debtIds = new Set(ordered.map((debt) => debt.id));
 
-    const events = document.debtEvents
-      .filter((event) => debtIds.has(event.debtId))
+    /*
+     * The history, and the balance under the lender's name, from one place.
+     *
+     * `replayDebtLedger` is the engine's own walk over the events — the same
+     * delta function the totals use, clamped the same way. Nothing here adds up
+     * an event, so there is no second arithmetic that could disagree with the
+     * first. This file previously did its own sum and clamped at every step; the
+     * two then differed on any debt that had dipped below zero and recovered.
+     */
+    // The note and the import a line came from live on the stored event; the
+    // engine works with the financial facts alone.
+    const storedById = new Map(document.debtEvents.map((event) => [event.id, event]));
+
+    const ledger: LedgerLine[] = ordered
+      .flatMap((debt) =>
+        replayDebtLedger(document.debtEvents, debt.id, today).map((line) => {
+          const stored = storedById.get(line.event.id);
+          return {
+            eventId: line.event.id,
+            debtId: line.event.debtId,
+            debtName: debt.creditorName,
+            kind: line.event.kind,
+            occurredOn: line.event.occurredOn,
+            amountMinor: line.event.amountMinor,
+            deltaMinor: line.deltaMinor,
+            balanceAfterMinor: line.balanceAfterMinor,
+            note: stored?.note ?? null,
+            importBatchId: stored?.importBatchId ?? null,
+          };
+        }),
+      )
+      // One lender may hold more than one debt; the card lists them together, in
+      // the same order the engine walked each of them.
       .sort(chronologically);
-
-    // The running balance is accumulated per debt, so a lender with two debts
-    // shows each line against the debt it actually belongs to.
-    const running = new Map<string, number>();
-    const ledger: LedgerLine[] = events.map((event) => {
-      const direction = directionOf(event.kind, event.correctionEffect);
-      const before = running.get(event.debtId) ?? 0;
-      const after = Math.max(0, before + direction * event.amountMinor);
-      running.set(event.debtId, after);
-      return {
-        eventId: event.id,
-        debtId: event.debtId,
-        debtName:
-          ordered.find((debt) => debt.id === event.debtId)?.creditorName ?? first.creditorName,
-        kind: event.kind,
-        occurredOn: event.occurredOn,
-        amountMinor: event.amountMinor,
-        direction,
-        balanceAfterMinor: after,
-        note: event.note,
-        importBatchId: event.importBatchId,
-      };
-    });
 
     const withDates = ordered
       .map((debt) => ({ debtId: debt.id, due: debt.dueDate }))
@@ -154,8 +145,15 @@ export function lenderCards(document: StoreDocument, today: string): readonly Le
       aliases: names.filter((name) => name !== first.creditorName.trim()),
       debts: ordered,
       activeDebtCount: ordered.filter((debt) => debt.status === 'active').length,
+      /*
+       * The lender's balance is the sum of each debt's final balance, and each
+       * of those is `finalBalanceOf` over the very lines shown below it. The
+       * heading and the last row of the column are therefore the same number by
+       * construction rather than by agreement.
+       */
       currentBalanceMinor: ordered.reduce(
-        (total, debt) => total + (balances.get(debt.id) ?? 0),
+        (total, debt) =>
+          total + finalBalanceOf(replayDebtLedger(document.debtEvents, debt.id, today)),
         0,
       ),
       currency: first.currency,

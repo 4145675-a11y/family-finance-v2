@@ -147,7 +147,12 @@ export default async function LenderCardPage({
           <p className="mt-1">
             כל שורה בהיסטוריה מוסיפה או מחסירה. יתרת פתיחה והלוואה נוספת מוסיפות; תשלום ומחיקת
             חוב מחסירים; תיקון הולך לכיוון שנרשם בו; הערה אינה משנה דבר. הטור ״יתרה אחרי״ מראה
-            את המצב אחרי כל שורה.
+            את המצב אחרי כל שורה, והשורה האחרונה היא הסכום שלמעלה.
+          </p>
+          <p className="mt-2">
+            אם שורה מראה מספר שלילי, נרשם החזר גדול יותר ממה שנרשם אי־פעם כחוב. איננו מסתירים
+            זאת: הטור היה מפסיק להסתכם בסכום שמעליו, וזה בדיוק מה שגרם לשני המספרים לא להסכים
+            בעבר.
           </p>
         </div>
       </Card>
@@ -268,17 +273,26 @@ export default async function LenderCardPage({
                 </>
               )}
             </span>,
-            line.direction === 0 ? (
+            line.deltaMinor === 0 ? (
               <span key="amount" className="text-text-secondary">
                 —
               </span>
             ) : (
               <span key="amount">
-                {line.direction === 1 ? '+' : '−'}
+                {line.deltaMinor > 0 ? '+' : '−'}
                 <Money amountMinor={line.amountMinor} currency={card.currency} />
               </span>
             ),
-            <Money key="after" amountMinor={line.balanceAfterMinor} currency={card.currency} />,
+            /*
+             * Shown as the engine computed it, including a dip below zero. A
+             * column that quietly floored itself would stop adding up to the
+             * balance printed above it, which is how the two came to disagree in
+             * the first place.
+             */
+            <span key="after" className={line.balanceAfterMinor < 0 ? 'text-attention' : ''}>
+              {line.balanceAfterMinor < 0 ? '−' : ''}
+              <Money amountMinor={Math.abs(line.balanceAfterMinor)} currency={card.currency} />
+            </span>,
             line.note ?? '',
           ],
         }))}
