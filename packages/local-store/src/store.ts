@@ -163,7 +163,11 @@ export class HouseholdStore {
    */
   async run<T>(
     command: (document: StoreDocument, context: CommandContext) => CommandResult<T>,
-    options: { readonly now?: string; readonly expectedRevision?: string } = {},
+    options: {
+      readonly now?: string;
+      readonly expectedRevision?: string;
+      readonly report?: (outcome: { readonly alreadyRecorded: boolean }) => void;
+    } = {},
   ): Promise<T> {
     await this.allow();
     const now = options.now ?? new Date().toISOString();
@@ -175,6 +179,7 @@ export class HouseholdStore {
           throw new Error('the household has no profile to attribute changes to');
         }
         const outcome = command(document, { actorProfileId: profile.id, now });
+        options.report?.({ alreadyRecorded: outcome.alreadyRecorded === true });
         return { document: outcome.document, result: outcome.value };
       },
       options.expectedRevision === undefined

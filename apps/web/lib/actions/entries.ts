@@ -20,9 +20,9 @@ import {
 } from '@family-finance/local-store';
 import { revalidatePath } from 'next/cache';
 
-import { FieldReader, failed, succeeded, type FormState } from '../forms';
+import { FieldReader, failed, succeeded, type FormState, submissionKey } from '../forms';
 import { householdStore } from '../store/server';
-import { describe, refreshMoneyScreens } from './errors';
+import { ALREADY_RECORDED, describe, repeatWatch, refreshMoneyScreens } from './errors';
 
 /**
  * The manual entry surface: everything a family can record by hand.
@@ -59,33 +59,39 @@ export async function recordExpenseAction(
     return failed('בואו נשלים כמה פרטים.', reader.errors);
   }
 
+  const watch = repeatWatch();
+
   try {
     await (
       await householdStore()
-    ).run((document, context) =>
-      recordTransaction(
-        document,
-        {
-          accountId,
-          counterpartAccountId: null,
-          scope,
-          kind: 'expense',
-          direction: 'outflow',
-          amountMinor,
-          categoryId,
-          merchant,
-          transactionDate,
-          note,
-          status: 'confirmed',
-        },
-        context,
-      ),
+    ).run(
+      (document, context) =>
+        recordTransaction(
+          document,
+          {
+            idempotencyKey: submissionKey(data),
+            accountId,
+            counterpartAccountId: null,
+            scope,
+            kind: 'expense',
+            direction: 'outflow',
+            amountMinor,
+            categoryId,
+            merchant,
+            transactionDate,
+            note,
+            status: 'confirmed',
+          },
+          context,
+        ),
+      watch,
     );
   } catch (error) {
     return describe(error);
   }
 
   refreshMoneyScreens();
+  if (watch.repeated) return succeeded(ALREADY_RECORDED);
   return succeeded('ההוצאה נרשמה.');
 }
 
@@ -110,33 +116,39 @@ export async function recordIncomeAction(
     return failed('בואו נשלים כמה פרטים.', reader.errors);
   }
 
+  const watch = repeatWatch();
+
   try {
     await (
       await householdStore()
-    ).run((document, context) =>
-      recordTransaction(
-        document,
-        {
-          accountId,
-          counterpartAccountId: null,
-          scope,
-          kind: 'income',
-          direction: 'inflow',
-          amountMinor,
-          categoryId: null,
-          merchant,
-          transactionDate,
-          note,
-          status: 'confirmed',
-        },
-        context,
-      ),
+    ).run(
+      (document, context) =>
+        recordTransaction(
+          document,
+          {
+            idempotencyKey: submissionKey(data),
+            accountId,
+            counterpartAccountId: null,
+            scope,
+            kind: 'income',
+            direction: 'inflow',
+            amountMinor,
+            categoryId: null,
+            merchant,
+            transactionDate,
+            note,
+            status: 'confirmed',
+          },
+          context,
+        ),
+      watch,
     );
   } catch (error) {
     return describe(error);
   }
 
   refreshMoneyScreens();
+  if (watch.repeated) return succeeded(ALREADY_RECORDED);
   return succeeded('ההכנסה נרשמה.');
 }
 
@@ -169,33 +181,39 @@ export async function recordMovementAction(
     return failed('בואו נשלים כמה פרטים.', reader.errors);
   }
 
+  const watch = repeatWatch();
+
   try {
     await (
       await householdStore()
-    ).run((document, context) =>
-      recordTransaction(
-        document,
-        {
-          accountId,
-          counterpartAccountId,
-          scope: 'household',
-          kind,
-          direction: 'outflow',
-          amountMinor,
-          categoryId: null,
-          merchant: null,
-          transactionDate,
-          note,
-          status: 'confirmed',
-        },
-        context,
-      ),
+    ).run(
+      (document, context) =>
+        recordTransaction(
+          document,
+          {
+            idempotencyKey: submissionKey(data),
+            accountId,
+            counterpartAccountId,
+            scope: 'household',
+            kind,
+            direction: 'outflow',
+            amountMinor,
+            categoryId: null,
+            merchant: null,
+            transactionDate,
+            note,
+            status: 'confirmed',
+          },
+          context,
+        ),
+      watch,
     );
   } catch (error) {
     return describe(error);
   }
 
   refreshMoneyScreens();
+  if (watch.repeated) return succeeded(ALREADY_RECORDED);
   return succeeded(kind === 'settlement' ? 'תשלום הכרטיס נרשם.' : 'ההעברה נרשמה.');
 }
 
@@ -219,28 +237,34 @@ export async function recordBalanceAction(
     return failed('בואו נשלים כמה פרטים.', reader.errors);
   }
 
+  const watch = repeatWatch();
+
   try {
     await (
       await householdStore()
-    ).run((document, context) =>
-      recordBalance(
-        document,
-        {
-          accountId,
-          balanceMinor,
-          balanceDirection,
-          verifiedAt: `${verifiedOn}T12:00:00.000Z`,
-          source: 'manual_entry',
-          note,
-        },
-        context,
-      ),
+    ).run(
+      (document, context) =>
+        recordBalance(
+          document,
+          {
+            idempotencyKey: submissionKey(data),
+            accountId,
+            balanceMinor,
+            balanceDirection,
+            verifiedAt: `${verifiedOn}T12:00:00.000Z`,
+            source: 'manual_entry',
+            note,
+          },
+          context,
+        ),
+      watch,
     );
   } catch (error) {
     return describe(error);
   }
 
   refreshMoneyScreens();
+  if (watch.repeated) return succeeded(ALREADY_RECORDED);
   return succeeded('היתרה עודכנה. התמונה מעודכנת יותר עכשיו.');
 }
 
@@ -358,32 +382,38 @@ export async function addPlannedItemAction(
 
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
+  const watch = repeatWatch();
+
   try {
     await (
       await householdStore()
-    ).run((document, context) =>
-      addPlannedItem(
-        document,
-        {
-          label,
-          scope,
-          direction,
-          amountMinor,
-          certainty,
-          expectedDate,
-          dueDate,
-          essential,
-          categoryId,
-          accountId,
-        },
-        context,
-      ),
+    ).run(
+      (document, context) =>
+        addPlannedItem(
+          document,
+          {
+            idempotencyKey: submissionKey(data),
+            label,
+            scope,
+            direction,
+            amountMinor,
+            certainty,
+            expectedDate,
+            dueDate,
+            essential,
+            categoryId,
+            accountId,
+          },
+          context,
+        ),
+      watch,
     );
   } catch (error) {
     return describe(error);
   }
 
   refreshMoneyScreens();
+  if (watch.repeated) return succeeded(ALREADY_RECORDED);
   return succeeded(
     direction === 'inflow' ? 'נרשם ככסף שצפוי להיכנס.' : 'נרשם כתשלום שצפוי לרדת.',
   );
@@ -514,35 +544,41 @@ export async function addDebtAction(_previous: FormState, data: FormData): Promi
 
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
+  const watch = repeatWatch();
+
   try {
     await (
       await householdStore()
-    ).run((document, context) =>
-      addDebt(
-        document,
-        {
-          creditorName,
-          kind,
-          openingBalanceMinor,
-          openedOn,
-          effectiveAnnualRateBp,
-          minimumPaymentMinor,
-          paymentDueDay,
-          urgency,
-          promiseSummary,
-          relationshipSensitivity,
-          partialPaymentAllowed,
-          expectedCallDate,
-          notes,
-        },
-        context,
-      ),
+    ).run(
+      (document, context) =>
+        addDebt(
+          document,
+          {
+            idempotencyKey: submissionKey(data),
+            creditorName,
+            kind,
+            openingBalanceMinor,
+            openedOn,
+            effectiveAnnualRateBp,
+            minimumPaymentMinor,
+            paymentDueDay,
+            urgency,
+            promiseSummary,
+            relationshipSensitivity,
+            partialPaymentAllowed,
+            expectedCallDate,
+            notes,
+          },
+          context,
+        ),
+      watch,
     );
   } catch (error) {
     return describe(error);
   }
 
   refreshMoneyScreens();
+  if (watch.repeated) return succeeded(ALREADY_RECORDED);
   return succeeded('החוב נרשם.');
 }
 
@@ -759,15 +795,30 @@ export async function startBudgetAction(
   }
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
+  const watch = repeatWatch();
+
   try {
     await (
       await householdStore()
-    ).run((document, context) => startBudget(document, { period, lines: [] }, context));
+    ).run(
+      (document, context) =>
+        startBudget(
+          document,
+          {
+            idempotencyKey: submissionKey(data),
+            period,
+            lines: [],
+          },
+          context,
+        ),
+      watch,
+    );
   } catch (error) {
     return describe(error);
   }
 
   refreshMoneyScreens();
+  if (watch.repeated) return succeeded(ALREADY_RECORDED);
   return succeeded('התחלנו תקציב לחודש. אפשר לקבוע סכומים.');
 }
 
@@ -826,25 +877,30 @@ export async function addTaskAction(_previous: FormState, data: FormData): Promi
 
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
+  const watch = repeatWatch();
+
   try {
     await (
       await householdStore()
-    ).run((document, context) =>
-      addTask(
-        document,
-        {
-          title,
-          reason,
-          origin: recommendationKey === null ? 'manual' : 'recommendation',
-          recommendationKey,
-          amountMinor,
-          relatedDebtId,
-          relatedAccountId: null,
-          assignedMemberId,
-          dueOn,
-        },
-        context,
-      ),
+    ).run(
+      (document, context) =>
+        addTask(
+          document,
+          {
+            idempotencyKey: submissionKey(data),
+            title,
+            reason,
+            origin: recommendationKey === null ? 'manual' : 'recommendation',
+            recommendationKey,
+            amountMinor,
+            relatedDebtId,
+            relatedAccountId: null,
+            assignedMemberId,
+            dueOn,
+          },
+          context,
+        ),
+      watch,
     );
   } catch (error) {
     return describe(error);
@@ -852,6 +908,7 @@ export async function addTaskAction(_previous: FormState, data: FormData): Promi
 
   revalidatePath('/tasks');
   revalidatePath('/');
+  if (watch.repeated) return succeeded(ALREADY_RECORDED);
   return succeeded('המשימה נוספה.');
 }
 

@@ -4,7 +4,7 @@ import { recordDebtEvent } from '@family-finance/local-store';
 
 import { FieldReader, failed, succeeded, type FormState } from '../forms';
 import { householdStore } from '../store/server';
-import { describe, refreshMoneyScreens } from './errors';
+import { ALREADY_RECORDED, describe, refreshMoneyScreens, repeatWatch } from './errors';
 
 /**
  * Adding a line to a lender's ledger.
@@ -72,28 +72,37 @@ export async function recordLedgerActionAction(
   if (debtId === null) reader.problem('debtId', 'לא ברור לאיזה חוב זה שייך');
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
+  /*
+   * Whether this submission was the one that recorded the action, or a repeat of
+   * one already recorded. Both are successes; they are not the same sentence.
+   */
+  const watch = repeatWatch();
+
   try {
     await (
       await householdStore()
-    ).run((document, context) =>
-      recordDebtEvent(
-        document,
-        {
-          debtId: debtId ?? '',
-          kind,
-          amountMinor,
-          occurredOn,
-          correctionEffect,
-          note: note === '' ? null : note,
-          ...(idempotencyKey === null ? {} : { idempotencyKey }),
-        },
-        context,
-      ),
+    ).run(
+      (document, context) =>
+        recordDebtEvent(
+          document,
+          {
+            debtId: debtId ?? '',
+            kind,
+            amountMinor,
+            occurredOn,
+            correctionEffect,
+            note: note === '' ? null : note,
+            ...(idempotencyKey === null ? {} : { idempotencyKey }),
+          },
+          context,
+        ),
+      watch,
     );
   } catch (error) {
     return describe(error);
   }
 
+  // Only now — the write returned and the screens are about to re-read.
   refreshMoneyScreens();
-  return succeeded('הפעולה נרשמה בכרטיס המלווה.');
+  return succeeded(watch.repeated ? ALREADY_RECORDED : 'הפעולה נרשמה בכרטיס המלווה.');
 }

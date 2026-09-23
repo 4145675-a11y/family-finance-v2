@@ -10,11 +10,11 @@ import {
 } from '@family-finance/local-store';
 import { revalidatePath } from 'next/cache';
 
-import { FieldReader, failed, succeeded, type FormState } from '../forms';
+import { FieldReader, failed, succeeded, type FormState, submissionKey } from '../forms';
 import { householdStore, supabaseHouseholdStore } from '../store/server';
 import { activeBackend } from '../auth/backend';
 import { accountScreen } from '../copy/security';
-import { describe, refreshMoneyScreens } from './errors';
+import { ALREADY_RECORDED, describe, repeatWatch, refreshMoneyScreens } from './errors';
 
 /**
  * Setting the household up, and changing the few decisions that shape every
@@ -201,19 +201,24 @@ export async function addBusinessAction(
 
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
+  const watch = repeatWatch();
+
   try {
     await (
       await householdStore()
-    ).run((document, context) =>
-      addBusiness(
-        document,
-        {
-          name,
-          taxReserveRateBp: taxReserveRateBp ?? 2_500,
-          operatingReserveMinor: operatingReserveMinor ?? 0,
-        },
-        context,
-      ),
+    ).run(
+      (document, context) =>
+        addBusiness(
+          document,
+          {
+            idempotencyKey: submissionKey(data),
+            name,
+            taxReserveRateBp: taxReserveRateBp ?? 2_500,
+            operatingReserveMinor: operatingReserveMinor ?? 0,
+          },
+          context,
+        ),
+      watch,
     );
   } catch (error) {
     return describe(error);
@@ -221,6 +226,7 @@ export async function addBusinessAction(
 
   refreshMoneyScreens();
   revalidatePath('/setup');
+  if (watch.repeated) return succeeded(ALREADY_RECORDED);
   return succeeded('העסק נוסף. אפשר להוסיף לו חשבון.');
 }
 
@@ -269,27 +275,33 @@ export async function addAccountAction(
 
   if (!reader.ok) return failed('בואו נשלים כמה פרטים.', reader.errors);
 
+  const watch = repeatWatch();
+
   try {
     const id = await (
       await householdStore()
-    ).run((document, context) =>
-      addAccount(
-        document,
-        {
-          name,
-          kind,
-          scope,
-          institution,
-          displaySuffix: suffix,
-          openingBalanceMinor,
-          openingBalanceDirection: direction,
-          openingBalanceDate,
-        },
-        context,
-      ),
+    ).run(
+      (document, context) =>
+        addAccount(
+          document,
+          {
+            idempotencyKey: submissionKey(data),
+            name,
+            kind,
+            scope,
+            institution,
+            displaySuffix: suffix,
+            openingBalanceMinor,
+            openingBalanceDirection: direction,
+            openingBalanceDate,
+          },
+          context,
+        ),
+      watch,
     );
     refreshMoneyScreens();
     revalidatePath('/setup');
+    if (watch.repeated) return succeeded(ALREADY_RECORDED, id);
     return succeeded(`${name} נוסף.`, id);
   } catch (error) {
     return describe(error);

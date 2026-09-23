@@ -108,7 +108,11 @@ export class SupabaseHouseholdStore implements HouseholdStorePort {
 
   async run<T>(
     command: (document: StoreDocument, context: CommandContext) => CommandResult<T>,
-    options: { readonly now?: string; readonly expectedRevision?: string } = {},
+    options: {
+      readonly now?: string;
+      readonly expectedRevision?: string;
+      readonly report?: (outcome: { readonly alreadyRecorded: boolean }) => void;
+    } = {},
   ): Promise<T> {
     const now = options.now ?? new Date().toISOString();
     const { document, version } = await this.load();
@@ -120,6 +124,7 @@ export class SupabaseHouseholdStore implements HouseholdStorePort {
     }
 
     const outcome = command(document, { actorProfileId: this.actorProfileId, now });
+    options.report?.({ alreadyRecorded: outcome.alreadyRecorded === true });
     const changes = changesBetween(document, outcome.document, this.actorProfileId);
     if (isEmptyChangeSet(changes)) return outcome.value;
 

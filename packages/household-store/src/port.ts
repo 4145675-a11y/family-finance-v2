@@ -29,7 +29,12 @@ export interface HouseholdStorePort {
   context(now?: string): Promise<CommandContext>;
   run<T>(
     command: (document: StoreDocument, context: CommandContext) => CommandResult<T>,
-    options?: { readonly now?: string; readonly expectedRevision?: string },
+    options?: {
+      readonly now?: string;
+      readonly expectedRevision?: string;
+      /** Told whether the command found the action already recorded. */
+      readonly report?: (outcome: { readonly alreadyRecorded: boolean }) => void;
+    },
   ): Promise<T>;
   /** Replaces everything. Restore only, and not every backend supports it. */
   replaceDocument(document: StoreDocument): Promise<void>;

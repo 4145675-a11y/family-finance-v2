@@ -47,7 +47,9 @@ export function addLearnedRule(
       rule.matcher.direction === input.matcher.direction &&
       rule.matcher.accountId === input.matcher.accountId,
   );
-  if (existing !== undefined) return { document, value: existing.id };
+  if (existing !== undefined) {
+    return { document, value: existing.id, alreadyRecorded: true };
+  }
 
   const rule: LearnedRule = {
     id: crypto.randomUUID(),

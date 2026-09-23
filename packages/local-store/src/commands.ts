@@ -41,6 +41,14 @@ export interface CommandContext {
 export interface CommandResult<T = void> {
   readonly document: StoreDocument;
   readonly value: T;
+  /**
+   * True when this call found the action already recorded and wrote nothing.
+   *
+   * Carried so a screen can say "already recorded" rather than a second
+   * "saved", which would be true but would also tell a person their second
+   * press did something.
+   */
+  readonly alreadyRecorded?: boolean;
 }
 
 export class CommandError extends Error {
@@ -54,6 +62,59 @@ export class CommandError extends Error {
 }
 
 const newId = (): string => crypto.randomUUID();
+
+/**
+ * The identifier a new record will carry, and whether it is already there.
+ *
+ * This is how a repeated submission becomes one record rather than two, and it
+ * is deliberately the simplest durable mechanism available: **the record's own
+ * primary key is the idempotency key.**
+ *
+ * A form renders one identifier and submits it with the action. If the same
+ * submission arrives twice — a double click, a retry after a slow response, a
+ * refresh of a page that posted, two requests racing each other — the second one
+ * names a record that already exists, so the command returns the original and
+ * writes nothing. The change set is then empty and `run` does not even reach the
+ * database.
+ *
+ * Why not a separate ledger of seen request identifiers: a second table has to
+ * be written in the same transaction as the record, pruned, and kept in step
+ * with it, and every one of those is a way for the two to disagree. A primary key
+ * is already unique, already durable, already atomic, and already enforced by
+ * the database on the very row being created — including for two requests that
+ * arrive at once, where the unique index decides and the loser writes nothing.
+ *
+ * A caller that omits the key gets a fresh identifier and no protection, which is
+ * correct for callers that genuinely mean "another one" — the import pipeline
+ * creating two identical rows from two identical lines in a file.
+ */
+function claimId<T extends { readonly id: string }>(
+  existing: readonly T[],
+  idempotencyKey: string | undefined,
+): { readonly id: string; readonly already: T | undefined } {
+  if (idempotencyKey === undefined) return { id: newId(), already: undefined };
+  return {
+    id: idempotencyKey,
+    already: existing.find((record) => record.id === idempotencyKey),
+  };
+}
+
+/**
+ * Carried by every command that creates a record.
+ *
+ * Optional on purpose: an omitted key means "this is a new action", which is what
+ * a caller without a form — a test, the importer, a migration — always means.
+ */
+export interface Idempotent {
+  /**
+   * The identifier the new record will have. Supplied by the form that rendered.
+   *
+   * Explicitly `| undefined` so a caller may pass the value it read straight
+   * through, whether or not the form carried one, without having to build the
+   * argument object two different ways.
+   */
+  readonly idempotencyKey?: string | undefined;
+}
 
 function requireAccount(document: StoreDocument, accountId: string) {
   const account = document.accounts.find((candidate) => candidate.id === accountId);
@@ -239,7 +300,7 @@ export function updateSettings(
 // Accounts and balances
 // ---------------------------------------------------------------------------
 
-export interface AddAccountInput {
+export interface AddAccountInput extends Idempotent {
   readonly name: string;
   readonly kind: AccountKind;
   readonly scope: RecordScope;
@@ -260,8 +321,14 @@ export function addAccount(
     throw new CommandError('no_business', 'a business account needs a business to belong to');
   }
 
+  const claim = claimId(document.accounts, input.idempotencyKey);
+  // The same submission arriving twice names a record that is already here.
+  if (claim.already !== undefined) {
+    return { document, value: claim.already.id, alreadyRecorded: true };
+  }
+
   const account = {
-    id: newId(),
+    id: claim.id,
     householdId: document.household.id,
     businessId: business?.id ?? null,
     scope: input.scope,
@@ -350,7 +417,7 @@ export function closeAccount(
   };
 }
 
-export interface RecordBalanceInput {
+export interface RecordBalanceInput extends Idempotent {
   readonly accountId: string;
   readonly balanceMinor: number;
   readonly balanceDirection: Direction;
@@ -377,8 +444,14 @@ export function recordBalance(
 ): CommandResult<string> {
   requireAccount(document, input.accountId);
 
+  const claim = claimId(document.balanceSnapshots, input.idempotencyKey);
+  // The same submission arriving twice names a record that is already here.
+  if (claim.already !== undefined) {
+    return { document, value: claim.already.id, alreadyRecorded: true };
+  }
+
   const snapshot = {
-    id: newId(),
+    id: claim.id,
     householdId: document.household.id,
     accountId: input.accountId,
     balanceMinor: input.balanceMinor,
@@ -418,7 +491,7 @@ export function recordBalance(
 // Transactions
 // ---------------------------------------------------------------------------
 
-export interface RecordTransactionInput {
+export interface RecordTransactionInput extends Idempotent {
   readonly accountId: string;
   readonly counterpartAccountId: string | null;
   readonly scope: RecordScope;
@@ -462,8 +535,14 @@ export function recordTransaction(
     throw new CommandError('amount_required', 'an amount must be greater than zero');
   }
 
+  const claim = claimId(document.transactions, input.idempotencyKey);
+  // The same submission arriving twice names a record that is already here.
+  if (claim.already !== undefined) {
+    return { document, value: claim.already.id, alreadyRecorded: true };
+  }
+
   const transaction: StoredTransaction = {
-    id: newId(),
+    id: claim.id,
     householdId: document.household.id,
     accountId: input.accountId,
     counterpartAccountId: input.counterpartAccountId,
@@ -615,7 +694,7 @@ export function acceptReconciliationGap(
 // Expected money in and out
 // ---------------------------------------------------------------------------
 
-export interface AddPlannedItemInput {
+export interface AddPlannedItemInput extends Idempotent {
   readonly label: string;
   readonly scope: RecordScope;
   readonly direction: Direction;
@@ -634,8 +713,14 @@ export function addPlannedItem(
   input: AddPlannedItemInput,
   context: CommandContext,
 ): CommandResult<string> {
+  const claim = claimId(document.cashflowItems, input.idempotencyKey);
+  // The same submission arriving twice names a record that is already here.
+  if (claim.already !== undefined) {
+    return { document, value: claim.already.id, alreadyRecorded: true };
+  }
+
   const item = {
-    id: newId(),
+    id: claim.id,
     householdId: document.household.id,
     scope: input.scope,
     accountId: input.accountId,
@@ -775,7 +860,7 @@ export function removePlannedItem(
 // Debts
 // ---------------------------------------------------------------------------
 
-export interface AddDebtInput {
+export interface AddDebtInput extends Idempotent {
   readonly creditorName: string;
   readonly kind: DebtKind;
   readonly openingBalanceMinor: number;
@@ -808,8 +893,14 @@ export function addDebt(
 ): CommandResult<string> {
   const isPrivate = input.kind === 'private_person';
 
+  const claim = claimId(document.debts, input.idempotencyKey);
+  // The same submission arriving twice names a record that is already here.
+  if (claim.already !== undefined) {
+    return { document, value: claim.already.id, alreadyRecorded: true };
+  }
+
   const debt = {
-    id: newId(),
+    id: claim.id,
     householdId: document.household.id,
     kind: input.kind,
     creditorName: input.creditorName.trim(),
@@ -933,7 +1024,7 @@ export function recordDebtEvent(
    */
   const eventId = input.idempotencyKey ?? newId();
   const already = document.debtEvents.find((candidate) => candidate.id === eventId);
-  if (already !== undefined) return { document, value: already.id };
+  if (already !== undefined) return { document, value: already.id, alreadyRecorded: true };
 
   const event = {
     id: eventId,
@@ -1064,7 +1155,7 @@ export function recordRollover(
 // Business
 // ---------------------------------------------------------------------------
 
-export interface AddBusinessInput {
+export interface AddBusinessInput extends Idempotent {
   readonly name: string;
   readonly taxReserveRateBp: number;
   readonly operatingReserveMinor: number;
@@ -1079,8 +1170,14 @@ export function addBusiness(
     throw new CommandError('business_exists', 'this household already has a business');
   }
 
+  const claim = claimId(document.businesses, input.idempotencyKey);
+  // The same submission arriving twice names a record that is already here.
+  if (claim.already !== undefined) {
+    return { document, value: claim.already.id, alreadyRecorded: true };
+  }
+
   const business = {
-    id: newId(),
+    id: claim.id,
     householdId: document.household.id,
     name: input.name.trim(),
     taxReserveRateBp: input.taxReserveRateBp,
@@ -1193,7 +1290,7 @@ export function transferToHousehold(
 // Budget
 // ---------------------------------------------------------------------------
 
-export interface StartBudgetInput {
+export interface StartBudgetInput extends Idempotent {
   /** `YYYY-MM`. */
   readonly period: string;
   readonly lines: readonly { categoryKey: BudgetCategoryKey; plannedMinor: number }[];
@@ -1437,7 +1534,7 @@ export const ALL_BUDGET_CATEGORY_KEYS = BUDGET_CATEGORY_KEYS;
 // Tasks
 // ---------------------------------------------------------------------------
 
-export interface AddTaskInput {
+export interface AddTaskInput extends Idempotent {
   readonly title: string;
   readonly reason: string | null;
   readonly origin: 'manual' | 'recommendation';
@@ -1454,8 +1551,14 @@ export function addTask(
   input: AddTaskInput,
   context: CommandContext,
 ): CommandResult<string> {
+  const claim = claimId(document.tasks, input.idempotencyKey);
+  // The same submission arriving twice names a record that is already here.
+  if (claim.already !== undefined) {
+    return { document, value: claim.already.id, alreadyRecorded: true };
+  }
+
   const task = {
-    id: newId(),
+    id: claim.id,
     householdId: document.household.id,
     title: input.title.trim(),
     reason: input.reason,

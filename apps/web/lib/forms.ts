@@ -258,3 +258,18 @@ export function todayInJerusalem(now = new Date()): string {
     day: '2-digit',
   }).format(now);
 }
+
+/**
+ * The identifier the form carried, for the record this action will create.
+ *
+ * `ActionForm` puts one on every form in the product, so an action only has to
+ * pass it through. Absent — a form posted by something other than the app, or an
+ * old cached page — the command mints its own and the write proceeds normally;
+ * the protection is lost for that one submission rather than the action failing.
+ */
+export function submissionKey(data: FormData): string | undefined {
+  const value = data.get('idempotencyKey');
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length >= 8 ? trimmed : undefined;
+}

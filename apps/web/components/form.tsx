@@ -1,6 +1,13 @@
 'use client';
 
-import { createContext, useActionState, useContext, useId, type ReactNode } from 'react';
+import {
+  createContext,
+  useActionState,
+  useContext,
+  useId,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { idleForm, type FormState } from '../lib/forms';
@@ -46,6 +53,55 @@ export interface ActionFormProps {
   tone?: 'primary' | 'secondary' | 'danger';
 }
 
+/**
+ * The identifier one filled-in form carries, for as long as it means one action.
+ *
+ * It is minted when the form appears and submitted with it. The server uses it
+ * as the new record's primary key, so the same form submitted twice — a double
+ * click, a retry after a slow response, two requests racing — names a record
+ * that already exists and writes nothing the second time.
+ *
+ * It is kept in `sessionStorage` so that a refresh mid-submit does not turn one
+ * intention into two: the reloaded page carries the same identifier, and the
+ * server recognises it. The entry is removed once the action has succeeded, so
+ * the next genuine action gets a new one and two real payments of the same
+ * amount both save. One small string per open form, cleared on success — bounded
+ * and inspectable, not an opaque cache.
+ *
+ * This is a convenience over the durable guarantee, not the guarantee itself.
+ * The record's primary key is what actually prevents the duplicate, in the
+ * database, whatever the browser does.
+ */
+function SubmissionKeyField({ slot, afterSuccess }: { slot: string; afterSuccess: boolean }) {
+  // Lazy initialiser: runs once per mount. The field is remounted by its `key`
+  // when a submission succeeds, which is what rotates the identifier — no state
+  // is set from an effect, and nothing recomputes on an unrelated render.
+  const [value] = useState(() => (afterSuccess ? mintFresh(slot) : readOrMint(slot)));
+  return <input type="hidden" name="idempotencyKey" value={value} readOnly />;
+}
+
+function readOrMint(slot: string): string {
+  try {
+    const stored = window.sessionStorage.getItem(slot);
+    if (stored !== null && stored.length >= 8) return stored;
+    return mintFresh(slot);
+  } catch {
+    // A browser that refuses storage still works; it just loses the
+    // across-refresh part, which is the convenience and not the guarantee.
+    return crypto.randomUUID();
+  }
+}
+
+function mintFresh(slot: string): string {
+  const minted = crypto.randomUUID();
+  try {
+    window.sessionStorage.setItem(slot, minted);
+  } catch {
+    // Same as above: the identifier still travels with this submission.
+  }
+  return minted;
+}
+
 export function ActionForm({
   action,
   submitLabel,
@@ -55,6 +111,9 @@ export function ActionForm({
   tone = 'primary',
 }: ActionFormProps) {
   const [state, formAction] = useActionState(action, idleForm);
+  // One slot per form on the page, stable across renders and refreshes.
+  const slot = `ff:submission:${useId()}`;
+  const succeeded = state.status === 'success';
 
   return (
     <FormStateContext.Provider value={state}>
@@ -65,6 +124,15 @@ export function ActionForm({
         // when the caller asked for that behaviour.
         key={resetOnSuccess && state.status === 'success' ? state.message : 'form'}
       >
+        {/*
+         * Carried by every form in the product, so no screen has to remember to
+         * add it and no write path is left without it.
+         */}
+        <SubmissionKeyField
+          key={succeeded ? `recorded:${state.message}` : 'open'}
+          slot={slot}
+          afterSuccess={succeeded}
+        />
         {children}
         <div className="flex flex-wrap items-center gap-3">
           <SubmitButton label={submitLabel} tone={tone} />

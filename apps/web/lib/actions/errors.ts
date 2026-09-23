@@ -125,3 +125,35 @@ export const FALLBACK_MESSAGE = 'לא הצלחנו לשמור את השינוי.
 
 /** Exposed so a test can prove every code the store can throw has a sentence. */
 export const ERROR_MESSAGES = MESSAGES;
+
+/**
+ * Watching a write to see whether it was the one that recorded the action.
+ *
+ * Every command now carries the submission's identifier as the new record's
+ * primary key, so a double click, a retry after a slow response or two requests
+ * racing all name a record that already exists and the second write does
+ * nothing. That is the guarantee. This is how a screen says so.
+ *
+ * It matters that the two are told apart. "נשמר" after a repeat is not false —
+ * the action *is* recorded — but it invites the person to wonder whether they
+ * have now paid twice, and the honest answer to a second click is that nothing
+ * new happened. A watcher is passed straight to `run` as its options, and the
+ * action reads `repeated` after the write returns.
+ */
+export function repeatWatch(): {
+  readonly report: (outcome: { readonly alreadyRecorded: boolean }) => void;
+  readonly repeated: boolean;
+} {
+  let seen = false;
+  return {
+    report: (outcome) => {
+      seen = outcome.alreadyRecorded;
+    },
+    get repeated() {
+      return seen;
+    },
+  };
+}
+
+/** What a screen says when the submission it just received was already recorded. */
+export const ALREADY_RECORDED = 'הפעולה הזו כבר נרשמה. לא נוצרה רשומה כפולה.';
