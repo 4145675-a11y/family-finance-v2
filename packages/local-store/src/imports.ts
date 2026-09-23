@@ -5,13 +5,15 @@ import type {
   ProposedPayload,
   ReviewState,
 } from '@family-finance/contracts';
-import { normaliseLenderName } from '@family-finance/contracts';
+import { REVIEW_REQUIREMENT, normaliseLenderName } from '@family-finance/contracts';
 import {
   assessDuplicate,
   sourceFingerprint,
   type ExtractionResult,
   type ExistingRecord,
 } from '@family-finance/document-import';
+
+import { classifyBatch } from '@family-finance/transaction-intelligence';
 
 import { auditEvent, withAudit } from './audit';
 import { clearCheck } from './checks';
@@ -25,6 +27,7 @@ import {
   type CommandResult,
 } from './commands';
 import type { StoreDocument } from './document';
+import { activeLearnedRules } from './learned-rules';
 import { isRealTransaction } from './projection';
 
 /**
@@ -69,8 +72,46 @@ export function stageExtraction(
   const batchId = crypto.randomUUID();
   const existing = existingRecordsFor(document);
 
+  /*
+   * What each row appears to be, decided before anything is written.
+   *
+   * The suggestion is attached to the proposal and changes nothing else: no
+   * amount, no direction, no date, and no balance anywhere. It exists so the
+   * review screen can offer an answer instead of a blank, and so the decision a
+   * person makes has something to be a decision *about*.
+   */
+  const rules = activeLearnedRules(document);
+  const debtHints = document.debts.map((debt) => ({
+    id: debt.id,
+    creditorName: debt.creditorName,
+    status: debt.status,
+  }));
+  const transactionRows = input.extraction.proposals.flatMap((proposal) =>
+    proposal.proposed.kind === 'transaction'
+      ? [
+          {
+            description: proposal.proposed.value.description,
+            amountMinor: proposal.proposed.value.amountMinor,
+            direction: proposal.proposed.value.direction,
+            date: proposal.proposed.value.transactionDate,
+            reference: proposal.proposed.value.reference,
+            bankName: null,
+            accountKind: null,
+          },
+        ]
+      : [],
+  );
+  const suggestions = classifyBatch(transactionRows, {
+    householdRules: rules,
+    debts: debtHints,
+    accountId: input.targetAccountId,
+  });
+  let suggestionAt = 0;
+
   const proposals: ImportProposal[] = input.extraction.proposals.map((proposal) => {
     const fingerprint = sourceFingerprint(input.sha256, proposal.location);
+    const classification =
+      proposal.proposed.kind === 'transaction' ? (suggestions[suggestionAt++] ?? null) : null;
     const assessment =
       proposal.proposed.kind === 'transaction'
         ? assessDuplicate(
@@ -101,9 +142,12 @@ export function stageExtraction(
       duplicateOfId: assessment.matchedId,
       reviewState: 'pending' as ReviewState,
       targetAccountId: input.targetAccountId,
+      // A suggestion may name a debt, but never attaches the row to it. That is
+      // a decision, and it is made on the review screen.
       targetDebtId: null,
       targetCheckId: null,
       committedRecordId: null,
+      classification,
       createdAt: context.now,
       updatedAt: context.now,
       version: 1,
@@ -332,7 +376,20 @@ export function reviewProposal(
 /** Applies one decision to every row of a batch at once. */
 export function reviewAll(
   document: StoreDocument,
-  input: { batchId: string; reviewState: ReviewState; onlyPending: boolean },
+  input: {
+    batchId: string;
+    reviewState: ReviewState;
+    onlyPending: boolean;
+    /**
+     * Restrict a bulk *include* to rows the classifier was confident about.
+     *
+     * This is what makes "confirm everything obvious" safe to offer. Without it
+     * a single button would sweep in the rows nobody has looked at, which is the
+     * exact opposite of what the review screen is for. Excluding in bulk is
+     * never restricted: deciding not to import something is always safe.
+     */
+    onlyHighConfidence?: boolean;
+  },
   context: CommandContext,
 ): CommandResult<number> {
   const batch = document.importBatches.find((candidate) => candidate.id === input.batchId);
@@ -344,6 +401,16 @@ export function reviewAll(
   const importProposals = document.importProposals.map((proposal) => {
     if (proposal.batchId !== input.batchId) return proposal;
     if (input.onlyPending && proposal.reviewState !== 'pending') return proposal;
+
+    if (input.onlyHighConfidence === true && input.reviewState === 'included') {
+      const suggestion = proposal.classification ?? null;
+      if (suggestion === null) return proposal;
+      if (REVIEW_REQUIREMENT[suggestion.confidence] !== 'may_preselect') return proposal;
+      // A row that would move a debt balance is never swept in, however
+      // confident the reading of the words was.
+      if (suggestion.requiresDebtChoice && proposal.targetDebtId === null) return proposal;
+    }
+
     touched += 1;
     return {
       ...proposal,
@@ -408,6 +475,36 @@ export function checkApproval(document: StoreDocument, batchId: string): Approva
     }
     if (payload.kind === 'transaction' && payload.value.amountMinor <= 0) {
       blocking.push({ proposalId: proposal.id, reason: 'needs_amount' });
+    }
+
+    const suggestion = proposal.classification ?? null;
+    if (suggestion !== null) {
+      /*
+       * A row the classifier read as a repayment but could not tie to a lender.
+       *
+       * This is the guard the requirement is about: until a person names the
+       * loan, no debt balance may move. It is deliberately independent of
+       * confidence — a line can say "חיוב הלוואה" beyond doubt and still not say
+       * whose loan it was.
+       */
+      if (suggestion.requiresDebtChoice && proposal.targetDebtId === null) {
+        blocking.push({ proposalId: proposal.id, reason: 'needs_debt' });
+      }
+
+      /*
+       * Low confidence is not blocked here, and that is deliberate.
+       *
+       * Every row already has to be moved out of `pending` by a person before the
+       * batch can be approved, so an unrecognised row cannot pass through on the
+       * classifier's word — including it *is* the decision the requirement asks
+       * for. Demanding an edit on top of that would force a family to retype an
+       * answer for every ordinary shop the rule table happens not to know, which
+       * teaches them to click past the screen rather than read it.
+       *
+       * What confidence governs instead is what the screen may do unasked:
+       * `REVIEW_REQUIREMENT` lets only `high` be preselected, and `reviewAll`
+       * refuses to bulk-include anything below it.
+       */
     }
     /*
      * A debt row naming a lender the household already has.

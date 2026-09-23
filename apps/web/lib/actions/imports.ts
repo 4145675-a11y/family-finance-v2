@@ -390,6 +390,13 @@ export async function reviewAllAction(
     'included',
   );
   const onlyPending = reader.boolean('onlyPending');
+  /**
+   * Restrict a bulk include to what the classifier was confident about.
+   *
+   * The store refuses to sweep in anything else, so this flag cannot become a
+   * way of approving unread rows even if the form is submitted by hand.
+   */
+  const onlyHighConfidence = reader.boolean('onlyHighConfidence');
 
   if (!reader.ok || batchId === null) {
     return failed('בואו נשלים כמה פרטים.', reader.errors);
@@ -400,7 +407,7 @@ export async function reviewAllAction(
     touched = await (
       await householdStore()
     ).run((document, context) =>
-      reviewAll(document, { batchId, reviewState, onlyPending }, context),
+      reviewAll(document, { batchId, reviewState, onlyPending, onlyHighConfidence }, context),
     );
   } catch (error) {
     return describe(error);
@@ -408,7 +415,11 @@ export async function reviewAllAction(
 
   revalidatePath(`/imports/${batchId}`);
   return succeeded(
-    reviewState === 'included' ? `${touched} שורות סומנו להכללה.` : `${touched} שורות הוצאו.`,
+    reviewState === 'included'
+      ? onlyHighConfidence
+        ? `${touched} שורות ברורות סומנו להכללה. השאר ממתינות לכם.`
+        : `${touched} שורות סומנו להכללה.`
+      : `${touched} שורות הוצאו.`,
   );
 }
 

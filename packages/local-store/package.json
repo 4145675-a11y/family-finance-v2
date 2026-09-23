@@ -13,6 +13,7 @@
     "@family-finance/contracts": "*",
     "@family-finance/document-import": "*",
     "@family-finance/finance-engine": "*",
+    "@family-finance/transaction-intelligence": "*",
     "zod": "4.4.3"
   }
 }

@@ -10,6 +10,7 @@ import {
   recordScopeSchema,
 } from './money';
 import { accountKindSchema } from './accounts';
+import { classificationSuggestionSchema } from './classification';
 import { budgetCategoryKeySchema } from './budget';
 import { dueDateSchema } from './calendar';
 import { debtKindSchema } from './debt';
@@ -299,6 +300,15 @@ export const importProposalSchema = z
     targetCheckId: uuidSchema.nullable(),
     /** The record created when the batch was approved. Null until then. */
     committedRecordId: uuidSchema.nullable(),
+    /**
+     * What the classifier made of this row, and why.
+     *
+     * A suggestion and nothing more: it changes no amount, no direction and no
+     * date, and the row still travels through the same review. Optional because
+     * every proposal recorded before the classifier existed has none, and absent
+     * means "nobody proposed anything", which is the honest reading.
+     */
+    classification: classificationSuggestionSchema.nullable().optional(),
     createdAt: timestampSchema,
     updatedAt: timestampSchema,
     version: versionSchema,

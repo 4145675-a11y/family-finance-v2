@@ -48,6 +48,7 @@ export interface LoadedHousehold {
   readonly importSourceFiles: JsonRow[];
   readonly importBatches: JsonRow[];
   readonly importProposals: JsonRow[];
+  readonly learnedRules: JsonRow[];
   readonly audit: JsonRow[];
 }
 
@@ -195,6 +196,29 @@ export function documentFromLoaded(loaded: LoadedHousehold): StoreDocument {
         createdAt: p['createdAt'],
         updatedAt: p['updatedAt'],
         version: p['version'],
+      };
+    }),
+    learnedRules: (loaded.learnedRules ?? []).map((r) => {
+      const rule = rowToCamel(r);
+      return {
+        id: rule['id'],
+        householdId: rule['householdId'],
+        label: rule['label'],
+        matcher: {
+          descriptionContains: rule['descriptionContains'],
+          direction: rule['direction'] ?? null,
+          accountId: rule['accountId'] ?? null,
+        },
+        class: rule['class'],
+        budgetCategoryKey: rule['budgetCategoryKey'] ?? null,
+        counterparty: rule['counterparty'] ?? null,
+        debtId: rule['debtId'] ?? null,
+        enabled: rule['enabled'],
+        timesApplied: rule['timesApplied'],
+        createdBy: rule['createdBy'],
+        createdAt: rule['createdAt'],
+        updatedAt: rule['updatedAt'],
+        version: rule['version'],
       };
     }),
     audit: loaded.audit.map((r) => rowToCamel(r)),
@@ -394,6 +418,39 @@ export function changesBetween(
         updated_at: b.updatedAt,
         version: b.version,
       })),
+    };
+  }
+
+  /*
+   * Classification rules, which are the one collection a household may delete
+   * from.
+   *
+   * Every financial record here is append-only or voidable, never removed — but a
+   * rule is not a record of anything that happened. It describes how to read the
+   * next statement, and a family that says to stop reading it that way is not
+   * erasing history: nothing already imported changes.
+   */
+  const rules = diffRows(before.learnedRules, after.learnedRules);
+  if (rules.upsert.length > 0 || rules.gone.length > 0) {
+    changes['learnedRules'] = {
+      upsert: rules.upsert.map((rule) => ({
+        id: rule.id,
+        label: rule.label,
+        description_contains: rule.matcher.descriptionContains,
+        direction: rule.matcher.direction,
+        account_id: rule.matcher.accountId,
+        class: rule.class,
+        budget_category_key: rule.budgetCategoryKey,
+        counterparty: rule.counterparty,
+        debt_id: rule.debtId,
+        enabled: rule.enabled,
+        times_applied: rule.timesApplied,
+        created_by: rule.createdBy,
+        created_at: rule.createdAt,
+        updated_at: rule.updatedAt,
+        version: rule.version,
+      })),
+      gone: rules.gone,
     };
   }
 

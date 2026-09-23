@@ -83,3 +83,6 @@
 | PROD-RLS-COVER-001 | Security | tools/check-rls-coverage.mjs | gate | 9 | **Verified in M9** — סטטי; **אומת במסד 2026-09-14**: 32/32 forced, 94 policies |
 | PROD-PERSON-SCOPE-001 | Security | webauthn_credentials / push_subscriptions policies | migration | 9 | **Applied (2026-09-14), allow/deny untested** — משק בית משותף אינו זהות משותפת |
 | PROD-NOTIFY-PRIVACY-001 | Privacy | notification_deliveries | migration | 9 | **Applied (2026-09-14)** — subject_key בלבד, ללא גוף הודעה |
+| IMP-CLASSIFY-001 | Architecture | packages/transaction-intelligence | unit | TXN-INT | **Verified in TXN-INT** — 81 בדיקות; טבלה דטרמיניסטית, שום נתון אינו יוצא מהתהליך |
+| IMP-LOANLINK-001 | Financial | packages/local-store/src/imports.ts + apps/web/app/imports/[id] | unit + store integration | TXN-INT | **Verified in TXN-INT** — `needs_debt` חוסם; יתרות אינן זזות בשורה עמומה |
+| IMP-RULES-001 | Security | packages/local-store/src/learned-rules.ts + apps/web/app/rules + learned_rules | unit + mapping round-trip | TXN-INT | **Verified in TXN-INT** — מוצע ולא נלקח; בידוד מבני ו־RLS; round-trip מוכח |

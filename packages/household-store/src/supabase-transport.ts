@@ -49,7 +49,13 @@ export class SupabaseHouseholdTransport implements HouseholdTransport {
     expectedVersion: number,
     changes: HouseholdChanges,
   ): Promise<number> {
-    const { data, error } = await this.client.rpc('apply_household_changes', {
+    /*
+     * `apply_household_document` composes the record changes with this
+     * household's classification rules, in one transaction. It delegates the
+     * version check and the membership check to `apply_household_changes`, so the
+     * failure modes and their error codes are unchanged.
+     */
+    const { data, error } = await this.client.rpc('apply_household_document', {
       p_household_id: householdId,
       p_expected_version: expectedVersion,
       p_changes: changes,

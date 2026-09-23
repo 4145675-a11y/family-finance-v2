@@ -561,13 +561,33 @@ describe('the migration itself', () => {
     expect(after['household']).toEqual({ name: 'x' });
   });
 
-  test('leaves a current document alone', () => {
+  test('leaves a current document alone, apart from collections added since', () => {
     const document: Record<string, unknown> = {
       formatVersion: 2,
       checks: [{ id: 'keep-me' }],
       repaymentPlans: [],
     };
-    expect(migrateDocument(document)).toEqual(document);
+
+    const migrated = migrateDocument(document) as Record<string, unknown>;
+
+    // Nothing that was there is touched.
+    expect(migrated['formatVersion']).toBe(2);
+    expect(migrated['checks']).toEqual([{ id: 'keep-me' }]);
+    expect(migrated['repaymentPlans']).toEqual([]);
+
+    // A collection added after version 2 was already in use is backfilled empty
+    // rather than forcing a format bump that would strand existing backups.
+    expect(migrated['learnedRules']).toEqual([]);
+  });
+
+  test('a document that already has learned rules keeps them', () => {
+    const migrated = migrateDocument({
+      formatVersion: 2,
+      checks: [],
+      repaymentPlans: [],
+      learnedRules: [{ id: 'mine' }],
+    }) as Record<string, unknown>;
+    expect(migrated['learnedRules']).toEqual([{ id: 'mine' }]);
   });
 
   test('does not invent collections for something that is not a document', () => {

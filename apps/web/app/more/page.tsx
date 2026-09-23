@@ -34,6 +34,11 @@ export default async function MorePage() {
       title: 'מלווים',
       description: 'כרטיס לכל מלווה: יתרה, מועדים בשני הלוחות וכל ההיסטוריה',
     },
+    {
+      href: '/rules',
+      title: 'כללים',
+      description: 'מה שאמרתם לנו על השורות בדף החשבון — לראות, לשנות, לכבות או למחוק',
+    },
     { href: '/business', title: copy.business.title, description: copy.business.safeToMove },
     { href: '/budget', title: copy.budget.title, description: copy.budget.subtitle },
     {

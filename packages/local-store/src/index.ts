@@ -138,6 +138,15 @@ export {
 } from './imports';
 
 export {
+  activeLearnedRules,
+  addLearnedRule,
+  deleteLearnedRule,
+  noteRuleApplied,
+  updateLearnedRule,
+  type UpdateLearnedRuleInput,
+} from './learned-rules';
+
+export {
   BACKUP_ENVELOPE_VERSION,
   BackupError,
   backupFileName,

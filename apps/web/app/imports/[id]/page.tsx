@@ -1,4 +1,8 @@
-import { maskCheckNumber, normaliseLenderName } from '@family-finance/contracts';
+import {
+  REVIEW_REQUIREMENT,
+  maskCheckNumber,
+  normaliseLenderName,
+} from '@family-finance/contracts';
 import { checkApproval, proposeCheckMatch } from '@family-finance/local-store';
 import { notFound } from 'next/navigation';
 
@@ -31,6 +35,12 @@ import {
   SectionTitle,
   StatRow,
 } from '../../../components/ui';
+import { saveRuleFromCorrectionAction } from '../../../lib/actions/rules';
+import {
+  CATEGORY_LABEL,
+  CLASS_LABEL,
+  CONFIDENCE_LABEL,
+} from '../../../lib/copy/classification';
 import { gemach } from '../../../lib/copy/gemach';
 import { screens } from '../../../lib/copy/screens';
 import { loadDashboardView } from '../../../lib/dashboard/load';
@@ -96,12 +106,33 @@ export default async function ImportReviewPage({
     accounts.find((account) => account.value === accountId)?.label ?? screens.common.none;
 
   /**
+   * Rows the classifier read clearly enough to offer in one press.
+   *
+   * A row that would move a debt balance is excluded from the count however clear
+   * the words were, because the lender still has to be named. The store enforces
+   * the same rule, so this number and what the button actually does agree.
+   */
+  const confidentCount = proposals.filter(
+    (proposal) =>
+      proposal.reviewState === 'pending' &&
+      proposal.classification != null &&
+      REVIEW_REQUIREMENT[proposal.classification.confidence] === 'may_preselect' &&
+      !(proposal.classification.requiresDebtChoice && proposal.targetDebtId === null),
+  ).length;
+
+  const classOptions = Object.entries(CLASS_LABEL).map(([value, label]) => ({ value, label }));
+  const categoryOptions = Object.entries(CATEGORY_LABEL).map(([value, label]) => ({
+    value,
+    label,
+  }));
+
+  /**
    * The lender a proposed debt would collide with, if there is one.
    *
    * Names are compared folded, so "גמ״ח אור החיים" and "גמח אור החיים" are the
    * same lender for the purposes of asking. The answer is a question for the
-   * family, never an automatic merge: `checkApproval` blocks the batch until
-   * they say which lender the row belongs to.
+   * family, never an automatic merge: `checkApproval` blocks the batch until they
+   * say which lender the row belongs to.
    */
   const existingLenderFor = (creditorName: string) =>
     document.debts.find(
@@ -273,6 +304,26 @@ export default async function ImportReviewPage({
 
       {decided ? null : (
         <Card title={screens.review.rowsTitle}>
+          {confidentCount === 0 ? null : (
+            <div className="mb-3">
+              <p className="mb-2 text-text-secondary">
+                ב־{confidentCount} שורות הזיהוי ברור. אפשר לסמן אותן להכללה בפעם אחת ולעבור בנחת
+                על השאר. שורה שדורשת בחירת הלוואה לא תיכנס כך — גם אם הזיהוי ברור.
+              </p>
+              <ActionForm
+                action={reviewAllAction}
+                submitLabel={`לסמן ${confidentCount} שורות ברורות`}
+                tone="primary"
+              >
+                <>
+                  <HiddenValue name="batchId" value={batch.id} />
+                  <HiddenValue name="reviewState" value="included" />
+                  <HiddenValue name="onlyPending" value="on" />
+                  <HiddenValue name="onlyHighConfidence" value="on" />
+                </>
+              </ActionForm>
+            </div>
+          )}
           <div className="flex flex-wrap gap-3">
             <ActionForm
               action={reviewAllAction}
@@ -362,6 +413,93 @@ export default async function ImportReviewPage({
                   value={accountName(proposal.targetAccountId)}
                 />
               </>
+            )}
+
+            {proposal.classification == null ? null : (
+              <div className="mb-3 rounded-control bg-surface-muted p-3">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="font-medium">
+                    {CLASS_LABEL[proposal.classification.class]}
+                  </span>
+                  <Badge
+                    tone={
+                      proposal.classification.confidence === 'high'
+                        ? 'success'
+                        : proposal.classification.confidence === 'medium'
+                          ? 'attention'
+                          : 'neutral'
+                    }
+                  >
+                    {CONFIDENCE_LABEL[proposal.classification.confidence]}
+                  </Badge>
+                  {proposal.classification.fromHouseholdRule ? (
+                    <Badge tone="primary">כלל שלכם</Badge>
+                  ) : null}
+                </div>
+                <p className="text-text-secondary">{proposal.classification.explanation}</p>
+                {proposal.classification.counterparty === null ? null : (
+                  <p className="mt-1 text-text-secondary">
+                    למי: <bdi dir="auto">{proposal.classification.counterparty}</bdi>
+                  </p>
+                )}
+                {proposal.classification.requiresDebtChoice &&
+                proposal.targetDebtId === null ? (
+                  <div className="mt-3">
+                    <Notice tone="attention" title="צריך לבחור לאיזו הלוואה">
+                      השורה אומרת שהלוואה נפרעה, אבל לא כתוב בה איזו. עד שתבחרו — שום יתרת חוב
+                      לא תזוז, והיבוא לא יאושר.
+                    </Notice>
+                  </div>
+                ) : null}
+
+                {payload.kind !== 'transaction' || decided ? null : (
+                  <div className="mt-3">
+                    <Disclosure summary="לא זה? לתקן ולזכור להבא">
+                      <p className="mb-3 text-text-secondary">
+                        אמרו לנו פעם אחת מה זה, ונזכור. הכלל יחול רק על משק הבית הזה, ורק על
+                        שורות שדומות לזאת. גם אחרי שנזכור — כל שורה עוברת אישור, ושום יתרה לא
+                        זזה בלעדיו.
+                      </p>
+                      <ActionForm action={saveRuleFromCorrectionAction} submitLabel="לזכור">
+                        <>
+                          <HiddenValue name="description" value={payload.value.description} />
+                          <HiddenValue name="direction" value={payload.value.direction} />
+                          <HiddenValue
+                            name="accountId"
+                            value={proposal.targetAccountId ?? ''}
+                          />
+                          <SelectField
+                            name="class"
+                            label="מה זה בעצם"
+                            defaultValue={proposal.classification.class}
+                            emptyLabel=""
+                            required
+                            options={classOptions}
+                          />
+                          <SelectField
+                            name="budgetCategoryKey"
+                            label="קטגוריה"
+                            defaultValue={proposal.classification.budgetCategoryKey ?? ''}
+                            emptyLabel="בלי קטגוריה"
+                            required={false}
+                            options={categoryOptions}
+                          />
+                          {debts.length === 0 ? null : (
+                            <SelectField
+                              name="debtId"
+                              label="אם זו הלוואה — איזו"
+                              defaultValue={proposal.targetDebtId ?? ''}
+                              emptyLabel={screens.common.none}
+                              required={false}
+                              options={debts}
+                            />
+                          )}
+                        </>
+                      </ActionForm>
+                    </Disclosure>
+                  </div>
+                )}
+              </div>
             )}
 
             {payload.kind !== 'debt' ? null : (

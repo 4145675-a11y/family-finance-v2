@@ -1,7 +1,9 @@
 import {
   addAccount,
   addMember,
+  addLearnedRule,
   addPlannedItem,
+  deleteLearnedRule,
   emptyDocument,
   recordTransaction,
   removePlannedItem,
@@ -13,6 +15,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   changesBetween,
+  documentFromLoaded,
   type HouseholdChanges,
   type LoadedHousehold,
 } from './document-mapping';
@@ -81,6 +84,14 @@ function loadedFrom(document: StoreDocument): LoadedHousehold {
     importSourceFiles: [],
     importBatches: [],
     importProposals: [],
+    learnedRules: rows(
+      document.learnedRules.map((rule) => ({
+        ...rule,
+        descriptionContains: rule.matcher.descriptionContains,
+        direction: rule.matcher.direction,
+        accountId: rule.matcher.accountId,
+      })),
+    ),
     audit: rows(document.audit),
   };
 }
@@ -362,5 +373,63 @@ describe('changesBetween on its own', () => {
       transaction_date: '2026-09-02',
     });
     expect(changes).not.toHaveProperty('accounts');
+  });
+});
+
+describe('classification rules survive the round trip', () => {
+  /*
+   * A rule that is saved but never written to the database would vanish on the
+   * next reload, and the family would watch the same correction be forgotten
+   * every month. These are the tests that would have caught that.
+   */
+  const base = seed();
+  const context = { actorProfileId: ALICE, now: NOW };
+  const withRule = addLearnedRule(
+    base,
+    {
+      label: 'סופרמרקט הוא אוכל',
+      matcher: { descriptionContains: 'סופרמרקט', direction: 'outflow', accountId: null },
+      class: 'purchase',
+      budgetCategoryKey: 'food',
+      counterparty: null,
+      debtId: null,
+    },
+    context,
+  ).document;
+
+  test('saving one sends it as an upsert, with the matcher flattened onto the row', () => {
+    const changes = changesBetween(base, withRule, ALICE);
+    const sent = changes['learnedRules'] as { upsert: Record<string, unknown>[] };
+    expect(sent).toBeDefined();
+    expect(sent.upsert).toHaveLength(1);
+    const row = sent.upsert[0] as Record<string, unknown>;
+    expect(row['description_contains']).toBe('סופרמרקט');
+    expect(row['direction']).toBe('outflow');
+    expect(row['class']).toBe('purchase');
+    expect(row['budget_category_key']).toBe('food');
+    expect(row['enabled']).toBe(true);
+  });
+
+  test('reading it back gives the same rule the household saved', () => {
+    const reloaded = documentFromLoaded(loadedFrom(withRule));
+    expect(reloaded.learnedRules).toHaveLength(1);
+    expect(reloaded.learnedRules[0]).toEqual(withRule.learnedRules[0]);
+  });
+
+  test('deleting one is sent as a deletion, because a rule is not a record', () => {
+    const removed = deleteLearnedRule(
+      withRule,
+      { ruleId: withRule.learnedRules[0]?.id ?? '' },
+      context,
+    ).document;
+
+    const changes = changesBetween(withRule, removed, ALICE);
+    expect((changes['learnedRules'] as { gone: string[] }).gone).toEqual([
+      withRule.learnedRules[0]?.id,
+    ]);
+  });
+
+  test('a household with no rules sends nothing about them', () => {
+    expect(changesBetween(base, base, ALICE)['learnedRules']).toBeUndefined();
   });
 });

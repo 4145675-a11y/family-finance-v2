@@ -17,6 +17,7 @@
     "@family-finance/hebrew-calendar": "*",
     "@family-finance/household-store": "*",
     "@family-finance/local-store": "*",
+    "@family-finance/transaction-intelligence": "*",
     "@family-finance/webauthn": "*",
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.112.3",

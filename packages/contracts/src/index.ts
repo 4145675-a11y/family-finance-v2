@@ -82,6 +82,30 @@ export {
 } from './accounts';
 
 export {
+  REVIEW_REQUIREMENT,
+  classificationAuditSchema,
+  classificationDecisionSchema,
+  classificationSignalSchema,
+  classificationSuggestionSchema,
+  confidenceLevelSchema,
+  createLearnedRuleInputSchema,
+  learnedRuleMatcherSchema,
+  learnedRuleSchema,
+  reviewRequirementSchema,
+  transactionClassSchema,
+  type ClassificationAudit,
+  type ClassificationDecision,
+  type ClassificationSignal,
+  type ClassificationSuggestion,
+  type ConfidenceLevel,
+  type CreateLearnedRuleInput,
+  type LearnedRule,
+  type LearnedRuleMatcher,
+  type ReviewRequirement,
+  type TransactionClass,
+} from './classification';
+
+export {
   EMPTY_DUE_DATE,
   adarChoiceSchema,
   dueDateReviewReasonSchema,

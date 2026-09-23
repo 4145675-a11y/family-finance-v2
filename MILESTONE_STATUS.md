@@ -3,7 +3,7 @@
 מצב הפרויקט מול `09-MILESTONES.md`. מתעדכן בסוף כל milestone, לפני העצירה לאישור.
 
 - **תאריך עדכון אחרון**: 2026-09-23
-- **Milestone פעיל**: **Debt Import & Dual Calendar** (ADR-0035) על `feature/debt-import-hebrew-calendar` — **המסלול שלם מקצה לקצה**: העלאה → זיהוי לפי ערכים → הצעות → סקירה → אישור → מלווה, חוב ואירוע פתיחה → כרטיס מלווה עם היסטוריה, ושני לוחות שנה בכל מקום שיש בו מועד. ה־hotfix של Render (ADR-0034) מוזג ל־`main` ב־`a42ca8c`; **הייצור חי** — `/api/health` מחזיר `200 ok`, `readiness: ready` (2026-09-22, אחרי שחזור פרויקט Supabase).
+- **Milestone פעיל**: **Transaction Intelligence** (ADR-0036) — סיווג דטרמיניסטי לכל שורת בנק, שלוש רמות ביטחון, קישור הלוואה שאינו ניחוש, וכללים של משק בית. לפניו: **Debt Import & Dual Calendar** (ADR-0035) על `feature/debt-import-hebrew-calendar` — **המסלול שלם מקצה לקצה**: העלאה → זיהוי לפי ערכים → הצעות → סקירה → אישור → מלווה, חוב ואירוע פתיחה → כרטיס מלווה עם היסטוריה, ושני לוחות שנה בכל מקום שיש בו מועד. ה־hotfix של Render (ADR-0034) מוזג ל־`main` ב־`a42ca8c`; **הייצור חי** — `/api/health` מחזיר `200 ok`, `readiness: ready` (2026-09-22, אחרי שחזור פרויקט Supabase).
 - **סטטוס**: **מוצר מקומי שלם ושמיש, עם נעילה אמיתית.** משפחה יכולה להקים משק בית, להזין
   הכול ידנית, להעלות קובץ בנק, לעבור עליו ולאשר, לראות תמונה יומית, לנהל תקציב וחובות,
   לנהל הלוואת גמ״ח שנפרעת בצ׳קים דחויים, להפיק דוחות, לייצא ולגבות — הכול על המחשב הזה,
@@ -47,6 +47,7 @@
 | — | **Local Access & Gemach** | **Complete — evidenced** | [milestone-8](docs/checkpoints/milestone-8-access-and-gemach.md) | **WebAuthn מול Windows Hello; גמ״ח וצ׳קים דחויים** |
 | — | **Production Data Layer** | **Complete — evidenced, merged to `main`** | [production-data-layer](docs/checkpoints/production-data-layer.md) | **האפליקציה קוראת וכותבת דרך Supabase כמשתמש מחובר; RLS מוכח על 32 טבלאות; ריצה חיה** |
 | — | **Debt Import & Dual Calendar** | **Complete — evidenced** | ADR-0035 | **מקצה לקצה**: `hebrew-calendar` 69 · זיהוי חובות 28 · xlsx מלא 21 · חנות 14 · מיגרציה `20260922120000` (סוג `note`, מועד מובְנה, `lender_aliases` עם RLS, 33 טבלאות) · מסך סקירה · `/lenders` + כרטיס מלווה עם היסטוריה, סינון והוספת פעולה |
+| — | **Transaction Intelligence** | **Complete — evidenced** | ADR-0036 | **מסווג דטרמיניסטי**: חבילה `transaction-intelligence` 81 בדיקות · חנות 19 · round-trip 4 · מיגרציה `20260923090000` (`learned_rules` עם RLS — 34 טבלאות; `classification` על ההצעה; `apply_household_document`) · מסך סקירה עם ביטחון, הסבר וקישור הלוואה חוסם · `/rules` לצפייה, שינוי, כיבוי ומחיקה |
 | — | **Hosting & Production-Origin** | **Complete — evidenced, merged; first deploy failed at build → hotfix on branch** | [hosting-production-origin](docs/checkpoints/hosting-production-origin.md) · [hotfix-render-build](docs/checkpoints/hotfix-render-build.md) | **`render.yaml` + בדיקה; origin חובה ומוכח; cookies Secure/HttpOnly/Lax; `/auth/callback` + קביעת סיסמה; ריצה חיה 18/18. יצירת השירות, Supabase Auth ודומיין — פעולות בעלים** |
 
 ## שערי איכות — מצב נוכחי

@@ -16,6 +16,7 @@ import {
   householdSettingsSchema,
   importBatchSchema,
   importProposalSchema,
+  learnedRuleSchema,
   postDatedCheckSchema,
   profileSchema,
   repaymentPlanSchema,
@@ -117,6 +118,14 @@ export const storeDocumentSchema = z.object({
   tasks: z.array(familyTaskSchema).max(5_000),
   importBatches: z.array(importBatchSchema).max(5_000),
   importProposals: z.array(importProposalSchema).max(200_000),
+  /**
+   * What this household decided a kind of statement line means.
+   *
+   * Belongs to the document, and therefore to one household, which is what makes
+   * the isolation structural rather than a filter somebody has to remember to
+   * apply: a rule cannot be read from a document it is not in.
+   */
+  learnedRules: z.array(learnedRuleSchema).max(2_000),
   /** Append-only. Never edited, never reordered, never pruned by the product. */
   audit: z.array(auditEventSchema).max(200_000),
 });
@@ -225,6 +234,7 @@ export function emptyDocument(input: EmptyDocumentInput): StoreDocument {
     tasks: [],
     importBatches: [],
     importProposals: [],
+    learnedRules: [],
     audit: [],
   };
 }
@@ -276,6 +286,16 @@ export function migrateDocument(value: unknown): unknown {
 
     document['formatVersion'] = 2;
   }
+
+  /*
+   * A collection added after version 2 was already being written.
+   *
+   * Backfilled rather than version-bumped because it is purely additive: a
+   * document without it means "this household has never saved a rule", which is
+   * exactly the empty array. Bumping the format instead would make every backup
+   * taken this month unreadable by a build from last month, for no gain.
+   */
+  if (!Array.isArray(document['learnedRules'])) document['learnedRules'] = [];
 
   return document;
 }
