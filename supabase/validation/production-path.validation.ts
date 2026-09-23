@@ -53,6 +53,8 @@ import {
   updateTask,
 } from '@family-finance/local-store';
 import { replayDebtBalances } from '@family-finance/finance-engine';
+
+import { debtEventKey } from '../../apps/web/lib/quick/keys';
 import { createServerClient } from '@supabase/ssr';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -770,6 +772,163 @@ describe('the production path', () => {
     );
     expect(openings).toHaveLength(1);
     expect(openings[0]?.amountMinor).toBe(400_000);
+  });
+
+  test('an expense submitted twice is one expense, in the database', async () => {
+    const store = storeFor(alice);
+    const before = (await store.readDocument()).transactions.length;
+
+    // The identifier the form renders once and submits with the expense.
+    const submission = randomUUID();
+    const expense = (): Promise<string> =>
+      store.run((d, c) =>
+        recordTransaction(
+          d,
+          {
+            idempotencyKey: submission,
+            accountId: accountA,
+            counterpartAccountId: null,
+            scope: 'household',
+            kind: 'expense',
+            direction: 'outflow',
+            amountMinor: 8_800,
+            categoryId: null,
+            merchant: 'חנות בדיקת כפילות',
+            transactionDate: '2026-09-21',
+            note: null,
+          },
+          c,
+        ),
+      );
+
+    const first = await expense();
+    expect(first).toBe(submission);
+
+    // Pressed again: a double click, or a retry after a slow save.
+    const second = await expense();
+    expect(second).toBe(submission);
+
+    const document = await store.readDocument();
+    expect(document.transactions).toHaveLength(before + 1);
+    expect(
+      document.transactions.filter((row) => row.merchant === 'חנות בדיקת כפילות'),
+    ).toHaveLength(1);
+  });
+
+  test('two genuine expenses of the same amount and shop both save', async () => {
+    const store = storeFor(alice);
+    const before = (await store.readDocument()).transactions.length;
+
+    const sameShop = (key: string): Promise<string> =>
+      store.run((d, c) =>
+        recordTransaction(
+          d,
+          {
+            idempotencyKey: key,
+            accountId: accountA,
+            counterpartAccountId: null,
+            scope: 'household',
+            kind: 'expense',
+            direction: 'outflow',
+            amountMinor: 4_200,
+            categoryId: null,
+            merchant: 'חנות בדיקת שתי קניות',
+            transactionDate: '2026-09-21',
+            note: null,
+          },
+          c,
+        ),
+      );
+
+    // Two trips to the same shop on the same day for the same amount. The
+    // submission, not the figures, is what tells one record from another.
+    await sameShop(randomUUID());
+    await sameShop(randomUUID());
+
+    const document = await store.readDocument();
+    expect(document.transactions).toHaveLength(before + 2);
+  });
+
+  test('a quick update approved twice leaves one transaction and one event', async () => {
+    const store = storeFor(alice);
+    const lenderId = await store.run((d, c) =>
+      addDebt(
+        d,
+        {
+          creditorName: 'מלווה בדיקת עדכון מהיר',
+          kind: 'private_person',
+          openingBalanceMinor: 200_000,
+          openedOn: '2026-08-01',
+          effectiveAnnualRateBp: null,
+          minimumPaymentMinor: null,
+          paymentDueDay: null,
+          urgency: 'none',
+          promiseSummary: null,
+          relationshipSensitivity: 'low',
+          partialPaymentAllowed: true,
+          expectedCallDate: null,
+          notes: null,
+        },
+        c,
+      ),
+    );
+
+    /*
+     * What the quick screen's approval does: one submission, two records, the
+     * second keyed off the first. Pressing approve twice has to leave one of
+     * each and move the balance once (ADR-0039).
+     */
+    const submission = randomUUID();
+    const approve = async (): Promise<void> => {
+      await store.run((d, c) =>
+        recordTransaction(
+          d,
+          {
+            idempotencyKey: submission,
+            accountId: accountA,
+            counterpartAccountId: null,
+            scope: 'household',
+            kind: 'expense',
+            direction: 'outflow',
+            amountMinor: 30_000,
+            categoryId: null,
+            merchant: 'החזר בעדכון מהיר',
+            transactionDate: '2026-09-22',
+            note: null,
+          },
+          c,
+        ),
+      );
+      await store.run((d, c) =>
+        recordDebtEvent(
+          d,
+          {
+            idempotencyKey: debtEventKey(submission),
+            debtId: lenderId,
+            kind: 'principal_payment',
+            amountMinor: 30_000,
+            occurredOn: '2026-09-22',
+            correctionEffect: null,
+            note: 'החזר בעדכון מהיר',
+          },
+          c,
+        ),
+      );
+    };
+
+    await approve();
+    await approve();
+
+    const document = await store.readDocument();
+    expect(
+      document.transactions.filter((row) => row.merchant === 'החזר בעדכון מהיר'),
+    ).toHaveLength(1);
+    expect(
+      document.debtEvents.filter(
+        (event) => event.debtId === lenderId && event.kind === 'principal_payment',
+      ),
+    ).toHaveLength(1);
+    expect(replayDebtBalances(document.debtEvents, '2026-12-31').get(lenderId)).toBe(170_000);
   });
 
   test('a recent password entry admits an export; the backup downloads', async () => {
