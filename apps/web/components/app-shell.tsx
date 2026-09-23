@@ -42,7 +42,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     title: copy.nav.groupToday,
     items: [
       { href: '/', label: copy.nav.home, onPhone: true },
-      { href: '/entry', label: copy.nav.entry, onPhone: true },
+      { href: '/quick', label: copy.nav.quick, onPhone: true },
+      { href: '/entry', label: copy.nav.entry, onPhone: false },
       { href: '/upload', label: copy.nav.upload, onPhone: false },
       { href: '/approvals', label: copy.nav.approvals, onPhone: true },
     ],

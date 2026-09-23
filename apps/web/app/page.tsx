@@ -518,9 +518,9 @@ export default async function HomePage() {
       {/* Quick updates. Every one of these opens a working screen. */}
       <Card title={copy.home.updatesTitle}>
         <div className="flex flex-wrap gap-2.5">
-          <LinkButton href="/entry">{copy.actions.addExpense}</LinkButton>
+          <LinkButton href="/quick">{copy.actions.quickUpdate}</LinkButton>
           <LinkButton href="/entry" tone="secondary">
-            {copy.actions.addIncome}
+            {copy.actions.addExpense}
           </LinkButton>
           <LinkButton href="/accounts" tone="secondary">
             {copy.actions.updateBalance}

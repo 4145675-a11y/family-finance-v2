@@ -50,7 +50,7 @@ const PORT = 3131;
 const HOST = '127.0.0.1';
 
 /** The pages fetched. Each is a route a person can reach from the navigation. */
-const ROUTES = ['/', '/entry', '/upload', '/budget', '/more'];
+const ROUTES = ['/', '/quick', '/entry', '/upload', '/budget', '/more'];
 
 /** @param {string} dir @returns {string[]} */
 function cssFilesIn(dir) {

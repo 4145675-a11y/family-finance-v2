@@ -111,9 +111,14 @@ describe('navigation', () => {
   });
 
   test('the phone bar carries five destinations, and they are the daily ones', () => {
+    /*
+     * '/quick' rather than '/entry' since Q1. The bar is for what a person does
+     * standing up, and a sentence is what they can manage with shopping in the
+     * other hand; the six-field form is still one tap away in the sidebar.
+     */
     expect(PHONE_NAV.map((item) => item.href)).toEqual([
       '/',
-      '/entry',
+      '/quick',
       '/approvals',
       '/budget',
       '/more',

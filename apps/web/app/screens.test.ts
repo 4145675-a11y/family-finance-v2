@@ -55,7 +55,7 @@ describe('the routes that exist', () => {
   test('the phone bar carries the five things a person does standing up', () => {
     expect(PHONE_NAV.map((item) => item.label)).toEqual([
       'בית',
-      'רישום',
+      'עדכון מהיר',
       'אישורים',
       'תכנון',
       'עוד',

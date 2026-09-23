@@ -28,6 +28,7 @@ export const copy = {
 
   nav: {
     home: 'בית',
+    quick: 'עדכון מהיר',
     entry: 'רישום',
     upload: 'העלאה',
     approvals: 'אישורים',
@@ -113,7 +114,7 @@ export const copy = {
     waitingLink: 'לעבור עליהן',
 
     actionTitle: 'מה כדאי לעשות עכשיו',
-    updatesTitle: 'עדכון מהיר',
+    updatesTitle: 'פעולות מהירות',
     moreTitle: 'עוד דברים שאפשר לבדוק',
     moreLink: 'לכל המסכים והפירוטים',
   },
@@ -323,6 +324,7 @@ export const copy = {
   },
 
   actions: {
+    quickUpdate: 'עדכון מהיר',
     addExpense: 'הוספת הוצאה',
     addIncome: 'הוספת הכנסה',
     updateBalance: 'עדכון יתרה',
