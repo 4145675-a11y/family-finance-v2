@@ -885,6 +885,15 @@ export interface RecordDebtEventInput {
   readonly transactionId?: string | null;
   readonly note?: string | null;
   readonly importBatchId?: string | null;
+  /**
+   * The identifier this event will have, supplied by the caller.
+   *
+   * A form renders one of these and submits it with the payment, so pressing the
+   * button twice records the payment once. Omitted, a fresh id is generated and
+   * the call is not idempotent — which is correct for callers that genuinely
+   * mean "another one", such as the import pipeline.
+   */
+  readonly idempotencyKey?: string;
 }
 
 export function recordDebtEvent(
@@ -907,8 +916,27 @@ export function recordDebtEvent(
     );
   }
 
+  /*
+   * The same submission arriving twice.
+   *
+   * A form can be submitted twice — a double click, a retry after a slow
+   * response, a refresh of a page that posted. The store's optimistic version
+   * check catches the case where both requests read the same document, but not
+   * the case where the second reads the document the first just wrote: that one
+   * looks like a person recording a second, identical payment, and a debt would
+   * quietly be paid down twice.
+   *
+   * So the caller may name the event. The identifier comes from the form that
+   * was rendered once, which makes the second submission of that form a no-op
+   * rather than a second payment. It is the row's primary key, so the database
+   * upsert is idempotent for the same reason the document is.
+   */
+  const eventId = input.idempotencyKey ?? newId();
+  const already = document.debtEvents.find((candidate) => candidate.id === eventId);
+  if (already !== undefined) return { document, value: already.id };
+
   const event = {
-    id: newId(),
+    id: eventId,
     householdId: document.household.id,
     debtId: input.debtId,
     kind: input.kind,

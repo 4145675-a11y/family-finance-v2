@@ -85,6 +85,13 @@ const PERSISTENCE_MESSAGES: Readonly<Record<PersistenceError['code'], string>> =
   unsupported_in_backend: 'הפעולה הזו לא זמינה כשהנתונים נשמרים במסד הנתונים.',
   invalid_document: 'הנתונים שנשמרו לא נקראו כמו שצריך. כדאי לרענן ולנסות שוב.',
   invitation_invalid: 'ההזמנה הזו לא תקפה יותר. אפשר לבקש הזמנה חדשה.',
+  /*
+   * The code is newer than the database. Said plainly, because "try again in a
+   * moment" is false here — waiting changes nothing, and the family would keep
+   * pressing a button that cannot work.
+   */
+  schema_outdated:
+    'הפעולה הזו דורשת עדכון של מסד הנתונים שעדיין לא הוחל. שאר הפעולות עובדות. צריך להחיל את המיגרציה האחרונה.',
   unavailable: 'מסד הנתונים לא זמין כרגע. אפשר לנסות שוב בעוד רגע.',
 };
 

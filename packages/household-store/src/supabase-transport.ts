@@ -54,13 +54,53 @@ export class SupabaseHouseholdTransport implements HouseholdTransport {
      * household's classification rules, in one transaction. It delegates the
      * version check and the membership check to `apply_household_changes`, so the
      * failure modes and their error codes are unchanged.
+     *
+     * It may not be there. A deployment carries new code the moment `main` is
+     * built, while a migration reaches the database only when the owner applies
+     * it, so there is always a window in which the code is ahead of the schema.
+     * A write that calls a function which does not exist comes back as PostgREST
+     * `PGRST202`, which mapped to "the database is unavailable" — a sentence that
+     * is both false and unactionable, and which stopped every write in the
+     * product until somebody guessed why.
+     *
+     * So the older function is used when the newer one is absent. Falling back is
+     * only safe because the two do the same thing to financial records; the one
+     * thing the old function cannot do is carry classification rules, and that is
+     * refused loudly below rather than dropped.
      */
-    const { data, error } = await this.client.rpc('apply_household_document', {
+    const composed = await this.client.rpc('apply_household_document', {
       p_household_id: householdId,
       p_expected_version: expectedVersion,
       p_changes: changes,
     });
-    if (error) throw this.translate(error, 'saving the change');
+
+    if (!isMissingFunction(composed.error)) {
+      if (composed.error) throw this.translate(composed.error, 'saving the change');
+      return this.versionOf(composed.data);
+    }
+
+    /*
+     * The schema is behind the code. Records still save; rules cannot, and a
+     * rule that silently failed to save would be a false success — the family
+     * would be told their correction was remembered and find it forgotten.
+     */
+    if (changes['learnedRules'] !== undefined) {
+      throw new TransportError(
+        'schema_outdated',
+        'saving a classification rule needs a database migration that has not been applied',
+      );
+    }
+
+    const legacy = await this.client.rpc('apply_household_changes', {
+      p_household_id: householdId,
+      p_expected_version: expectedVersion,
+      p_changes: changes,
+    });
+    if (legacy.error) throw this.translate(legacy.error, 'saving the change');
+    return this.versionOf(legacy.data);
+  }
+
+  private versionOf(data: unknown): number {
     const version = (data as { version?: unknown } | null)?.version;
     if (typeof version !== 'number') {
       throw new TransportError('unavailable', 'saving the change returned no version');
@@ -129,4 +169,16 @@ export class SupabaseHouseholdTransport implements HouseholdTransport {
       `${operation} failed (${failure}, code ${error.code ?? 'none'})`,
     );
   }
+}
+
+/**
+ * True when PostgREST is saying the function does not exist.
+ *
+ * `PGRST202` is the schema cache reporting that no function matches the name and
+ * arguments. It is the one error that means "the code is ahead of the database"
+ * rather than "something went wrong with this write", and it is the only one this
+ * module is willing to recover from.
+ */
+function isMissingFunction(error: { code?: string } | null): boolean {
+  return error?.code === 'PGRST202';
 }

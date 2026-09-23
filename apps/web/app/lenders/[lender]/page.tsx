@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { DebtEventKind } from '@family-finance/contracts';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -108,6 +110,13 @@ export default async function LenderCardPage({
     if (toFilter !== null && line.occurredOn > toFilter) return false;
     return true;
   });
+
+  /*
+   * One identifier per render of this page, carried by the "add an action"
+   * form. It is what makes a second submission of the same form a no-op rather
+   * than a second payment.
+   */
+  const submissionId = randomUUID();
 
   const filtered = lines.length !== card.ledger.length;
   const debtOptions = card.debts.map((debt) => ({
@@ -281,6 +290,12 @@ export default async function LenderCardPage({
           <ActionForm action={recordLedgerActionAction} submitLabel="לרשום">
             <>
               <HiddenValue name="debtId" value={card.debts[0]?.id ?? ''} />
+              {/*
+               * Rendered once with this page, and the identifier the ledger line
+               * will carry. Submitting the form twice — a double press, a retry
+               * after a slow save — records the payment once.
+               */}
+              <HiddenValue name="idempotencyKey" value={submissionId} />
               {debtOptions.length < 2 ? null : (
                 <SelectField
                   name="debtId"

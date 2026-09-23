@@ -77,6 +77,7 @@ export type PersistenceErrorCode =
   | 'unsupported_in_backend'
   | 'invalid_document'
   | 'invitation_invalid'
+  | 'schema_outdated'
   | 'unavailable';
 
 /** The household changed under a command. Same name as the file store's, so callers treat them alike. */

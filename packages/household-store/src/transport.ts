@@ -46,6 +46,7 @@ export type TransportFailure =
   | 'permission_denied'
   | 'version_conflict'
   | 'invitation_invalid'
+  | 'schema_outdated'
   | 'unavailable';
 
 export class TransportError extends Error {
@@ -83,6 +84,24 @@ export function failureForSqlState(
       return 'permission_denied';
     case '40001':
       return 'version_conflict';
+    /*
+     * PostgREST cannot find the function, or the database cannot read a value we
+     * sent. Both mean the same thing here: the code is ahead of the schema.
+     *
+     * `PGRST202` is unambiguous. `22P02` needs the argument: every value this
+     * application writes has already been through its contract, so a database
+     * that cannot parse one is a database that does not know the type yet — a
+     * ledger action whose kind was added in a migration nobody has applied. The
+     * alternative reading is a bug in our own writing, and pointing at the write
+     * path is the right answer for that too.
+     *
+     * Either way it is not "the database is unavailable", which is untrue and
+     * which a person can only respond to by waiting for something that will not
+     * change on its own.
+     */
+    case 'PGRST202':
+    case '22P02':
+      return 'schema_outdated';
     default:
       return 'unavailable';
   }

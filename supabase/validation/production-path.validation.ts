@@ -43,6 +43,7 @@ import {
   approveBatch,
   clearCheck,
   deliverChecks,
+  recordDebtEvent,
   recordTransaction,
   reviewAll,
   setBudgetLine,
@@ -51,6 +52,7 @@ import {
   startBudget,
   updateTask,
 } from '@family-finance/local-store';
+import { replayDebtBalances } from '@family-finance/finance-engine';
 import { createServerClient } from '@supabase/ssr';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -683,6 +685,91 @@ describe('the production path', () => {
       expect(rendered.status, path).toBe(200);
       expect(rendered.html, path).toContain(expected);
     }
+  });
+
+  /*
+   * A manual lender payment, committed through PostgREST against the real
+   * database.
+   *
+   * This is the test the regression needed. The write path had been pointed at a
+   * function that exists only in a migration nobody had applied, so every write
+   * in the product answered "the database is currently unavailable". A stand-in
+   * transport could never have caught that: it answers with whatever function the
+   * test asks it for. Only a real round trip to the real schema does.
+   */
+  test('a manual lender payment saves once, moves the balance, and does not double', async () => {
+    const store = storeFor(alice);
+    const lenderId = await store.run((d, c) =>
+      addDebt(
+        d,
+        {
+          creditorName: 'מלווה בדיקת תשלום',
+          kind: 'private_person',
+          openingBalanceMinor: 400_000,
+          openedOn: '2026-08-01',
+          effectiveAnnualRateBp: null,
+          minimumPaymentMinor: null,
+          paymentDueDay: null,
+          urgency: 'none',
+          promiseSummary: null,
+          relationshipSensitivity: 'low',
+          partialPaymentAllowed: true,
+          expectedCallDate: null,
+          notes: null,
+        },
+        c,
+      ),
+    );
+
+    const balanceOfLender = async (): Promise<number> => {
+      const document = await store.readDocument();
+      return replayDebtBalances(document.debtEvents, '2026-12-31').get(lenderId) ?? 0;
+    };
+
+    expect(await balanceOfLender()).toBe(400_000);
+
+    // The payment, with the identifier the lender card's form renders once.
+    const submission = randomUUID();
+    const payment = (): Promise<string> =>
+      store.run((d, c) =>
+        recordDebtEvent(
+          d,
+          {
+            debtId: lenderId,
+            kind: 'principal_payment',
+            amountMinor: 150_000,
+            occurredOn: '2026-09-20',
+            correctionEffect: null,
+            note: 'תשלום ידני מכרטיס המלווה',
+            idempotencyKey: submission,
+          },
+          c,
+        ),
+      );
+
+    const firstId = await payment();
+    expect(firstId).toBe(submission);
+    expect(await balanceOfLender()).toBe(250_000);
+
+    // The same form submitted again — a double press, or a retry after a slow
+    // save. It must be the same event and the same balance, not a second payment.
+    const secondId = await payment();
+    expect(secondId).toBe(submission);
+    expect(await balanceOfLender()).toBe(250_000);
+
+    const document = await store.readDocument();
+    const payments = document.debtEvents.filter(
+      (event) => event.debtId === lenderId && event.kind === 'principal_payment',
+    );
+    expect(payments).toHaveLength(1);
+    expect(payments[0]?.note).toBe('תשלום ידני מכרטיס המלווה');
+
+    // And the opening balance it was paid against is untouched.
+    const openings = document.debtEvents.filter(
+      (event) => event.debtId === lenderId && event.kind === 'opening_balance',
+    );
+    expect(openings).toHaveLength(1);
+    expect(openings[0]?.amountMinor).toBe(400_000);
   });
 
   test('a recent password entry admits an export; the backup downloads', async () => {

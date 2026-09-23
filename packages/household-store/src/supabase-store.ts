@@ -198,6 +198,8 @@ export class SupabaseHouseholdStore implements HouseholdStorePort {
             throw new PersistenceError('permission_denied', error.message);
           case 'invitation_invalid':
             throw new PersistenceError('invitation_invalid', error.message);
+          case 'schema_outdated':
+            throw new PersistenceError('schema_outdated', error.message);
           default:
             throw new PersistenceError('unavailable', error.message);
         }

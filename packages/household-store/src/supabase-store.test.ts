@@ -433,3 +433,65 @@ describe('classification rules survive the round trip', () => {
     expect(changesBetween(base, base, ALICE)['learnedRules']).toBeUndefined();
   });
 });
+
+describe('a write that is refused never reports success', () => {
+  /*
+   * The regression this pins down: the code called a function the database did
+   * not have, and every write in the product answered "the database is
+   * unavailable" — a sentence that is untrue and that a family cannot act on.
+   * A stale schema now keeps its own code all the way to the screen.
+   */
+  class RefusingTransport extends MemoryTransport {
+    constructor(
+      document: StoreDocument | null,
+      private readonly failure: 'schema_outdated' | 'unavailable',
+    ) {
+      super(document);
+    }
+
+    override async apply(): Promise<number> {
+      throw new TransportError(this.failure, 'refused');
+    }
+  }
+
+  test('a stale schema keeps its own code instead of collapsing into "unavailable"', async () => {
+    const store = new SupabaseHouseholdStore(
+      new RefusingTransport(seed(), 'schema_outdated'),
+      ALICE,
+      null,
+    );
+
+    await expect(
+      store.run((d, c) => renameHousehold(d, { name: 'שם חדש' }, c), { now: NOW }),
+    ).rejects.toMatchObject({ code: 'schema_outdated' });
+  });
+
+  test('anything genuinely unknown is still "unavailable"', async () => {
+    const store = new SupabaseHouseholdStore(
+      new RefusingTransport(seed(), 'unavailable'),
+      ALICE,
+      null,
+    );
+
+    await expect(
+      store.run((d, c) => renameHousehold(d, { name: 'שם חדש' }, c), { now: NOW }),
+    ).rejects.toMatchObject({ code: 'unavailable' });
+  });
+
+  test('the refusal is a rejection, not a value the caller could mistake for success', async () => {
+    const store = new SupabaseHouseholdStore(
+      new RefusingTransport(seed(), 'schema_outdated'),
+      ALICE,
+      null,
+    );
+
+    let resolved = false;
+    await store
+      .run((d, c) => renameHousehold(d, { name: 'שם חדש' }, c), { now: NOW })
+      .then(() => {
+        resolved = true;
+      })
+      .catch(() => undefined);
+    expect(resolved).toBe(false);
+  });
+});

@@ -30,6 +30,14 @@ export async function recordLedgerActionAction(
 ): Promise<FormState> {
   const reader = new FieldReader(data);
   const debtId = reader.id('debtId', 'החוב', { required: true });
+  /**
+   * The identifier this ledger line will have.
+   *
+   * Rendered once with the form, so a double click or a retry records the
+   * payment once. A submission without one is still accepted — the field is a
+   * safeguard, not a gate — but the page always sends it.
+   */
+  const idempotencyKey = reader.id('idempotencyKey', 'מזהה הפעולה');
   const kind = reader.choice(
     'kind',
     'סוג הפעולה',
@@ -77,6 +85,7 @@ export async function recordLedgerActionAction(
           occurredOn,
           correctionEffect,
           note: note === '' ? null : note,
+          ...(idempotencyKey === null ? {} : { idempotencyKey }),
         },
         context,
       ),

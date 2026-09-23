@@ -49,3 +49,4 @@
 | [0034](0034-a-misconfigured-process-serves-refusals.md) | תהליך עם תצורה פגומה מגיש סירובים (503 + health `misconfigured`), לא exit ולא throw; ה־build של הייצור הוא שער | Accepted | HPO hotfix |
 | [0035](0035-two-calendars-and-a-debt-list-with-no-headers.md) | זיהוי חובות לפי ערכים כשהכותרות ריקות מתוכן; הלוח העברי כאזרח מן המניין דרך `@hebcal/core`, עם שכבת סירוב — תאריך לא ודאי אינו תאריך | Accepted | DEBT-CAL |
 | [0036](0036-a-classifier-that-can-be-argued-with.md) | סיווג תנועות דטרמיניסטי שאפשר להתווכח איתו: טבלת כללים, קיפול טקסט עברי, שלוש רמות ביטחון, קישור הלוואה שלעולם אינו ניחוש, וכללים של משק בית שמוצעים ולא נלקחים | Accepted | TXN-INT |
+| [0037](0037-the-code-may-arrive-before-the-schema.md) | הקוד עלול להגיע לפני הסכמה: נפילה אחורה לפונקציה הקודמת לרשומות, סירוב בקול למה שבאמת אינו יכול להישמר, הודעה שאפשר לפעול לפיה, ותשלום ידני שנרשם פעם אחת | Accepted | HOTFIX |
