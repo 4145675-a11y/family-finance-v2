@@ -319,3 +319,79 @@ describe('security definer functions pin their search path', () => {
     }
   });
 });
+
+/**
+ * A restated function must not lose what the previous one returned.
+ *
+ * `load_household_document` builds the whole document the application reads. A
+ * migration that adds one key to it has to restate the entire function, and a
+ * restatement is a transcription — which is exactly how a key got replaced by an
+ * empty array and every household that had ever imported a file stopped loading.
+ *
+ * The rule enforced here: the last definition of that function in migration order
+ * carries every key any earlier definition carried. Adding keys is fine; losing
+ * one, or quietly turning one into a literal, is not.
+ */
+describe('load_household_document never loses a key', () => {
+  /** The keys a definition builds, and whether each reads from a table. */
+  function keysOf(definition) {
+    const keys = new Map();
+    for (const match of definition.matchAll(
+      /'([A-Za-z][A-Za-z0-9]*)',\s*(\(select[\s\S]*?from\s+(public\.[a-z_]+)|'\[\]'::jsonb|to_jsonb)/g,
+    )) {
+      const [, key, body, table] = match;
+      keys.set(key, { readsTable: table ?? null, literal: body.startsWith("'[]'") });
+    }
+    return keys;
+  }
+
+  /** Every definition of the function, in the order the migrations apply. */
+  function definitions() {
+    const found = [];
+    for (const { name, sql } of migrations()) {
+      let at = sql.indexOf('create or replace function public.load_household_document');
+      while (at >= 0) {
+        const end = sql.indexOf('$$;', at);
+        found.push({ name, definition: sql.slice(at, end) });
+        at = sql.indexOf('create or replace function public.load_household_document', end);
+      }
+    }
+    return found;
+  }
+
+  test('there is at least one definition to check', () => {
+    expect(definitions().length).toBeGreaterThan(0);
+  });
+
+  test('the final definition carries every key an earlier one did', () => {
+    const all = definitions();
+    const final = keysOf(all[all.length - 1].definition);
+
+    const lost = [];
+    for (const { name, definition } of all.slice(0, -1)) {
+      for (const [key] of keysOf(definition)) {
+        if (!final.has(key)) lost.push(`${key} (last seen in ${name})`);
+      }
+    }
+
+    expect(lost, 'these keys were dropped by a later restatement').toEqual([]);
+  });
+
+  test('a key that once read a table is not later an empty literal', () => {
+    const all = definitions();
+    const final = keysOf(all[all.length - 1].definition);
+
+    const emptied = [];
+    for (const { name, definition } of all.slice(0, -1)) {
+      for (const [key, shape] of keysOf(definition)) {
+        if (shape.readsTable === null) continue;
+        const now = final.get(key);
+        if (now !== undefined && now.literal) {
+          emptied.push(`${key}: read ${shape.readsTable} in ${name}, now always empty`);
+        }
+      }
+    }
+
+    expect(emptied, 'these keys silently stopped returning their rows').toEqual([]);
+  });
+});

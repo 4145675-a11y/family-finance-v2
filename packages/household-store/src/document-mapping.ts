@@ -126,7 +126,7 @@ export function documentFromLoaded(loaded: LoadedHousehold): StoreDocument {
     balanceSnapshots: loaded.balanceSnapshots.map((r) => rowToCamel(r)),
     transactions: loaded.transactions.map((r) => rowToCamel(r)),
     cashflowItems: loaded.cashflowItems.map((r) => rowToCamel(r)),
-    debts: loaded.debts.map((r) => rowToCamel(r)),
+    debts: loaded.debts.map((r) => debtFromRow(r)),
     debtEvents: loaded.debtEvents.map((r) => rowToCamel(r)),
     rollovers: loaded.rollovers.map((r) => rowToCamel(r)),
     checks: loaded.checks.map((r) => rowToCamel(r)),
@@ -365,7 +365,12 @@ export function changesBetween(
       );
     }
     if (upsert.length === 0 && gone.length === 0) continue;
-    const entry: JsonRow = { upsert: upsert.map((row) => rowToSnake({ ...row })) };
+    const entry: JsonRow = {
+      upsert: upsert.map((row) =>
+        // A debt's due date is one value here and ten columns there.
+        collection === 'debts' ? debtToRow({ ...row }) : rowToSnake({ ...row }),
+      ),
+    };
     if (gone.length > 0 && mark !== undefined) entry[mark] = gone;
     changes[collection] = entry;
   }
@@ -504,4 +509,100 @@ export function changesBetween(
 
 export function isEmptyChangeSet(changes: HouseholdChanges): boolean {
   return Object.keys(changes).length === 0;
+}
+
+/**
+ * The columns a due date is spread across, and the object the contract wants.
+ *
+ * A `DueDate` is one value to the application and ten columns to the database:
+ * the canonical civil day, the three Hebrew parts, which calendar the family
+ * wrote, the text the file held, the reason a date was refused, and the answers
+ * to the recurrence questions. Something has to translate between the two, and
+ * until this existed nothing did — the columns were added, the contract field was
+ * added, and the two never met. A database that had the columns then returned
+ * `due_date: null` where the contract expected an object, and every household
+ * failed to load.
+ *
+ * Absent rather than null when there is nothing to say: "this debt has never had
+ * anything said about a due date" is what an absent field means, and it is what
+ * every debt recorded before this feature means too.
+ */
+const DUE_DATE_COLUMNS = [
+  'due_date',
+  'due_date_hebrew_year',
+  'due_date_hebrew_month',
+  'due_date_hebrew_day',
+  'due_date_is_hebrew',
+  'due_date_source_text',
+  'due_date_review_reason',
+  'due_date_recurs_annually',
+  'due_date_adar_choice',
+  'due_date_missing_day_choice',
+] as const;
+
+function debtFromRow(row: JsonRow): JsonRow {
+  const flat = { ...row };
+  for (const column of DUE_DATE_COLUMNS) delete flat[column];
+  const debt = rowToCamel(flat);
+
+  const gregorian = row['due_date'];
+  const sourceText = row['due_date_source_text'];
+  const reviewReason = row['due_date_review_reason'];
+
+  // Nothing was ever said about a due date on this debt.
+  if (gregorian == null && sourceText == null && reviewReason == null) return debt;
+
+  const year = row['due_date_hebrew_year'];
+  const month = row['due_date_hebrew_month'];
+  const day = row['due_date_hebrew_day'];
+  const hebrew =
+    year == null || month == null || day == null
+      ? null
+      : { day: Number(day), month: Number(month), year: Number(year) };
+
+  debt['dueDate'] = {
+    gregorian: gregorian == null ? null : String(gregorian).slice(0, 10),
+    hebrew,
+    isHebrew: row['due_date_is_hebrew'] === true,
+    sourceText: sourceText == null ? null : String(sourceText),
+    reviewReason: reviewReason == null ? null : String(reviewReason),
+    recursAnnually: row['due_date_recurs_annually'] === true,
+    adarChoice:
+      row['due_date_adar_choice'] == null ? null : String(row['due_date_adar_choice']),
+    missingDayChoice:
+      row['due_date_missing_day_choice'] == null
+        ? null
+        : String(row['due_date_missing_day_choice']),
+  };
+  return debt;
+}
+
+/** The reverse: one `DueDate` object spread back across its columns. */
+function debtToRow(debt: JsonRow): JsonRow {
+  const { dueDate, ...rest } = debt;
+  const row = rowToSnake(rest);
+  if (dueDate === undefined || dueDate === null) return row;
+
+  const value = dueDate as {
+    gregorian: string | null;
+    hebrew: { day: number; month: number; year: number } | null;
+    isHebrew: boolean;
+    sourceText: string | null;
+    reviewReason: string | null;
+    recursAnnually: boolean;
+    adarChoice: string | null;
+    missingDayChoice: string | null;
+  };
+
+  row['due_date'] = value.gregorian;
+  row['due_date_hebrew_year'] = value.hebrew?.year ?? null;
+  row['due_date_hebrew_month'] = value.hebrew?.month ?? null;
+  row['due_date_hebrew_day'] = value.hebrew?.day ?? null;
+  row['due_date_is_hebrew'] = value.isHebrew;
+  row['due_date_source_text'] = value.sourceText;
+  row['due_date_review_reason'] = value.reviewReason;
+  row['due_date_recurs_annually'] = value.recursAnnually;
+  row['due_date_adar_choice'] = value.adarChoice;
+  row['due_date_missing_day_choice'] = value.missingDayChoice;
+  return row;
 }

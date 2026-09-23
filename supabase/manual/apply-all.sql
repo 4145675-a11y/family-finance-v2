@@ -5,7 +5,7 @@
 --   regenerate: npm run db:build
 --   verified by: tools/manual-sql.test.mjs
 --
--- Contains 19 migrations, in filename order:
+-- Contains 21 migrations, in filename order:
 --   1. 20260816090000_identity_foundation.sql
 --   2. 20260816090100_profiles_households.sql
 --   3. 20260816090200_invitations.sql
@@ -25,6 +25,8 @@
 --   17. 20260915090000_invitation_bootstraps_profile.sql
 --   18. 20260922120000_lender_ledger_and_dual_calendar.sql
 --   19. 20260923090000_transaction_intelligence.sql
+--   20. 20260923120000_restore_import_source_files.sql
+--   21. 20260923130000_debt_due_dates_are_written.sql
 --
 -- Safe to run more than once: every trigger and policy is dropped before it is
 -- created, and every enum is created under an existence check (ADR-0015). Running
@@ -6157,5 +6159,178 @@ comment on function public.apply_household_document(uuid, integer, jsonb) is
 revoke all on function public.apply_household_document(uuid, integer, jsonb) from public, anon;
 grant execute on function public.apply_household_document(uuid, integer, jsonb) to authenticated;
 -- <<< END MIGRATION: 20260923090000_transaction_intelligence.sql
+
+-- >>> BEGIN MIGRATION: 20260923120000_restore_import_source_files.sql
+-- Restore the source files the document carries.
+--
+-- ADR-0036's migration restated `load_household_document` in order to add one
+-- key, and in restating it replaced the `importSourceFiles` query with an empty
+-- array. Every household that had ever imported a file then failed to load at
+-- all: `documentFromLoaded` refuses a batch whose source file it cannot see, so
+-- the application could not read the household — reads and writes alike.
+--
+-- This migration rebuilds the function from the original text with the one key
+-- added, rather than from a retyped copy. The fault was transcription, and the
+-- fix is to stop transcribing.
+--
+-- Nothing but the function definition changes. No table, no column, no row.
+
+create or replace function public.load_household_document(p_household_id uuid)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select case when h.id is null then null else jsonb_build_object(
+    'household', to_jsonb(h),
+    'settings', (select to_jsonb(s) from public.household_settings s where s.household_id = h.id),
+    'setup', (select to_jsonb(s) from public.setup_progress s where s.household_id = h.id),
+    'members', (select coalesce(jsonb_agg(to_jsonb(m) order by m.joined_at, m.id), '[]'::jsonb)
+                from public.household_members m where m.household_id = h.id),
+    'profiles', (select coalesce(jsonb_agg(to_jsonb(p) order by p.created_at, p.id), '[]'::jsonb)
+                 from public.profiles p
+                 where p.id in (select m.profile_id from public.household_members m where m.household_id = h.id)),
+    'invitations', (select coalesce(jsonb_agg(to_jsonb(i) - 'token_hash' order by i.created_at, i.id), '[]'::jsonb)
+                    from public.household_invitations i where i.household_id = h.id),
+    'businesses', (select coalesce(jsonb_agg(to_jsonb(b) order by b.created_at, b.id), '[]'::jsonb)
+                   from public.businesses b where b.household_id = h.id),
+    'accounts', (select coalesce(jsonb_agg(to_jsonb(a) order by a.created_at, a.id), '[]'::jsonb)
+                 from public.financial_accounts a where a.household_id = h.id),
+    'categories', (select coalesce(jsonb_agg(to_jsonb(c) order by c.created_at, c.id), '[]'::jsonb)
+                   from public.categories c where c.household_id = h.id),
+    'balanceSnapshots', (select coalesce(jsonb_agg(to_jsonb(s) order by s.verified_at, s.created_at, s.id), '[]'::jsonb)
+                         from public.account_balance_snapshots s where s.household_id = h.id and s.voided_at is null),
+    'transactions', (select coalesce(jsonb_agg(to_jsonb(t) order by t.transaction_date, t.created_at, t.id), '[]'::jsonb)
+                     from public.transactions t where t.household_id = h.id),
+    'cashflowItems', (select coalesce(jsonb_agg(to_jsonb(c) order by c.expected_date, c.created_at, c.id), '[]'::jsonb)
+                      from public.cashflow_items c where c.household_id = h.id and c.removed_at is null),
+    'debts', (select coalesce(jsonb_agg(to_jsonb(d) order by d.created_at, d.id), '[]'::jsonb)
+              from public.debts d where d.household_id = h.id),
+    'debtEvents', (select coalesce(jsonb_agg(to_jsonb(e) order by e.occurred_on, e.created_at, e.id), '[]'::jsonb)
+                   from public.debt_events e where e.household_id = h.id and e.voided_at is null),
+    'rollovers', (select coalesce(jsonb_agg(to_jsonb(r) order by r.created_at, r.id), '[]'::jsonb)
+                  from public.debt_rollovers r where r.household_id = h.id),
+    'checks', (select coalesce(jsonb_agg(to_jsonb(c) order by c.due_date, c.created_at, c.id), '[]'::jsonb)
+               from public.post_dated_checks c where c.household_id = h.id),
+    'repaymentPlans', (select coalesce(jsonb_agg(to_jsonb(p) order by p.created_at, p.id), '[]'::jsonb)
+                       from public.repayment_plans p where p.household_id = h.id),
+    'budgets', (select coalesce(jsonb_agg(to_jsonb(b) order by b.period, b.id), '[]'::jsonb)
+                from public.budgets b where b.household_id = h.id),
+    'budgetLines', (select coalesce(jsonb_agg(to_jsonb(l) order by l.created_at, l.id), '[]'::jsonb)
+                    from public.budget_lines l where l.household_id = h.id),
+    'tasks', (select coalesce(jsonb_agg(to_jsonb(t) order by t.created_at, t.id), '[]'::jsonb)
+              from public.family_tasks t where t.household_id = h.id),
+    'importSourceFiles', (select coalesce(jsonb_agg(to_jsonb(f) order by f.uploaded_at, f.id), '[]'::jsonb)
+                          from public.import_source_files f where f.household_id = h.id),
+    'importBatches', (select coalesce(jsonb_agg(to_jsonb(b) order by b.created_at, b.id), '[]'::jsonb)
+                      from public.import_batches b where b.household_id = h.id),
+    'importProposals', (select coalesce(jsonb_agg(to_jsonb(p) order by p.created_at, p.id), '[]'::jsonb)
+                        from public.import_proposals p where p.household_id = h.id),
+    -- What this household decided its own statement lines mean (ADR-0036).
+    'learnedRules', (select coalesce(jsonb_agg(to_jsonb(lr) order by lr.created_at, lr.id), '[]'::jsonb)
+                     from public.learned_rules lr where lr.household_id = h.id),
+    -- Command-level entries only (dotted actions): the row-level trail the
+    -- triggers write stays in the table for forensics and is not the family's
+    -- activity feed.
+    'audit', (select coalesce(jsonb_agg(to_jsonb(a) order by a.occurred_at, a.id), '[]'::jsonb)
+              from public.audit_events a where a.household_id = h.id and a.action like '%.%')
+  ) end
+  from (select * from public.households where id = p_household_id) h;
+$$;
+
+revoke all on function public.load_household_document(uuid) from public, anon;
+grant execute on function public.load_household_document(uuid) to authenticated;
+-- <<< END MIGRATION: 20260923120000_restore_import_source_files.sql
+
+-- >>> BEGIN MIGRATION: 20260923130000_debt_due_dates_are_written.sql
+-- Write the due-date columns a debt now carries.
+--
+-- ADR-0035 added ten `due_date*` columns to `public.debts`, but the function
+-- that writes debts lists its columns explicitly and was written before they
+-- existed. A due date therefore reached the database and was dropped on the way
+-- in, without an error — the family would have been told their date was saved
+-- and found it gone.
+--
+-- Composed rather than restated, for the reason ADR-0037 gives: the five hundred
+-- lines of `apply_household_changes` have been exercised against a real
+-- database, and the last time one of its functions was restated to add a key, a
+-- transcription slip emptied `importSourceFiles` and stopped every household
+-- loading. So this adds a second, small function and calls it from the same
+-- entry point, inside the same transaction.
+--
+-- Additive only. No column is dropped, no row is rewritten, and the statement is
+-- safe to run twice.
+
+create or replace function app.apply_debt_due_dates(
+  p_household_id uuid,
+  p_changes jsonb
+)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if p_changes ? 'debts' then
+    /*
+     * Only the rows that actually carry the key are touched. A change set built
+     * from a debt that has never had a due date does not mention these columns
+     * at all, and such a row must keep whatever it already had rather than be
+     * blanked by an absent value.
+     */
+    update public.debts d set
+      due_date                    = (r.value ->> 'due_date')::date,
+      due_date_hebrew_year        = (r.value ->> 'due_date_hebrew_year')::integer,
+      due_date_hebrew_month       = (r.value ->> 'due_date_hebrew_month')::integer,
+      due_date_hebrew_day         = (r.value ->> 'due_date_hebrew_day')::integer,
+      due_date_is_hebrew          = coalesce((r.value ->> 'due_date_is_hebrew')::boolean, false),
+      due_date_source_text        = r.value ->> 'due_date_source_text',
+      due_date_review_reason      = r.value ->> 'due_date_review_reason',
+      due_date_recurs_annually    = coalesce((r.value ->> 'due_date_recurs_annually')::boolean, false),
+      due_date_adar_choice        = r.value ->> 'due_date_adar_choice',
+      due_date_missing_day_choice = r.value ->> 'due_date_missing_day_choice'
+    from jsonb_array_elements(coalesce(p_changes -> 'debts' -> 'upsert', '[]'::jsonb)) as r(value)
+    where d.household_id = p_household_id
+      and d.id = (r.value ->> 'id')::uuid
+      and r.value ? 'due_date';
+  end if;
+end
+$$;
+
+revoke all on function app.apply_debt_due_dates(uuid, jsonb) from public, anon;
+grant execute on function app.apply_debt_due_dates(uuid, jsonb) to authenticated;
+
+-- The entry point, now composing three: the records, this household's rules, and
+-- the due dates a debt carries. One statement, therefore one transaction: the
+-- version check inside `apply_household_changes` raises on a conflict and rolls
+-- all of it back together.
+create or replace function public.apply_household_document(
+  p_household_id uuid,
+  p_expected_version integer,
+  p_changes jsonb
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_result jsonb;
+begin
+  v_result := public.apply_household_changes(p_household_id, p_expected_version, p_changes);
+  perform app.apply_learned_rule_changes(p_household_id, p_changes);
+  perform app.apply_debt_due_dates(p_household_id, p_changes);
+  return v_result;
+end
+$$;
+
+comment on function public.apply_household_document(uuid, integer, jsonb) is
+  'Applies a document change set: records, household classification rules, and '
+  'the due-date columns a debt carries. One transaction.';
+
+revoke all on function public.apply_household_document(uuid, integer, jsonb) from public, anon;
+grant execute on function public.apply_household_document(uuid, integer, jsonb) to authenticated;
+-- <<< END MIGRATION: 20260923130000_debt_due_dates_are_written.sql
 
 commit;
