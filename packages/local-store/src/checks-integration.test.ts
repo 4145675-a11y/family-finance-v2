@@ -279,6 +279,7 @@ describe('importing the clearing of a check', () => {
           fileName: 'statement.csv',
           currency: 'ILS',
           scope: 'household',
+          importedOn: '2026-09-22',
         }),
         displayName: 'statement.csv',
         storedId: crypto.randomUUID(),

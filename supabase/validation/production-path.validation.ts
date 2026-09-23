@@ -553,6 +553,7 @@ describe('the production path', () => {
       fileName: 'statement.csv',
       currency: 'ILS',
       scope: 'household',
+      importedOn: '2026-09-22',
     });
     const batchId = await store.run((d, c) =>
       stageExtraction(

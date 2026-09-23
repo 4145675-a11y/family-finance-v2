@@ -29,6 +29,11 @@ export default async function MorePage() {
     { href: '/forecast', title: copy.forecast.title, description: copy.forecast.endQuestion },
     { href: '/debts', title: copy.debts.title, description: copy.debts.realStoryTitle },
     { href: '/gemach', title: gemach.title, description: gemach.subtitle },
+    {
+      href: '/lenders',
+      title: 'מלווים',
+      description: 'כרטיס לכל מלווה: יתרה, מועדים בשני הלוחות וכל ההיסטוריה',
+    },
     { href: '/business', title: copy.business.title, description: copy.business.safeToMove },
     { href: '/budget', title: copy.budget.title, description: copy.budget.subtitle },
     {

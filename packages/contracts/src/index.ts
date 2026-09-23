@@ -82,6 +82,24 @@ export {
 } from './accounts';
 
 export {
+  EMPTY_DUE_DATE,
+  adarChoiceSchema,
+  dueDateReviewReasonSchema,
+  dueDateSchema,
+  hebrewDateSchema,
+  hebrewMonthNumberSchema,
+  lenderAliasSchema,
+  missingDayChoiceSchema,
+  normaliseLenderName,
+  type AdarChoice,
+  type DueDate,
+  type DueDateReviewReason,
+  type HebrewDateParts,
+  type LenderAlias,
+  type MissingDayChoice,
+} from './calendar';
+
+export {
   CONSUMER_DEBT_KINDS,
   DEBT_EVENT_BALANCE_EFFECT,
   balanceEffectSchema,

@@ -14,6 +14,7 @@
     "@family-finance/design-system": "*",
     "@family-finance/document-import": "*",
     "@family-finance/finance-engine": "*",
+    "@family-finance/hebrew-calendar": "*",
     "@family-finance/household-store": "*",
     "@family-finance/local-store": "*",
     "@family-finance/webauthn": "*",

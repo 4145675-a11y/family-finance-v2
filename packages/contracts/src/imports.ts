@@ -11,6 +11,7 @@ import {
 } from './money';
 import { accountKindSchema } from './accounts';
 import { budgetCategoryKeySchema } from './budget';
+import { dueDateSchema } from './calendar';
 import { debtKindSchema } from './debt';
 
 /**
@@ -194,6 +195,22 @@ export const proposedDebtSchema = z.object({
   effectiveAnnualRateBp: z.number().int().min(0).max(1_000_000).nullable(),
   minimumPaymentMinor: amountMinorSchema.nullable(),
   paymentDueDay: z.number().int().min(1).max(31).nullable(),
+  /** The due date read from the file, in whichever calendar it was written. */
+  dueDate: dueDateSchema.optional(),
+  /** Text from the due-date cell that was not part of the date. */
+  note: z.string().trim().max(500).nullable().optional(),
+  /**
+   * How confidently this row's creditor matches a lender the household already
+   * has. A match is never applied on this alone: `exact` still shows the
+   * existing lender for confirmation, and anything less asks which lender it is.
+   */
+  lenderMatch: z
+    .object({
+      canonicalName: z.string().trim().min(1).max(160),
+      via: z.enum(['exact', 'alias', 'normalised']),
+    })
+    .nullable()
+    .optional(),
 });
 export type ProposedDebt = z.infer<typeof proposedDebtSchema>;
 

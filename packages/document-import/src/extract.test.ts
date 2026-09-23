@@ -21,7 +21,12 @@ import { MalformedDocumentError } from './limits';
  * confirmation dialog.
  */
 
-const options = { fileName: 'statement.csv', currency: 'ILS', scope: 'household' } as const;
+const options = {
+  fileName: 'statement.csv',
+  currency: 'ILS',
+  scope: 'household',
+  importedOn: '2026-09-22',
+} as const;
 
 describe('a bank statement in CSV', () => {
   const bytes = buildCsv({

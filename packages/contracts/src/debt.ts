@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { dueDateSchema } from './calendar';
 import { timestampSchema, uuidSchema, versionSchema } from './identity';
 import { amountMinorSchema, businessDateSchema, currencySchema } from './money';
 
@@ -102,6 +103,14 @@ export const debtSchema = z
     lastConversationAt: timestampSchema.nullable(),
     /** A date the lender may call the money in, when one was agreed. */
     expectedCallDate: businessDateSchema.nullable(),
+    /**
+     * When the payment is due, in whichever calendar the family wrote it.
+     *
+     * Optional so that every debt recorded before dual-calendar dates existed
+     * stays valid: absent means nothing was ever said about a due date, which is
+     * exactly what those records mean.
+     */
+    dueDate: dueDateSchema.optional(),
     notes: z.string().trim().max(1000).nullable(),
     openedOn: businessDateSchema,
     closedAt: timestampSchema.nullable(),
@@ -140,6 +149,13 @@ export const debtEventKindSchema = z.enum([
   'fee_paid',
   'balance_correction',
   'write_off',
+  /**
+   * Something worth remembering that moved no money: a conversation, a promise,
+   * a change of terms. It belongs on the ledger because the ledger is the whole
+   * history of a lender, and leaving it off would mean keeping it somewhere the
+   * balance cannot be read beside it. Its effect is `none`.
+   */
+  'note',
 ]);
 export type DebtEventKind = z.infer<typeof debtEventKindSchema>;
 
@@ -166,6 +182,7 @@ export const DEBT_EVENT_BALANCE_EFFECT: Readonly<
   interest_paid: 'none',
   fee_paid: 'none',
   write_off: 'decrease',
+  note: 'none',
 };
 
 export const debtEventSchema = z
@@ -271,6 +288,7 @@ export const createDebtInputSchema = z.object({
   relationshipSensitivity: relationshipSensitivitySchema.nullable(),
   partialPaymentAllowed: z.boolean().nullable(),
   expectedCallDate: businessDateSchema.nullable(),
+  dueDate: dueDateSchema.optional(),
   notes: z.string().trim().max(1000).nullable(),
 });
 export type CreateDebtInput = z.infer<typeof createDebtInputSchema>;

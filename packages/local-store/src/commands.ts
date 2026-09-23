@@ -8,6 +8,7 @@ import {
   type DebtKind,
   type DebtUrgency,
   type Direction,
+  type DueDate,
   type RecordScope,
   type RelationshipSensitivity,
   type TransactionKind,
@@ -788,6 +789,16 @@ export interface AddDebtInput {
   readonly partialPaymentAllowed: boolean | null;
   readonly expectedCallDate: string | null;
   readonly notes: string | null;
+  /** When the payment falls due, in whichever calendar the family wrote it. */
+  readonly dueDate?: DueDate;
+  /**
+   * The import this debt came from, recorded on its opening balance.
+   *
+   * It is what makes the debt reversible: `reverseBatch` removes exactly the
+   * events a batch created, so an import that turns out to be wrong can be
+   * undone without touching anything a person entered by hand.
+   */
+  readonly importBatchId?: string | null;
 }
 
 export function addDebt(
@@ -815,6 +826,7 @@ export function addDebt(
     lastDemandAt: null,
     lastConversationAt: null,
     expectedCallDate: input.expectedCallDate,
+    ...(input.dueDate === undefined ? {} : { dueDate: input.dueDate }),
     notes: input.notes,
     openedOn: input.openedOn,
     closedAt: null,
@@ -837,7 +849,7 @@ export function addDebt(
     note: null,
     createdBy: context.actorProfileId,
     createdAt: context.now,
-    importBatchId: null,
+    importBatchId: input.importBatchId ?? null,
   };
 
   return {

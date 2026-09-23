@@ -18,6 +18,7 @@ import {
   stageFailure,
 } from '@family-finance/local-store';
 import type { ProposedPayload } from '@family-finance/contracts';
+import { todayInIsrael } from '@family-finance/hebrew-calendar';
 import { revalidatePath } from 'next/cache';
 
 import { gemach } from '../copy/gemach';
@@ -154,6 +155,9 @@ export async function uploadDocumentAction(
       fileName: displayName,
       currency,
       scope,
+      // A debt list says what is owed now, not since when. The opening balance
+      // is dated today in the household's time zone — a fact, not a guess.
+      importedOn: todayInIsrael(),
     });
 
     batchId = await store.run((document, context) =>

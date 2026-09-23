@@ -165,32 +165,44 @@ export function detectDocumentType(input: DetectionInput): DetectionResult {
     }
   }
 
-  if (best.confidenceBp < RECOGNITION_THRESHOLD) {
-    /*
-     * The words said nothing. Before falling back to the generic mapper, ask the
-     * values: a column of names beside a column of amounts is a debt list, and
-     * that shape is recognisable even when every header is `שדה1`.
-     *
-     * This runs only here, below the recognition threshold, so a file the
-     * phrases already identified keeps the type it had.
-     */
-    if (input.dataRows !== undefined && input.dataRows.length > 0) {
-      const debts = detectDebtTable(input.dataRows, input.headerRow ?? []);
-      if (debts.detected) {
-        return {
-          type: 'private_debt_list',
-          confidenceBp: debts.confidenceBp,
-          evidence: debts.evidence.slice(0, 6),
-        };
-      }
-    }
+  const readableColumns =
+    input.shape !== null && input.shape.columns.some((column) => column.role !== 'unknown');
 
+  /*
+   * What the values look like, when the headers named no column.
+   *
+   * Two guards keep this narrow, and neither is optional:
+   *
+   *   * `readableColumns` — a household expense sheet also has a text column
+   *     beside a numeric one. What tells the two apart is that the expense
+   *     sheet's headers say "תאריך" and "סכום", so its columns carry roles.
+   *     Without this the value test is true of almost every table.
+   *   * the confidence comparison — the value reading only wins where it is the
+   *     stronger evidence. A bank statement announcing itself in four phrases
+   *     scores far above it and keeps its type.
+   *
+   * The comparison is what makes this robust rather than lucky. A phrase match
+   * is one word found somewhere in the file, and a lender called "הלוואה מדוד"
+   * puts the word "הלוואה" in a data cell — enough, on its own, to score a debt
+   * list as a loan schedule and read nothing from it. The shape of every row in
+   * the table is better evidence than one word in one cell, and here it is
+   * allowed to say so.
+   */
+  if (!readableColumns && input.dataRows !== undefined && input.dataRows.length > 0) {
+    const debts = detectDebtTable(input.dataRows, input.headerRow ?? []);
+    if (debts.detected && debts.confidenceBp > best.confidenceBp) {
+      return {
+        type: 'private_debt_list',
+        confidenceBp: debts.confidenceBp,
+        evidence: debts.evidence.slice(0, 6),
+      };
+    }
+  }
+
+  if (best.confidenceBp < RECOGNITION_THRESHOLD) {
     // A table we can read but cannot name is still useful: the generic mapper
     // handles it, and the reviewer says what it is.
-    if (
-      input.shape !== null &&
-      input.shape.columns.some((column) => column.role !== 'unknown')
-    ) {
+    if (readableColumns) {
       return { type: 'general_table', confidenceBp: 2_000, evidence: best.evidence };
     }
     return { type: 'unrecognised', confidenceBp: 0, evidence: best.evidence };

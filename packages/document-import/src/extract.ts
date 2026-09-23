@@ -1,5 +1,7 @@
 import type {
+  BusinessDate,
   DocumentType,
+  DueDate,
   ExtractionSummary,
   ImportFileKind,
   ImportWarningCode,
@@ -9,8 +11,10 @@ import type {
   RecordScope,
   SourceLocation,
 } from '@family-finance/contracts';
+import { EMPTY_DUE_DATE } from '@family-finance/contracts';
 
 import { readCsv } from './csv';
+import { detectDebtTable, readDebtTable, type DebtColumnMapping } from './debt-table';
 import { detectDocumentType, findAccountHints } from './detect';
 import { Deadline, LIMITS, MalformedDocumentError } from './limits';
 import {
@@ -111,6 +115,14 @@ export interface ExtractionOptions {
   readonly currency: string;
   /** Which side of the household this document belongs to. */
   readonly scope: RecordScope;
+  /**
+   * The civil day the file is being imported on, in the household's time zone.
+   *
+   * A debt list states what is owed now and rarely says since when, so the
+   * opening balance is dated the day the family brought it in — a fact that is
+   * true, rather than a date invented to look like history.
+   */
+  readonly importedOn: BusinessDate;
   readonly deadline?: Deadline;
 }
 
@@ -289,7 +301,26 @@ export function extractDocument(
     ...sources.flatMap((source) => source.context.slice(0, 20)),
   ];
 
-  const detection = detectDocumentType({ context, shape: bestShape });
+  /*
+   * The rows the value-based detector reads when the headers say nothing.
+   *
+   * The widest sheet is the one to judge by: a workbook's first sheet is often a
+   * cover page. Rows below the detected header are what carry values; with no
+   * header detected, every row does.
+   */
+  const widestSource = [...sources].sort((a, b) => b.rows.length - a.rows.length)[0] ?? null;
+  const widestShape = widestSource === null ? null : (shapes.get(widestSource) ?? null);
+  const widestText = (widestSource?.rows ?? []).map((row) => row.map((cell) => cell.text));
+  const headerIndex = widestShape?.headerRow ?? -1;
+  const detectionDataRows = widestText.slice(headerIndex + 1);
+  const detectionHeader = headerIndex >= 0 ? (widestText[headerIndex] ?? []) : [];
+
+  const detection = detectDocumentType({
+    context,
+    shape: bestShape,
+    dataRows: detectionDataRows,
+    headerRow: detectionHeader,
+  });
   if (detection.confidenceBp < 5_000) warnings.add('low_confidence_document_type');
 
   const accountHints = findAccountHints(context);
@@ -317,6 +348,42 @@ export function extractDocument(
       })),
       needsManualMapping: shape === null || shape.confidenceBp < CONFIDENT_ENOUGH,
     });
+
+    /*
+     * A debt list whose headers carry no meaning. The header-based extractor
+     * cannot read it — every column is `unknown` — so the value-based reading
+     * runs instead, and only for this document type.
+     */
+    if (detection.type === 'private_debt_list') {
+      const text = source.rows.map((row) => row.map((cell) => cell.text));
+      const at = shape?.headerRow ?? -1;
+      const dataRows = text.slice(at + 1);
+      const header = at >= 0 ? (text[at] ?? []) : [];
+      const debts = detectDebtTable(dataRows, header);
+
+      if (debts.detected && debts.mapping !== null) {
+        const extractedDebts = extractDebtRows(
+          source,
+          dataRows,
+          header,
+          debts.mapping,
+          at + 1,
+          options,
+          debts.confidenceBp,
+        );
+        rowsScanned += dataRows.length;
+        rowsSkipped += extractedDebts.skipped;
+        for (const proposal of extractedDebts.proposals) {
+          if (proposals.length >= LIMITS.maxProposalsPerBatch) {
+            warnings.add('truncated_by_limit');
+            break;
+          }
+          proposals.push(proposal);
+        }
+        for (const warning of extractedDebts.warnings) warnings.add(warning);
+        continue;
+      }
+    }
 
     if (shape === null) {
       rowsSkipped += source.rows.length;
@@ -702,6 +769,114 @@ function buildTransaction(input: {
     balanceMinor: balance?.amountMinor ?? null,
     balanceNegative: balance?.negative ?? false,
   };
+}
+
+/**
+ * Turns a value-detected debt table into proposals.
+ *
+ * Every row produces something. A row that becomes a debt produces a proposal;
+ * a row that does not — a total, a repeated header, a zero balance — is counted
+ * as skipped and its reason is carried to the review screen in the warnings, so
+ * the family can see what the file held and why part of it was left out.
+ *
+ * Nothing here decides. A due date that could not be read safely travels as a
+ * review reason on the payload, and the balance is proposed either way: the
+ * amount being certain does not depend on the date being certain.
+ */
+function extractDebtRows(
+  source: Source,
+  dataRows: readonly (readonly string[])[],
+  header: readonly string[],
+  mapping: DebtColumnMapping,
+  firstRowOffset: number,
+  options: ExtractionOptions,
+  confidenceBp: number,
+): {
+  proposals: ExtractedProposal[];
+  skipped: number;
+  warnings: ImportWarningCode[];
+} {
+  const proposals: ExtractedProposal[] = [];
+  const warnings: ImportWarningCode[] = [];
+  let skipped = 0;
+
+  for (const reading of readDebtTable(dataRows, mapping, header)) {
+    const row = dataRows[reading.rowIndex] ?? [];
+    const location: SourceLocation = {
+      sheetName: source.sheetName,
+      page: source.page,
+      row: firstRowOffset + reading.rowIndex + 1,
+      snippet: row.join(' | ').slice(0, 1000) || null,
+    };
+
+    const raw: RawCell[] = row.map((text, index) => ({
+      column: (header[index] ?? `עמודה ${index + 1}`).slice(0, 200),
+      text: text.slice(0, 2000),
+    }));
+
+    if (reading.outcome === 'excluded') {
+      skipped += 1;
+      // A row left out for a structural reason is ordinary; one left out because
+      // its amount could not be read is something the reviewer should see.
+      if (reading.reason === 'unparsed_amount') warnings.push('unparsed_amount');
+      if (reading.reason === 'missing_lender_name') warnings.push('missing_description');
+      continue;
+    }
+
+    const due = reading.due;
+    const dueDate: DueDate =
+      due === null || due.outcome === 'no_date'
+        ? { ...EMPTY_DUE_DATE, sourceText: due?.originalText.trim() || null }
+        : due.outcome === 'needs_review'
+          ? {
+              ...EMPTY_DUE_DATE,
+              sourceText: due.originalText.trim() || null,
+              reviewReason: due.reason,
+            }
+          : {
+              gregorian: due.gregorian,
+              hebrew: due.hebrew,
+              isHebrew: due.source === 'hebrew',
+              sourceText: due.originalText.trim() || null,
+              reviewReason: null,
+              recursAnnually: false,
+              adarChoice: null,
+              missingDayChoice: null,
+            };
+
+    if (dueDate.reviewReason !== null) warnings.push('ambiguous_date');
+
+    proposals.push({
+      kind: 'debt',
+      location,
+      raw,
+      proposed: {
+        kind: 'debt',
+        value: {
+          creditorName: reading.lenderName.slice(0, 160),
+          // Who the lender is decides the kind, and the file does not say. The
+          // reviewer picks; `other` is the honest placeholder until they do.
+          kind: 'other',
+          balanceMinor: reading.balanceMinor,
+          currency: options.currency,
+          openedOn: options.importedOn,
+          effectiveAnnualRateBp: null,
+          minimumPaymentMinor: null,
+          paymentDueDay: null,
+          dueDate,
+          note: reading.note?.slice(0, 500) ?? null,
+          lenderMatch: null,
+        },
+      },
+      confidenceBp,
+      warnings: dueDate.reviewReason !== null ? ['ambiguous_date'] : [],
+    });
+  }
+
+  // The mapping was inferred rather than read, so the reviewer is told.
+  if (proposals.length > 0) warnings.push('ambiguous_column_mapping');
+
+  return { proposals, skipped, warnings };
 }
 
 function buildDebtPayment(

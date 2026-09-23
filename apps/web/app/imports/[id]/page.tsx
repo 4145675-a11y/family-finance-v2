@@ -1,4 +1,4 @@
-import { maskCheckNumber } from '@family-finance/contracts';
+import { maskCheckNumber, normaliseLenderName } from '@family-finance/contracts';
 import { checkApproval, proposeCheckMatch } from '@family-finance/local-store';
 import { notFound } from 'next/navigation';
 
@@ -19,6 +19,7 @@ import {
   SelectField,
   TextField,
 } from '../../../components/form';
+import { DueDateLines } from '../../../components/due-date';
 import { NoHousehold } from '../../../components/screen';
 import {
   Badge,
@@ -93,6 +94,21 @@ export default async function ImportReviewPage({
 
   const accountName = (accountId: string | null): string =>
     accounts.find((account) => account.value === accountId)?.label ?? screens.common.none;
+
+  /**
+   * The lender a proposed debt would collide with, if there is one.
+   *
+   * Names are compared folded, so "גמ״ח אור החיים" and "גמח אור החיים" are the
+   * same lender for the purposes of asking. The answer is a question for the
+   * family, never an automatic merge: `checkApproval` blocks the batch until
+   * they say which lender the row belongs to.
+   */
+  const existingLenderFor = (creditorName: string) =>
+    document.debts.find(
+      (debt) =>
+        debt.status !== 'written_off' &&
+        normaliseLenderName(debt.creditorName) === normaliseLenderName(creditorName),
+    ) ?? null;
 
   /**
    * The checks a row could be the clearing of.
@@ -210,6 +226,22 @@ export default async function ImportReviewPage({
           value={screens.review.rowsFound(batch.summary.rowsProposed)}
           hint={screens.review.rowsSkipped(batch.summary.rowsSkipped)}
         />
+        {batch.documentType !== 'private_debt_list' ? null : (
+          <div className="mt-3">
+            <Notice tone="attention" title="הכותרות בקובץ לא אומרות מה יש בעמודות">
+              <p>קראנו את העמודות לפי התוכן שלהן. כך הבנו אותן:</p>
+              <ul className="mt-2 flex list-inside list-disc flex-col gap-1">
+                <li>שם המלווה — העמודה שבה יש שמות</li>
+                <li>יתרת החוב — העמודה שבה יש סכומים</li>
+                <li>מועד או הערה — העמודה שאחריה</li>
+              </ul>
+              <p className="mt-2">
+                כדאי לעבור שורה־שורה ולוודא. שורות ריקות, שורות סיכום ושורות שהיתרה בהן אפס לא
+                הוצעו כחוב — הן מופיעות בקובץ אבל אינן חוב פעיל.
+              </p>
+            </Notice>
+          </div>
+        )}
         {batch.summary.dateRangeStart === null || batch.summary.dateRangeEnd === null ? null : (
           <StatRow
             label={screens.review.dateRange(
@@ -277,9 +309,11 @@ export default async function ImportReviewPage({
           <Card
             key={proposal.id}
             title={
-              value === null
-                ? (screens.review.columnRole[proposal.kind] ?? proposal.kind)
-                : value.description
+              payload.kind === 'debt'
+                ? payload.value.creditorName
+                : value === null
+                  ? (screens.review.columnRole[proposal.kind] ?? proposal.kind)
+                  : value.description
             }
             subtitle={screens.review.sourceAt(
               proposal.location.sheetName,
@@ -327,6 +361,37 @@ export default async function ImportReviewPage({
                   label={screens.entry.account}
                   value={accountName(proposal.targetAccountId)}
                 />
+              </>
+            )}
+
+            {payload.kind !== 'debt' ? null : (
+              <>
+                <StatRow
+                  label="יתרת החוב"
+                  value={<Money amountMinor={payload.value.balanceMinor} currency={currency} />}
+                  hint="תירשם כ״יתרת פתיחה״ בכרטיס המלווה"
+                />
+                <StatRow
+                  label="תאריך היבוא"
+                  value={formatBusinessDate(payload.value.openedOn)}
+                />
+                {payload.value.dueDate === undefined ? null : (
+                  <div className="border-b border-border py-2">
+                    <p className="mb-1 text-text-secondary">מועד לתשלום</p>
+                    <DueDateLines due={payload.value.dueDate} />
+                  </div>
+                )}
+                {payload.value.note == null ? null : (
+                  <StatRow label="הערה מהקובץ" value={payload.value.note} />
+                )}
+                {existingLenderFor(payload.value.creditorName) === null ? null : (
+                  <div className="mt-3">
+                    <Notice tone="attention" title="המלווה הזה כבר קיים">
+                      כבר יש כרטיס בשם הזה. צריך לומר אם מדובר באותו מלווה — ואז הסכום ייווסף
+                      להיסטוריה שלו — או להוציא את השורה. בלי החלטה היבוא לא יאושר.
+                    </Notice>
+                  </div>
+                )}
               </>
             )}
 
@@ -548,10 +613,15 @@ export default async function ImportReviewPage({
                       required={false}
                       options={accounts}
                     />
-                    {payload.kind === 'debt_payment' && debts.length > 0 ? (
+                    {(payload.kind === 'debt_payment' || payload.kind === 'debt') &&
+                    debts.length > 0 ? (
                       <SelectField
                         name="targetDebtId"
-                        label={screens.entry.debtTitle}
+                        label={
+                          payload.kind === 'debt'
+                            ? 'מלווה שכבר קיים (להשאיר ריק אם זה מלווה חדש)'
+                            : screens.entry.debtTitle
+                        }
                         defaultValue={proposal.targetDebtId ?? ''}
                         emptyLabel={screens.common.none}
                         required={false}

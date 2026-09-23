@@ -42,6 +42,7 @@ function stage(document: StoreDocument, accountId: string, bytes = statement) {
     fileName: 'statement.csv',
     currency: 'ILS',
     scope: 'household',
+    importedOn: '2026-09-22',
   });
 
   return stageExtraction(
@@ -520,6 +521,7 @@ describe('an import that could not be read', () => {
         fileName: 'scan.pdf',
         currency: 'ILS',
         scope: 'household',
+        importedOn: '2026-09-22',
       }),
     ).toThrow();
     expect(seeded.document.importProposals).toHaveLength(0);

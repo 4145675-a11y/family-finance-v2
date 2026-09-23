@@ -5,6 +5,7 @@ import type {
   ProposedPayload,
   ReviewState,
 } from '@family-finance/contracts';
+import { normaliseLenderName } from '@family-finance/contracts';
 import {
   assessDuplicate,
   sourceFingerprint,
@@ -16,6 +17,7 @@ import { auditEvent, withAudit } from './audit';
 import { clearCheck } from './checks';
 import {
   CommandError,
+  addDebt,
   recordBalance,
   recordDebtEvent,
   recordTransaction,
@@ -407,6 +409,25 @@ export function checkApproval(document: StoreDocument, batchId: string): Approva
     if (payload.kind === 'transaction' && payload.value.amountMinor <= 0) {
       blocking.push({ proposalId: proposal.id, reason: 'needs_amount' });
     }
+    /*
+     * A debt row naming a lender the household already has.
+     *
+     * The two readings — "they lent us more" and "this is a second lender who
+     * happens to share a name" — are not distinguishable from the file, and
+     * guessing either one is unsafe: the first invents money that was never
+     * borrowed, the second splits one lender's history in two. So the row waits
+     * until a person says which, by attaching it to a lender or excluding it.
+     */
+    if (payload.kind === 'debt' && proposal.targetDebtId === null) {
+      const name = normaliseLenderName(payload.value.creditorName);
+      const clash = document.debts.some(
+        (debt) =>
+          debt.householdId === document.household.id &&
+          debt.status !== 'written_off' &&
+          normaliseLenderName(debt.creditorName) === name,
+      );
+      if (clash) blocking.push({ proposalId: proposal.id, reason: 'needs_lender_decision' });
+    }
   }
 
   return {
@@ -424,6 +445,7 @@ export interface ApprovalOutcome {
   readonly batchId: string;
   readonly transactionsCreated: number;
   readonly balancesCreated: number;
+  readonly debtsCreated: number;
   readonly debtEventsCreated: number;
   readonly plannedItemsCreated: number;
   /** The signed change to each account, so the screen can show before and after. */
@@ -471,6 +493,7 @@ export function approveBatch(
   const outcome = {
     transactionsCreated: 0,
     balancesCreated: 0,
+    debtsCreated: 0,
     debtEventsCreated: 0,
     plannedItemsCreated: 0,
   };
@@ -627,9 +650,83 @@ export function approveBatch(
       continue;
     }
 
-    // Account, debt, planned item and budget line proposals are not committed
+    /*
+     * A debt read from a debt list.
+     *
+     * Two shapes, and the difference between them is a decision a person made:
+     *
+     *   * `targetDebtId` set — the reviewer said this row belongs to a lender the
+     *     household already has, so it is more principal on that debt, not a
+     *     second card for the same person.
+     *   * `targetDebtId` null — a lender that is new. `checkApproval` has already
+     *     refused the batch if a debt with this name exists and the reviewer did
+     *     not say which it was, so reaching here means the name is genuinely new.
+     *
+     * Either way the balance arrives as an event and is never written as a
+     * number on the debt: `replayDebtBalances` stays the only definition of what
+     * is owed.
+     */
+    if (payload.kind === 'debt') {
+      const value = payload.value;
+
+      if (proposal.targetDebtId !== null) {
+        const existing = working.debts.find(
+          (candidate) => candidate.id === proposal.targetDebtId,
+        );
+        if (existing === undefined) {
+          throw new CommandError('unknown_debt', 'the lender this row points at is gone');
+        }
+        const added = recordDebtEvent(
+          working,
+          {
+            debtId: existing.id,
+            kind: 'new_principal',
+            amountMinor: value.balanceMinor,
+            occurredOn: value.openedOn,
+            correctionEffect: null,
+            note: value.note ?? null,
+            importBatchId: batch.id,
+          },
+          context,
+        );
+        working = added.document;
+        committed.set(proposal.id, existing.id);
+        outcome.debtEventsCreated += 1;
+        continue;
+      }
+
+      const created = addDebt(
+        working,
+        {
+          creditorName: value.creditorName,
+          kind: value.kind,
+          openingBalanceMinor: value.balanceMinor,
+          openedOn: value.openedOn,
+          effectiveAnnualRateBp: value.effectiveAnnualRateBp,
+          minimumPaymentMinor: value.minimumPaymentMinor,
+          paymentDueDay: value.paymentDueDay,
+          urgency: 'none',
+          promiseSummary: null,
+          relationshipSensitivity: null,
+          partialPaymentAllowed: null,
+          expectedCallDate: null,
+          ...(value.dueDate === undefined ? {} : { dueDate: value.dueDate }),
+          notes: value.note ?? null,
+          importBatchId: batch.id,
+        },
+        context,
+      );
+      working = created.document;
+      committed.set(proposal.id, created.value);
+      outcome.debtsCreated += 1;
+      // `addDebt` writes the opening balance with the debt, in one step.
+      outcome.debtEventsCreated += 1;
+      continue;
+    }
+
+    // Account, planned item and budget line proposals are not committed
     // automatically. They describe structure rather than movements, and creating
-    // an account or a debt from a document without the family naming it produces
+    // an account from a document without the family naming it produces
     // records nobody recognises. The review screen offers them as a next step.
   }
 

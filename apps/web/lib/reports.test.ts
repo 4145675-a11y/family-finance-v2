@@ -97,6 +97,7 @@ describe('a staged import is not in any total', () => {
     fileName: 'statement.csv',
     currency: 'ILS',
     scope: 'household',
+    importedOn: '2026-09-22',
   });
 
   const staged = stageExtraction(

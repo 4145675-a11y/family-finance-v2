@@ -71,6 +71,9 @@
 | PROD-COOKIE-001 | Security | apps/web/lib/auth/cookies.ts (server client + proxy) | unit + live (http and https origin) | HPO | **Verified in HPO** — Secure/HttpOnly/SameSite=Lax observed on Set-Cookie |
 | PROD-AUTHURL-001 | Security | app/auth/{callback,set-password,forgot} + lib/auth/redirect.ts | unit (25) + live (planted token) | HPO | **Verified in HPO** — 18/18 live; Supabase email templates are an owner action |
 | PROD-HEALTH-002 | Operations | apps/web/app/api/health/route.ts | unit + gate | PDL | **Verified in PDL** — 6 unit + 2 gate checks |
+| IMP-DEBTMAP-001 | Architecture | packages/document-import/src/{debt-table,detect,extract}.ts | unit + end-to-end xlsx | DEBT-CAL | **Verified in DEBT-CAL** — 28 + 21 בדיקות; זיהוי לפי ערכים רק בהיעדר תפקידי עמודה וכשהוא העדות החזקה יותר |
+| IMP-DEBTLEDGER-001 | Financial | packages/local-store/src/{imports,commands}.ts + apps/web/app/lenders | unit + store integration | DEBT-CAL | **Verified in DEBT-CAL** — 14 בדיקות; יתרה מ־`replayDebtBalances`, אירוע פתיחה יחיד, מלווה קיים חוסם עד הכרעה |
+| CAL-DUAL-001 | Financial | packages/hebrew-calendar + packages/contracts/src/calendar.ts | unit | DEBT-CAL | **Verified in DEBT-CAL** — 69 בדיקות מעל `@hebcal/core` 6.9.3; שכבת סירוב על גלישה שקטה ועל התאמת שם מקורבת |
 | PROD-FAILCLOSED-001 | Architecture | apps/web/lib/config/{deployment,startup}.ts + proxy.ts + instrumentation.ts | unit/gate | 9 | **Verified in M9** — השרת הבנוי מסרב לעלות; התצורה התקינה כן עולה |
 | PROD-HEALTH-001 | Operations | apps/web/app/api/health/route.ts | gate | 9 | **Verified in M9** — שמות הגדרות בלבד, לעולם לא ערכים |
 | PROD-NOENV-001 | Security | tools/check-no-env-files.mjs | gate | 9 | **Verified in M9** — נמצא כש־.env.local סיפק תצורה בשקט לשער אחר |
