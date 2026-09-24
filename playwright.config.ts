@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-import { LOCAL_BASE_URL } from './e2e/support/origins';
+import { LOCAL_BASE_URL, PLAIN_BASE_URL } from './e2e/support/origins';
 
 /**
  * The browser suite.
@@ -65,7 +65,24 @@ export default defineConfig({
     {
       name: 'desktop',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } },
-      testIgnore: /\.mobile\.spec\.ts$/,
+      testIgnore: /\.(mobile|plain)\.spec\.ts$/,
+    },
+    {
+      /*
+       * The deployment as it stands today: no smart reader configured.
+       *
+       * Its own server on its own port, because "not set up here" is a property
+       * of the process rather than of a request — and it is the state a person
+       * meets on the hosted service right now, so it is the one most worth
+       * seeing in a browser.
+       */
+      name: 'unconfigured',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 900 },
+        baseURL: PLAIN_BASE_URL,
+      },
+      testMatch: /\.plain\.spec\.ts$/,
     },
     {
       /*

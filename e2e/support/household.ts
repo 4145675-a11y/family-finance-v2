@@ -57,6 +57,15 @@ export const LENDER_CARD = 'E2E גמח שני';
 export const LENDER_OVERPAY = 'E2E גמח שלישי';
 
 /**
+ * The smart-reading journeys' own lender.
+ *
+ * Opened large enough to absorb the 3,000 repayment those journeys make, so that
+ * spec never zeroes a balance another spec is asserting on. One lender per
+ * concern is what keeps the files reorderable.
+ */
+export const LENDER_AI = 'E2E גמח רביעי';
+
+/**
  * A gemach and its branch, whose names overlap.
  *
  * Naming the longer one names the shorter one too, so "החזרתי 200 לE2E גמח אור
@@ -72,6 +81,7 @@ export const LENDER_OVERLAP_B = 'E2E גמח אור החיים';
 export const LENDER_PLAIN_OPENING_MINOR = 100_000;
 export const LENDER_CARD_OPENING_MINOR = 100_000;
 export const LENDER_OVERPAY_OPENING_MINOR = 50_000;
+export const LENDER_AI_OPENING_MINOR = 500_000;
 export const LENDER_OVERLAP_A_OPENING_MINOR = 50_000;
 export const LENDER_OVERLAP_B_OPENING_MINOR = 70_000;
 
@@ -85,6 +95,7 @@ export interface SeededHousehold {
   readonly lenderPlainId: string;
   readonly lenderCardId: string;
   readonly lenderOverpayId: string;
+  readonly lenderAiId: string;
   readonly lenderOverlapAId: string;
   readonly lenderOverlapBId: string;
 }
@@ -183,6 +194,7 @@ export async function seedHousehold(): Promise<SeededHousehold> {
   const lenderPlainId = await lend(LENDER_PLAIN, LENDER_PLAIN_OPENING_MINOR);
   const lenderCardId = await lend(LENDER_CARD, LENDER_CARD_OPENING_MINOR);
   const lenderOverpayId = await lend(LENDER_OVERPAY, LENDER_OVERPAY_OPENING_MINOR);
+  const lenderAiId = await lend(LENDER_AI, LENDER_AI_OPENING_MINOR);
   const lenderOverlapAId = await lend(LENDER_OVERLAP_A, LENDER_OVERLAP_A_OPENING_MINOR);
   const lenderOverlapBId = await lend(LENDER_OVERLAP_B, LENDER_OVERLAP_B_OPENING_MINOR);
 
@@ -192,6 +204,7 @@ export async function seedHousehold(): Promise<SeededHousehold> {
     lenderPlainId,
     lenderCardId,
     lenderOverpayId,
+    lenderAiId,
     lenderOverlapAId,
     lenderOverlapBId,
   };

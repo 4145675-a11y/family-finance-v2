@@ -29,6 +29,8 @@ export interface RunState extends SeededHousehold {
   readonly baseURL: string;
   /** The server this run started, so teardown can stop it from another process. */
   readonly serverPid: number | null;
+  /** The second server, configured the way the deployment is today: no reader. */
+  readonly plainServerPid: number | null;
 }
 
 export function writeRunState(state: RunState): void {

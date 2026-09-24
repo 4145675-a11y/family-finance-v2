@@ -1,7 +1,7 @@
 import { LOCAL_BASE_URL } from './origins';
 import { seedHousehold } from './household';
 import { clearRunState, writeRunState } from './run-state';
-import { startLocalServer } from './server';
+import { startLocalServer, startPlainServer } from './server';
 
 /**
  * One temporary household, then one server pointed at it.
@@ -14,11 +14,20 @@ export default async function globalSetup(): Promise<void> {
   clearRunState();
   const seeded = await seedHousehold();
   const server = await startLocalServer(seeded.dataDirectory);
+  /*
+   * And a second one with no reader configured at all, so the suite can see the
+   * screen the hosted deployment actually shows today. Same build, same
+   * household, different environment.
+   */
+  const plain = await startPlainServer(seeded.dataDirectory);
+
   writeRunState({
     ...seeded,
     baseURL: LOCAL_BASE_URL,
     serverPid: server.pid ?? null,
+    plainServerPid: plain.pid ?? null,
   });
-  // Detached from this process's lifetime tracking: teardown stops it by pid.
+  // Detached from this process's lifetime tracking: teardown stops them by pid.
   server.unref();
+  plain.unref();
 }

@@ -20,6 +20,7 @@ export default async function globalTeardown(): Promise<void> {
     const state = readRunStateIfAny();
     if (state !== null) {
       stopServerByPid(state.serverPid);
+      stopServerByPid(state.plainServerPid);
       removeHousehold(state.dataDirectory);
     }
   } finally {

@@ -17,3 +17,16 @@ export const LOCAL_BASE_URL = `http://${LOCAL_HOST}:${LOCAL_PORT}`;
  * cookies and the auth-link checks behave as they do in production.
  */
 export const LOCAL_APP_ORIGIN = `http://localhost:${LOCAL_PORT}`;
+
+/**
+ * A second server, configured the way the deployment is today: **no reader at
+ * all**.
+ *
+ * It exists because "smart reading is not set up here" is the state production
+ * is actually in, and a screen that claims a reading happened when none did
+ * would be the worst failure this feature could have. The only way to see that
+ * screen is to run a process with no provider, so the suite runs one.
+ */
+export const PLAIN_PORT = 3143;
+export const PLAIN_BASE_URL = `http://${LOCAL_HOST}:${PLAIN_PORT}`;
+export const PLAIN_APP_ORIGIN = `http://localhost:${PLAIN_PORT}`;
