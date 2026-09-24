@@ -2,7 +2,8 @@ import { AppShell } from '../../components/app-shell';
 import { QuickCapture } from '../../components/quick-capture';
 import { NoHousehold } from '../../components/screen';
 import { Card, EmptyPrompt, Notice } from '../../components/ui';
-import { interpretQuickUpdateAction } from '../../lib/actions/quick';
+import { analyseQuickUpdateAction, interpretQuickUpdateAction } from '../../lib/actions/quick';
+import { aiConfigured } from '../../lib/ai/server';
 import { quick } from '../../lib/copy/quick';
 import { loadDashboardView } from '../../lib/dashboard/load';
 
@@ -50,11 +51,15 @@ export default async function QuickPage() {
        * the same reason: it is the question they actually have.
        */}
       <Notice tone="primary" title={quick.promise}>
-        {quick.hint}
+        {quick.promiseBody}
       </Notice>
 
       <Card title={quick.subtitle}>
-        <QuickCapture action={interpretQuickUpdateAction} />
+        <QuickCapture
+          action={interpretQuickUpdateAction}
+          analyse={analyseQuickUpdateAction}
+          aiConfigured={aiConfigured()}
+        />
       </Card>
     </AppShell>
   );

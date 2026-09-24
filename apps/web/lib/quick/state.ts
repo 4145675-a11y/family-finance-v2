@@ -1,3 +1,4 @@
+import type { AiProposal } from '@family-finance/ai-proposal';
 import type { QuickProposal } from '@family-finance/quick-update';
 
 /**
@@ -21,6 +22,17 @@ export interface QuickState {
   /** The active debts, for a repayment that named no lender. */
   readonly debts: readonly { readonly id: string; readonly creditorName: string }[];
   readonly message: string;
+  /**
+   * What the smart reading produced, when one was asked for.
+   *
+   * Separate from `proposals` on purpose. The deterministic reader and the smart
+   * one answer different questions — one is a rule table, the other is a remote
+   * system — and a screen that blurred them would be unable to say which it is
+   * showing. A person is entitled to know.
+   */
+  readonly ai: AiProposal | null;
+  /** Whether this deployment has a reader configured at all. */
+  readonly aiConfigured: boolean;
 }
 
 export const idleQuick: QuickState = {
@@ -30,6 +42,8 @@ export const idleQuick: QuickState = {
   accounts: [],
   debts: [],
   message: '',
+  ai: null,
+  aiConfigured: false,
 };
 
 /** The longest utterance the screen accepts. A paragraph is a file, not a sentence. */

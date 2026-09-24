@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { AiProposalCard } from './ai-proposal-card';
 import { QuickProposals } from './quick-proposals';
 import { idleQuick, MAX_QUICK_TEXT, type QuickState } from '../lib/quick/state';
 import { quick } from '../lib/copy/quick';
@@ -70,10 +71,26 @@ function recognitionConstructor(): RecognitionConstructor | null {
  */
 export function QuickCapture({
   action,
+  analyse,
+  aiConfigured,
 }: {
   action: (state: QuickState, data: FormData) => Promise<QuickState>;
+  /** The smart reading. A second action, not a second write path. */
+  analyse: (state: QuickState, data: FormData) => Promise<QuickState>;
+  /** Whether this deployment has a reader at all, known before anybody presses. */
+  aiConfigured: boolean;
 }) {
+  /*
+   * Two readers, two action states, one box.
+   *
+   * Kept separate so a screen can never show one reader's result under the
+   * other's name, and so that pressing one does not discard what the other said
+   * until its own answer arrives. Which of the two a person is looking at is then
+   * a fact about which state is populated, rather than a flag somebody has to
+   * remember to clear.
+   */
   const [state, formAction] = useActionState(action, idleQuick);
+  const [aiState, aiFormAction] = useActionState(analyse, idleQuick);
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const recognition = useRef<RecognitionLike | null>(null);
@@ -154,6 +171,12 @@ export function QuickCapture({
 
         <div className="flex flex-wrap items-center gap-3">
           <InterpretButton />
+          {/*
+           * A second submit button on the same form, with its own `formAction`.
+           * One box, one sentence, two ways of reading it — and the browser sends
+           * the same field either way, so nothing has to be kept in step.
+           */}
+          <AnalyseButton formAction={aiFormAction} />
           {dictationAvailable ? (
             <button
               type="button"
@@ -182,6 +205,15 @@ export function QuickCapture({
         ) : (
           <p className="text-small text-text-secondary">{quick.noDictation}</p>
         )}
+
+        {/*
+         * What leaves the building, said before anybody presses the button that
+         * sends it — and said whether or not a reader is configured, because a
+         * person deciding whether to type something private needs to know now.
+         */}
+        <p className="text-small text-text-secondary" data-testid="ai-privacy">
+          {aiConfigured ? quick.aiPrivacy : quick.aiNotConfigured}
+        </p>
       </form>
 
       {state.message !== '' ? (
@@ -198,8 +230,35 @@ export function QuickCapture({
         <span role="status" aria-live="polite" className="sr-only" />
       )}
 
+      {/*
+       * The smart reading's own result, above the deterministic one's. Both can be
+       * on screen at once — a person who pressed both is entitled to see both —
+       * and each is labelled with which reader produced it.
+       */}
+      <AiProposalCard state={aiState} />
       <QuickProposals state={state} />
     </div>
+  );
+}
+
+/**
+ * The smart reading's button.
+ *
+ * `formAction` on the button rather than on the form: that is how one box can be
+ * submitted to two different actions, and it means the textarea, the dictation
+ * and the character limit are shared rather than duplicated.
+ */
+function AnalyseButton({ formAction }: { formAction: (data: FormData) => void }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      formAction={formAction}
+      disabled={pending}
+      className="inline-flex min-h-11 items-center justify-center rounded-control border border-primary/40 bg-primary/5 px-4 py-2 font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
+    >
+      {pending ? quick.aiWorking : quick.aiButton}
+    </button>
   );
 }
 

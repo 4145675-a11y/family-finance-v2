@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@family-finance/ai-proposal": "*",
     "@family-finance/contracts": "*",
     "@family-finance/design-system": "*",
     "@family-finance/document-import": "*",
