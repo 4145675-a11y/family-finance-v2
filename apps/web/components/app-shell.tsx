@@ -54,6 +54,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { href: '/accounts', label: copy.nav.accounts, onPhone: false },
       { href: '/budget', label: copy.nav.planning, onPhone: true },
       { href: '/debts', label: copy.nav.debts, onPhone: false },
+      { href: '/lenders', label: copy.nav.lenders, onPhone: false },
       { href: '/forecast', label: copy.nav.forecast, onPhone: false },
       { href: '/business', label: copy.nav.business, onPhone: false },
     ],
@@ -125,7 +126,7 @@ export function AppShell({
     <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-4 px-4 pt-4 pb-24 sm:px-6 sm:pb-8">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:right-2 focus:z-50 focus:rounded-control focus:bg-primary focus:px-4 focus:py-2 focus:text-surface"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:right-2 focus:z-50 focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-control focus:bg-primary focus:px-4 focus:py-2 focus:text-surface"
       >
         {copy.nav.skipToContent}
       </a>

@@ -1,7 +1,7 @@
 import { AppShell } from '../../components/app-shell';
 import { QuickCapture } from '../../components/quick-capture';
 import { NoHousehold } from '../../components/screen';
-import { Card, EmptyPrompt } from '../../components/ui';
+import { Card, EmptyPrompt, Notice } from '../../components/ui';
 import { interpretQuickUpdateAction } from '../../lib/actions/quick';
 import { quick } from '../../lib/copy/quick';
 import { loadDashboardView } from '../../lib/dashboard/load';
@@ -44,6 +44,15 @@ export default async function QuickPage() {
 
   return (
     <AppShell active="/quick" title={quick.title}>
+      {/*
+       * Where the point of no return is, before a person types anything about
+       * money. The upload screen makes the same promise above its file picker for
+       * the same reason: it is the question they actually have.
+       */}
+      <Notice tone="primary" title={quick.promise}>
+        {quick.hint}
+      </Notice>
+
       <Card title={quick.subtitle}>
         <QuickCapture action={interpretQuickUpdateAction} />
       </Card>

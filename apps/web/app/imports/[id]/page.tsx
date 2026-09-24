@@ -67,6 +67,29 @@ import { formatBasisPoints, formatBusinessDate, toAmountInput } from '../../../l
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Why a row is holding the batch, said in the words that match it.
+ *
+ * Every blocker used to be reported as "לא ברור לאיזה חשבון", which sends a
+ * family to look for an account control on a row whose problem is a lender that
+ * has to be identified. A person who cannot find the thing they are being asked
+ * for concludes the screen is broken, and the next thing they do is press past
+ * it — so the sentence has to name the actual decision.
+ */
+const BLOCKING_SENTENCE: Readonly<Record<string, string>> = {
+  needs_account: screens.review.approveNeedsAccount,
+  needs_debt: screens.review.approveNeedsDebt,
+  needs_lender_decision: screens.review.approveNeedsLenderDecision,
+  needs_amount: screens.review.approveNeedsAmount,
+};
+
+/** The distinct reasons present, in a stable order so the list does not jump. */
+function blockingReasons(blocking: readonly { readonly reason: string }[]): readonly string[] {
+  const order = Object.keys(BLOCKING_SENTENCE);
+  const present = new Set(blocking.map((entry) => entry.reason));
+  return order.filter((reason) => present.has(reason));
+}
+
 export default async function ImportReviewPage({
   params,
 }: {
@@ -792,9 +815,9 @@ export default async function ImportReviewPage({
                   {check.includedCount === 0 ? (
                     <li>{screens.review.approveNoneIncluded}</li>
                   ) : null}
-                  {check.blocking.length > 0 ? (
-                    <li>{screens.review.approveNeedsAccount}</li>
-                  ) : null}
+                  {blockingReasons(check.blocking).map((reason) => (
+                    <li key={reason}>{BLOCKING_SENTENCE[reason]}</li>
+                  ))}
                 </ul>
               </>
             )}

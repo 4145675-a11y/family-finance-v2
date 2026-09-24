@@ -1,3 +1,7 @@
+import Link from 'next/link';
+
+import { normaliseLenderName } from '@family-finance/contracts';
+
 import { addDebtAction, recordRolloverAction } from '../../lib/actions/entries';
 import { AppShell } from '../../components/app-shell';
 import { ActionForm, MoneyField, SelectField, TextField } from '../../components/form';
@@ -235,7 +239,18 @@ export default async function DebtsPage() {
             key: debt.id,
             cells: [
               <span key="creditor">
-                {debt.creditorName}
+                {/*
+                 * The name is the way in. A family looking at a balance here and
+                 * wanting to know why it is that number had to find /lenders on
+                 * the "more" screen first, which is two screens away from the
+                 * question they are already asking.
+                 */}
+                <Link
+                  href={`/lenders/${encodeURIComponent(normaliseLenderName(debt.creditorName))}`}
+                  className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+                >
+                  {debt.creditorName}
+                </Link>
                 {debt.kind === 'mortgage' ? (
                   <span className="text-small text-text-secondary">
                     {' '}
@@ -287,6 +302,14 @@ export default async function DebtsPage() {
             ],
           }))}
         />
+        <p className="mt-3">
+          <Link
+            href="/lenders"
+            className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+          >
+            {copy.debts.lendersLink}
+          </Link>
+        </p>
       </Card>
 
       <SectionTitle>{screens.entry.debtTitle}</SectionTitle>

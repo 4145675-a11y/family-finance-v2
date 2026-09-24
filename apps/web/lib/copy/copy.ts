@@ -35,6 +35,7 @@ export const copy = {
     accounts: 'חשבונות',
     planning: 'תכנון',
     debts: 'חובות',
+    lenders: 'מלווים',
     forecast: 'תחזית',
     business: 'עסק',
     tasks: 'משימות',
@@ -258,6 +259,7 @@ export const copy = {
     monthly: 'תשלום חודשי',
     cost: 'כמה זה עולה בשנה',
     unknownCost: 'לא ידוע',
+    lendersLink: 'לכרטיסי המלווים — יתרה, מועדים וכל ההיסטוריה',
     unknownCostNote: 'בלי הריבית אי אפשר לדעת איזה חוב הכי יקר.',
     urgency: {
       none: 'רגיל',

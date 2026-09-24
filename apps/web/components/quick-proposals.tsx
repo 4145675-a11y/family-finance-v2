@@ -5,6 +5,7 @@ import type { QuickProposal } from '@family-finance/quick-update';
 import { ActionForm, HiddenValue, MoneyField, SelectField, TextField } from './form';
 import { Badge, Card } from './ui';
 import { confirmQuickUpdateAction } from '../lib/actions/quick';
+import { CATEGORY_LABEL } from '../lib/copy/classification';
 import { quick } from '../lib/copy/quick';
 import type { QuickState } from '../lib/quick/state';
 
@@ -65,18 +66,41 @@ function ProposalCard({
 
   return (
     <Card title={quick.intent[proposal.intent]}>
-      <div className="flex flex-col gap-3">
+      {/*
+       * Anchors for the browser suite. A test that had to find this card by its
+       * Hebrew heading would break the first time the wording improves, and the
+       * wording is meant to keep improving.
+       */}
+      <div
+        className="flex flex-col gap-3"
+        data-testid="quick-proposal"
+        data-state={proposal.state}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={TONE[proposal.state]}>{quick.state[proposal.state]}</Badge>
-          {proposal.classification !== null ? (
-            <span className="text-small text-text-secondary">
-              {proposal.classification.explanation}
-            </span>
-          ) : null}
         </div>
 
         <p className="text-small text-text-secondary">„{proposal.sourceText}”</p>
         <p>{proposal.explanation}</p>
+
+        {/*
+         * The category, said as a category.
+         *
+         * The classifier's own sentence used to sit beside the "מוכן לאישור" badge,
+         * which put "לא זיהינו מה השורה הזאת" next to "הבנו: כסף שיצא" — two
+         * sentences that read as a contradiction to anybody who does not know that
+         * one is about the envelope and the other about the record. An unrecognised
+         * shop is not an unrecognised update: the expense is understood, and the
+         * category is simply undecided. So that is what it says.
+         */}
+        {proposal.classification === null ? null : (
+          <p className="text-small text-text-secondary">
+            {quick.category}:{' '}
+            {proposal.classification.budgetCategoryKey === null
+              ? quick.categoryUndecided
+              : CATEGORY_LABEL[proposal.classification.budgetCategoryKey]}
+          </p>
+        )}
 
         {understood ? (
           <ActionForm action={confirmQuickUpdateAction} submitLabel={quick.approve}>

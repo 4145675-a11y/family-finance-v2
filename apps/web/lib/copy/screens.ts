@@ -281,6 +281,17 @@ export const screens = {
         : `נשארו ${count(pending)} שורות שעוד לא הוכרעו.`,
     approveNoneIncluded: 'לא סומנה אף שורה להכנסה.',
     approveNeedsAccount: 'יש שורות שעוד לא ברור לאיזה חשבון הן שייכות.',
+    /*
+     * One sentence per reason a row is holding the batch, because "לאיזה חשבון"
+     * was being shown for every kind of blocker — including a lender that has to
+     * be chosen, where it sends a family looking for the wrong control.
+     */
+    approveNeedsDebt: 'יש שורות שעוד לא ברור לאיזו הלוואה הן שייכות.',
+    approveNeedsLenderDecision:
+      'יש שורות שהמלווה בהן כבר קיים. צריך לומר בכל אחת אם זה אותו מלווה או מלווה אחר.',
+    approveNeedsAmount: 'יש שורות שהסכום בהן אינו גדול מאפס.',
+    approveBlockedCount: (rows: number) =>
+      rows === 1 ? 'שורה אחת ממתינה להחלטה.' : `${count(rows)} שורות ממתינות להחלטה.`,
     approve: 'לאשר ולהכניס',
     reject: 'לא להשתמש בקובץ הזה',
     rejectHint: 'הקובץ יסומן כנדחה. שום דבר לא ייכנס.',
@@ -430,6 +441,24 @@ export const screens = {
     title: 'מה קרה כאן',
     subtitle: 'כל שינוי שנעשה, לפי הסדר',
     empty: 'עוד לא נעשה כאן שום שינוי.',
+    /*
+     * The list of records, added in B1.
+     *
+     * Until then a family could record an expense and had nowhere to see it: this
+     * screen listed the *names* of actions ("נרשמה תנועה") with no amount and no
+     * merchant, and no other screen listed transactions at all. So the one
+     * question a person asks after pressing save — "did that go in, and as what" —
+     * had no answer anywhere in the product.
+     */
+    recordsTitle: 'מה נרשם',
+    recordsSubtitle: 'הרשומות האחרונות, החדשות למעלה',
+    recordsEmpty: 'עוד לא נרשמה אף תנועה. אחרי עדכון מהיר או רישום, היא תופיע כאן.',
+    recordsWhat: 'על מה',
+    recordsAmount: 'סכום',
+    recordsAccount: 'חשבון',
+    recordsMore: (total: number) => `מוצגות האחרונות מתוך ${count(total)} רשומות.`,
+    voided: 'בוטלה',
+    noMerchant: 'בלי תיאור',
     actions: {
       'household.renamed': 'שם משק הבית שונה',
       'member.added': 'נוסף בן משפחה',

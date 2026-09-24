@@ -81,7 +81,7 @@ export default async function LenderCardPage({
 
   if (document === null) {
     return (
-      <AppShell source={view.descriptor} active="/more" title="כרטיס מלווה">
+      <AppShell source={view.descriptor} active="/lenders" title="כרטיס מלווה">
         <EmptyState reason={view.descriptor.reason} />
       </AppShell>
     );
@@ -127,7 +127,7 @@ export default async function LenderCardPage({
   return (
     <AppShell
       source={view.descriptor}
-      active="/more"
+      active="/lenders"
       title={card.displayName}
       subtitle={
         card.aliases.length === 0 ? 'כרטיס מלווה' : `נרשם גם כ: ${card.aliases.join(' · ')}`
@@ -238,7 +238,7 @@ export default async function LenderCardPage({
             </button>
             {filtered ? (
               <Link
-                className="self-center underline"
+                className="self-center inline-flex min-h-11 items-center text-primary underline underline-offset-4"
                 href={`/lenders/${encodeURIComponent(card.key)}`}
               >
                 לנקות סינון
@@ -267,7 +267,10 @@ export default async function LenderCardPage({
               {line.importBatchId === null ? null : (
                 <>
                   {' '}
-                  <Link className="underline" href={`/imports/${line.importBatchId}`}>
+                  <Link
+                    className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+                    href={`/imports/${line.importBatchId}`}
+                  >
                     מיבוא
                   </Link>
                 </>

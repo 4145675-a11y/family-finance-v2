@@ -18,6 +18,17 @@ export const quick = {
   subtitle: 'משפט אחד, ואנחנו נציע מה לרשום',
   navLabel: 'עדכון מהיר',
 
+  /*
+   * The promise, in the words the upload screen already uses.
+   *
+   * A person meeting this screen for the first time has no way to know that
+   * pressing "מה הבנתם?" does not save anything — and the one thing they need to
+   * know before typing about money is where the point of no return is. The upload
+   * screen says it above the file picker; this says it above the box.
+   */
+  promise: 'שום דבר לא נרשם לפני שתראו מה הבנו ותאשרו.',
+  proposalNotice: 'זו הצעה. אפשר לתקן כל שדה, ורק לחיצה על ״אישור ורישום״ רושמת.',
+
   captureLabel: 'מה קרה?',
   placeholder: 'למשל: שילמתי 120 שקל בסופר היום',
   hint: 'אפשר לכתוב כמה עדכונים במשפט אחד. כל אחד יאושר בנפרד.',
@@ -34,6 +45,8 @@ export const quick = {
   noDictation: 'הדפדפן הזה לא תומך בהכתבה. אפשר להקליד, וזה בדיוק אותו דבר.',
 
   proposalsTitle: 'מה הבנו',
+  category: 'קטגוריה',
+  categoryUndecided: 'בלי קטגוריה — אפשר לקבוע אחר כך',
   approve: 'אישור ורישום',
   nothingYet: 'עוד לא נרשם כלום. תוכלו לבדוק, לתקן ולאשר.',
 

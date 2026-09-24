@@ -28,7 +28,7 @@ export default async function LendersPage() {
 
   if (document === null) {
     return (
-      <AppShell source={view.descriptor} active="/more" title="מלווים">
+      <AppShell source={view.descriptor} active="/lenders" title="מלווים">
         <EmptyState reason={view.descriptor.reason} />
       </AppShell>
     );
@@ -43,7 +43,7 @@ export default async function LendersPage() {
   return (
     <AppShell
       source={view.descriptor}
-      active="/more"
+      active="/lenders"
       title="מלווים"
       subtitle="למי אנחנו חייבים, וכמה — לפי ההיסטוריה עצמה"
     >
@@ -73,7 +73,7 @@ export default async function LendersPage() {
                 {needingReview.map((card) => (
                   <li key={card.key}>
                     <Link
-                      className="underline"
+                      className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
                       href={`/lenders/${encodeURIComponent(card.key)}`}
                     >
                       {card.displayName}
@@ -119,7 +119,10 @@ export default async function LendersPage() {
               />
 
               <p className="mt-3">
-                <Link className="underline" href={`/lenders/${encodeURIComponent(card.key)}`}>
+                <Link
+                  className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+                  href={`/lenders/${encodeURIComponent(card.key)}`}
+                >
                   לכרטיס המלווה ולהיסטוריה המלאה
                 </Link>
               </p>

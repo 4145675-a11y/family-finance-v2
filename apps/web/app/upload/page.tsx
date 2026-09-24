@@ -5,6 +5,7 @@ import { NoHousehold, StatusChips } from '../../components/screen';
 import { Badge, Card, DataTable, Figure, Notice } from '../../components/ui';
 import { UploadForm } from '../../components/upload-form';
 import { screens } from '../../lib/copy/screens';
+import { requireUnlocked } from '../../lib/auth/guard';
 import { loadDashboardView } from '../../lib/dashboard/load';
 import { sweepExpiredUploads } from '../../lib/store/retention';
 
@@ -25,6 +26,19 @@ import { sweepExpiredUploads } from '../../lib/store/retention';
 export const dynamic = 'force-dynamic';
 
 export default async function UploadPage() {
+  /*
+   * The lock first, before anything touches the store.
+   *
+   * This page is the one screen that does work of its own before reading the
+   * household, and that ordering was a real bug: with the database backend and no
+   * session, the sweep asked for a store, got an authentication error, and a
+   * signed-out visitor met a server error page instead of the sign-in screen —
+   * on a destination that is in the main navigation. `requireUnlocked` redirects,
+   * which is what a person should experience, and it has to run first for that to
+   * be true.
+   */
+  await requireUnlocked();
+
   // 05-ARCHITECTURE-DATA.md § Imports gives an undecided upload 24 hours. The
   // immediate deletions happen where the decision is made; this is the file
   // somebody uploaded and then closed the tab on.
