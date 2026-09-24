@@ -68,13 +68,6 @@ export interface ApprovedAction {
 }
 
 /**
- * What the ledger line says: what the money was, and when it goes back.
- *
- * A due date that a card displayed and then dropped on confirmation would be
- * worse than never reading it, so it is recorded where a family will find it —
- * beside the amount, in the lender's own history.
- */
-/**
  * A repayment day in the shape the household stores dates in.
  *
  * Both calendars, from the one implementation that knows how to convert between
@@ -99,6 +92,13 @@ function dueDateValue(date: string | null): DueDate | null {
   };
 }
 
+/**
+ * What the ledger line says: what the money was, and when it goes back.
+ *
+ * A due date that a card displayed and then dropped on confirmation would be
+ * worse than never reading it, so it is recorded where a family will find it —
+ * beside the amount, in the lender's own history.
+ */
 function eventNote(action: ApprovedAction): string | null {
   const due =
     action.dueDate === undefined || action.dueDate === null
