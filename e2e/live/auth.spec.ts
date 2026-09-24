@@ -107,10 +107,17 @@ test.describe('the first synthetic person', () => {
 
     /*
      * The name comes back in the rename field, which is where the setup screen
-     * shows it. Asserting on the input's value rather than on page text is the
-     * difference between checking the household exists and checking that the word
-     * appears somewhere.
+     * shows it once a household exists.
+     *
+     * The create field has to be gone first, and that check is not decoration.
+     * Both fields carry the same label, so a value assertion on its own passes
+     * against a *create* field that still holds what was typed — which is exactly
+     * what happened once against the deployed service: this test went green
+     * without creating anything and the next one failed instead, pointing at the
+     * wrong place. Waiting for the create form to disappear is both the honest
+     * assertion and the thing that waits for the write to land.
      */
+    await expect(page.locator('input[name="householdName"]')).toHaveCount(0);
     await expect(page.getByLabel('איך לקרוא למשק הבית')).toHaveValue(HOUSEHOLD_ONE);
     await expect(page.getByText(/מתוך .*שלבים/)).toBeVisible();
 
@@ -148,6 +155,7 @@ test.describe('the second synthetic person never sees the first household', () =
     await page.getByRole('button', { name: 'ליצור את משק הבית' }).click();
 
     // Two households now exist, and this person is looking at theirs.
+    await expect(page.locator('input[name="householdName"]')).toHaveCount(0);
     await expect(page.getByLabel('איך לקרוא למשק הבית')).toHaveValue(HOUSEHOLD_TWO);
     await context.close();
   });
@@ -171,6 +179,10 @@ test.describe('the second synthetic person never sees the first household', () =
       const page = await context.newPage();
       await signIn(page, person);
       await page.goto('/setup');
+      // A person with a household sees the rename field; one without sees the
+      // create field. Checking which is present makes a failure say which
+      // happened rather than reporting an empty value.
+      await expect(page.locator('input[name="householdName"]'), person.id).toHaveCount(0);
       await expect(page.getByLabel('איך לקרוא למשק הבית')).toHaveValue(expected);
       await expect(page.getByLabel('איך לקרוא למשק הבית')).not.toHaveValue(other);
       await context.close();
