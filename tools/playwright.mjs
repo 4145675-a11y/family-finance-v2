@@ -11,7 +11,13 @@
  *
  * Zero dependencies beyond Node built-ins, matching the rest of tools/.
  *
+ * It also understands one flag of its own, `--live-origin=<url>`, which it strips
+ * and turns into an environment variable. An npm script cannot set one portably —
+ * the same reason this file exists at all — and the live suite needs to be able to
+ * drive the deployed service as well as a local one.
+ *
  * Usage: node tools/playwright.mjs <test|install|show-report> [...args]
+ *        node tools/playwright.mjs test --config playwright.live.config.ts --live-origin=https://…
  */
 
 import { spawn } from 'node:child_process';
@@ -63,8 +69,33 @@ export function runPlaywright(args) {
   });
 }
 
+/** The variable the live suite reads to decide which origin it drives. */
+export const LIVE_ORIGIN_ENV_VAR = 'FAMILY_FINANCE_LIVE_ORIGIN';
+
+/**
+ * Pulls `--live-origin=<url>` out of the arguments and into the environment.
+ * @param {string[]} args
+ * @returns {string[]} the arguments Playwright should see
+ */
+export function extractLiveOrigin(args) {
+  const kept = [];
+  for (const arg of args) {
+    if (arg.startsWith('--live-origin=')) {
+      const given = arg.slice('--live-origin='.length);
+      const origin = given.endsWith('/') ? given.slice(0, -1) : given;
+      if (!origin.startsWith('https://') && !origin.startsWith('http://localhost')) {
+        throw new Error(`--live-origin must be https, or http://localhost: got ${origin}`);
+      }
+      process.env[LIVE_ORIGIN_ENV_VAR] = origin;
+      continue;
+    }
+    kept.push(arg);
+  }
+  return kept;
+}
+
 async function main() {
-  const args = process.argv.slice(2);
+  const args = extractLiveOrigin(process.argv.slice(2));
   if (args.length === 0) {
     console.error('Usage: node tools/playwright.mjs <test|install|show-report> [...args]');
     process.exitCode = 2;

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-import { LIVE_BASE_URL } from './e2e/support/live';
+import { liveOrigin } from './e2e/support/live';
 
 /**
  * The live browser suite: the real database, a synthetic person, one household.
@@ -17,6 +17,11 @@ import { LIVE_BASE_URL } from './e2e/support/live';
  * one outcome CLAUDE.md rules out entirely.
  *
  * Everything it creates it deletes, and it counts the rows afterwards to prove it.
+ *
+ * With `--live-origin=https://…` the same specs run against the **deployed**
+ * service instead of a server started here. That is the authenticated production
+ * check: a synthetic person signing in to the real site, seeing their own
+ * household and nobody else's, and being removed afterwards.
  */
 export default defineConfig({
   testDir: './e2e/live',
@@ -34,7 +39,7 @@ export default defineConfig({
   reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
 
   use: {
-    baseURL: LIVE_BASE_URL,
+    baseURL: liveOrigin(),
     locale: 'he-IL',
     timezoneId: 'Asia/Jerusalem',
     trace: 'retain-on-failure',

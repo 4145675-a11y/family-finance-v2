@@ -28,6 +28,29 @@ export const LIVE_BASE_URL = `http://${LIVE_HOST}:${LIVE_PORT}`;
 /** `localhost` is the one http origin the configuration treats as secure. */
 export const LIVE_APP_ORIGIN = `http://localhost:${LIVE_PORT}`;
 
+/**
+ * The origin this run drives.
+ *
+ * Without `--live-origin` it is a server this process starts, pointed at the real
+ * database — which is the ordinary case and needs no deployment.
+ *
+ * With it, the suite signs a synthetic person in to **the deployed service**. That
+ * is the authenticated production check, and it is safe for the same reasons the
+ * rest of this suite is: the person is created here, owns nothing, is never
+ * invited anywhere, and is deleted by a teardown that counts the rows afterwards
+ * and fails if one is left. It writes nothing to anybody else's household because
+ * row-level security will not let it.
+ */
+export function liveOrigin(): string {
+  const configured = process.env['FAMILY_FINANCE_LIVE_ORIGIN'] ?? LIVE_BASE_URL;
+  return configured.endsWith('/') ? configured.replace(/\/+$/, '') : configured;
+}
+
+/** True when the suite is driving something this process did not start. */
+export function drivesDeployedService(): boolean {
+  return liveOrigin() !== LIVE_BASE_URL;
+}
+
 export interface LiveState {
   readonly people: readonly SyntheticUser[];
   readonly serverPid: number | null;

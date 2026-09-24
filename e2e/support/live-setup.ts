@@ -5,7 +5,13 @@
  */
 import '../../supabase/tests/load-env';
 
-import { clearLiveState, startLiveServer, writeLiveState } from './live';
+import {
+  clearLiveState,
+  drivesDeployedService,
+  liveOrigin,
+  startLiveServer,
+  writeLiveState,
+} from './live';
 import { connectAsOwner, provision, syntheticUser } from './synthetic-user';
 
 /**
@@ -24,6 +30,17 @@ export default async function liveSetup(): Promise<void> {
     for (const person of people) await provision(owner, person);
   } finally {
     await owner.end();
+  }
+
+  /*
+   * Only start a server when this run owns one. Pointed at a deployed origin
+   * there is nothing to start, nothing to build, and no local process to stop —
+   * the synthetic people are still created and still removed.
+   */
+  if (drivesDeployedService()) {
+    console.log(`live suite: driving the deployed service at ${liveOrigin()}`);
+    writeLiveState({ people: [...people], serverPid: null });
+    return;
   }
 
   const server = await startLiveServer();
