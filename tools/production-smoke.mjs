@@ -25,18 +25,33 @@
  *        FAMILY_FINANCE_SMOKE_ORIGIN=https://… node tools/production-smoke.mjs
  */
 
-const DEFAULT_ORIGIN = 'https://family-finance-web-l2gp.onrender.com';
+import { pathToFileURL } from 'node:url';
 
-const origin = (
-  process.argv[2] ??
-  process.env['FAMILY_FINANCE_SMOKE_ORIGIN'] ??
-  DEFAULT_ORIGIN
-).replace(/\/+$/, '');
+export const DEFAULT_ORIGIN = 'https://family-finance-web-l2gp.onrender.com';
 
-if (!origin.startsWith('https://')) {
-  console.error(`RESULT: FAIL — the origin must be https, got ${origin}`);
-  process.exit(2);
+/**
+ * Which origin to check.
+ *
+ * An **empty** value counts as absent, and that is not a nicety: a GitHub
+ * workflow writes an inputs expression as an empty string on every event that
+ * carries no inputs, so a nullish fallback would take that empty string and the
+ * check would fail with "the origin must be https, got" — which is exactly what
+ * happened on the first triggered run of this workflow.
+ *
+ * @param {string | undefined} fromArgument
+ * @param {string | undefined} fromEnvironment
+ * @returns {string}
+ */
+export function resolveOrigin(fromArgument, fromEnvironment) {
+  const given = [fromArgument, fromEnvironment]
+    .map((value) => (value ?? '').trim())
+    .find((value) => value !== '');
+  const chosen = given ?? DEFAULT_ORIGIN;
+  // A trailing slash would turn every path into a double slash.
+  return chosen.endsWith('/') ? chosen.slice(0, -1) : chosen;
 }
+
+const origin = resolveOrigin(process.argv[2], process.env['FAMILY_FINANCE_SMOKE_ORIGIN']);
 
 /** @type {{name: string, ok: boolean, detail: string}[]} */
 const checks = [];
@@ -194,10 +209,25 @@ async function main() {
   console.log('        which commit is live.');
 }
 
-main().catch((error) => {
-  console.error(
-    'The smoke check itself failed:',
-    error instanceof Error ? error.message : error,
-  );
-  process.exitCode = 2;
-});
+/*
+ * Run only when executed directly.
+ *
+ * The test imports `resolveOrigin` from this file, and without the guard that
+ * import would fire a run against the production service as a side effect — a
+ * unit test that reaches the internet is a unit test that fails when the train
+ * goes into a tunnel. Same pattern as `tools/next.mjs`.
+ */
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (!origin.startsWith('https://')) {
+    console.error(`RESULT: FAIL — the origin must be https, got "${origin}"`);
+    process.exitCode = 2;
+  } else {
+    main().catch((error) => {
+      console.error(
+        'The smoke check itself failed:',
+        error instanceof Error ? error.message : error,
+      );
+      process.exitCode = 2;
+    });
+  }
+}

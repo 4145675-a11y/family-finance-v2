@@ -60,11 +60,13 @@ jobs:
         if: github.event_name == 'workflow_run'
         run: sleep 240
 
+      # The origin is passed as an argument only when one was actually given. An
+      # `inputs` expression is an empty string on every event that carries no
+      # inputs, and setting the variable to that is what failed this workflow's
+      # first triggered run — the script now treats empty as absent as well.
       - name: Smoke the deployed service
-        env:
-          FAMILY_FINANCE_SMOKE_ORIGIN: ${{ inputs.origin }}
         run: |
           set -o pipefail
-          node tools/production-smoke.mjs
+          node tools/production-smoke.mjs ${{ inputs.origin }}
           code=$?
           exit "$code"
