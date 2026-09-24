@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { approve, interpret, onlyProposal, submissionKeyOf } from '../support/quick';
+import { approve, proposeWithAccount, submissionKeyOf } from '../support/quick';
 import {
   asShekels,
   balanceOf,
@@ -206,10 +206,16 @@ test.describe('a repayment through the quick screen writes both facts, once', ()
     const eventsBefore = eventsFor(debtId).length;
     const balanceBefore = balanceOf(debtId);
     const SENTENCE = `היום החזרתי 150 שקל ל${LENDER_CARD}`;
-    const MERCHANT = `ל${LENDER_CARD}`;
+    /*
+     * The lender's own recorded name, not the sentence's wording.
+     *
+     * Once the words have been resolved to a card, that card's name is what the
+     * record is filed under — so one lender's history is under one spelling
+     * however a family happened to phrase it that day.
+     */
+    const MERCHANT = LENDER_CARD;
 
-    await interpret(page, SENTENCE);
-    const card = await onlyProposal(page);
+    const card = await proposeWithAccount(page, SENTENCE);
     const key = await submissionKeyOf(card);
 
     let swallowed = false;
@@ -228,8 +234,7 @@ test.describe('a repayment through the quick screen writes both facts, once', ()
     expect(transactionsFor(MERCHANT)).toHaveLength(1);
 
     await page.unroute('**/quick');
-    await interpret(page, SENTENCE);
-    const retry = await onlyProposal(page);
+    const retry = await proposeWithAccount(page, SENTENCE);
     expect(await submissionKeyOf(retry)).toBe(key);
     await approve(retry);
     await expect(page.getByText('הפעולה הזו כבר נרשמה. לא נוצרה רשומה כפולה.')).toBeVisible();

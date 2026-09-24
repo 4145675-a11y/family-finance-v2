@@ -1,92 +1,62 @@
 'use server';
 
-import { unavailableProposal, type AiProposal } from '@family-finance/ai-proposal';
+import type { AiProposal } from '@family-finance/ai-proposal';
+import type { StoreDocument } from '@family-finance/local-store';
 
 import { buildAnalysisRequest } from '../ai/context';
 import { aiConfigured, provider, withinRateLimit } from '../ai/server';
 import { verifyProposal } from '../ai/verify';
 import { FieldReader, failed, submissionKey, succeeded, type FormState } from '../forms';
 import { applyQuickUpdate, type ApprovedIntent } from '../quick/apply';
-import { readQuickUpdate } from '../quick/read';
+import { fallbackProposal } from '../quick/fallback';
+import { todayInIsrael } from '@family-finance/hebrew-calendar';
 import { MAX_QUICK_TEXT, idleQuick, type QuickState } from '../quick/state';
+import { splitUpdates } from '@family-finance/quick-update';
 import { householdStore } from '../store/server';
 import { ALREADY_RECORDED, describe, refreshMoneyScreens, repeatWatch } from './errors';
 
 /**
  * The quick update: reading a sentence, and recording what it meant.
  *
- * Three actions now, and the split between them is still the approval boundary.
- * Two of them read — the deterministic rule table, and the smart reader — and
- * **neither writes anything at all**. The third records, and it is the only one
- * that touches a command.
+ * Two actions, and the line between them is the approval boundary. One reads and
+ * **writes nothing at all**; the other records, and it is the only one in this
+ * file that touches a command.
  *
- * The smart reader does not get its own write path. Its proposal ends up in the
- * same confirmation form, carrying the same fields, and confirming it runs
- * `applyQuickUpdate` exactly as the deterministic route does. That is deliberate:
- * a second path would be a second place for the rule "nothing is recorded without
- * a person" to be relaxed.
+ * There used to be two reading actions, one per reader, and a screen that asked a
+ * family which of them to use. That question had no answer anybody could give,
+ * so the choice is gone: one action reads the sentence with whichever reader can
+ * answer, and the person sees one proposal either way.
  *
- * The approval never trusts what the browser says a proposal was. The
- * deterministic route re-reads the sentence; the smart route re-validates every
- * submitted field against the household that was just loaded. In both cases the
- * values that reach a command are values this server established.
+ * The approval never trusts what the browser says a proposal was. Every submitted
+ * value is re-checked against the household that was just loaded — an account
+ * that has since closed, a lender that has since settled and an amount that was
+ * edited in the page all fail here rather than reaching a command.
  */
 
-/** Reading with the rule table. Writes nothing. */
-export async function interpretQuickUpdateAction(
-  _previous: QuickState,
-  data: FormData,
-): Promise<QuickState> {
-  const raw = data.get('text');
-  const text = typeof raw === 'string' ? raw.trim().slice(0, MAX_QUICK_TEXT) : '';
-  const configured = aiConfigured();
-
-  if (text === '') {
-    return {
-      ...idleQuick,
-      status: 'error',
-      aiConfigured: configured,
-      message: 'צריך לכתוב או להקריא משהו קודם.',
-    };
-  }
-
-  try {
-    const reading = await readQuickUpdate(text);
-    return {
-      status: 'read',
-      text,
-      proposals: reading.proposals,
-      accounts: reading.accounts.map((account) => ({ id: account.id, name: account.name })),
-      debts: reading.debts,
-      message: reading.proposals.length === 0 ? 'לא מצאנו כאן עדכון. אפשר לנסח אחרת.' : '',
-      ai: null,
-      aiConfigured: configured,
-    };
-  } catch (error) {
-    const described = describe(error);
-    return {
-      ...idleQuick,
-      status: 'error',
-      text,
-      aiConfigured: configured,
-      message: described.message,
-    };
-  }
-}
-
 /**
- * Reading with the smart reader. Writes nothing either.
+ * Reading a sentence. The only reading action, and it writes nothing.
  *
- * The order of operations *is* the safety argument, so it is worth reading as a
+ * One action because there is one flow. A person types or dictates, presses one
+ * button, and gets one proposal — they are never asked to choose which machinery
+ * reads their sentence, because that is not a question anybody can answer and
+ * the answer would not change what can happen to their money.
+ *
+ * Inside, the smart reader is tried first and the rule table catches everything
+ * it cannot do: no key configured, a timeout, a rate limit, an answer that did
+ * not parse. The fallback is **resilience, not a second product**, and it is
+ * silent for that reason.
+ *
+ * The order of operations is the safety argument, so it is worth reading as a
  * list:
  *
  *   1. the text is trimmed and capped — a paragraph is not a sentence;
  *   2. the household is read on the server, as the signed-in person;
  *   3. a **deliberately small** context is built from it (`ai/context.ts`);
  *   4. the provider is asked, with a timeout it cannot exceed;
- *   5. the answer is parsed against the contract, and anything else is discarded;
- *   6. every field is re-verified against this household (`ai/verify.ts`), and
- *      `safeToConfirm` is decided **there**, never by the model.
+ *   5. the answer is parsed against the contract, and anything else discarded;
+ *   6. every field is re-verified against this household (`ai/verify.ts`), the
+ *      lender is resolved from words by the one matcher, and `safeToConfirm` is
+ *      decided **there**, never by the model.
  *
  * At no point does this function call a command, and there is no branch in which
  * it could: it has no writer in scope.
@@ -105,30 +75,32 @@ export async function analyseQuickUpdateAction(
     return { ...base, status: 'error', message: 'צריך לכתוב או להקריא משהו קודם.' };
   }
 
-  const engine = provider();
-  if (engine === null) return { ...base, ai: unavailableProposal('not_configured') };
-
   try {
     const store = await householdStore();
     const document = await store.readDocument();
+    const today = todayInIsrael();
 
-    if (!withinRateLimit(document.household.id)) {
-      return { ...base, ai: unavailableProposal('rate_limited') };
-    }
-
-    const request = buildAnalysisRequest(text, document);
-    const outcome = await engine.analyse(request);
-
-    const ai: AiProposal =
-      outcome.kind === 'answered'
-        ? verifyProposal(outcome.output, { document, today: request.today })
-        : unavailableProposal(outcome.reason);
+    const ai = await readWithBestReader(text, document, today);
 
     const open = document.accounts.filter((account) => account.closedAt === null);
+
+    /*
+     * One card, and a sentence that carried two updates says so.
+     *
+     * The screen used to show a card per update, which is a shape the smart
+     * reader has no way to produce — it answers with one proposal. Rather than
+     * keep two card shapes, the flow reads one update and **says** that the rest
+     * was not read. Dropping the remainder silently would be the quiet wrongness
+     * 02-FINANCIAL-RULES.md forbids; saying it costs a person one more sentence.
+     */
+    const several = splitUpdates(text).length > 1;
 
     return {
       ...base,
       ai,
+      message: several
+        ? 'יש כאן יותר מעדכון אחד. ההצעה מתייחסת לעדכון אחד — את השאר אפשר לשלוח בנפרד.'
+        : '',
       accounts: open.map((account) => ({ id: account.id, name: account.name })),
       debts: document.debts
         .filter((debt) => debt.status === 'active')
@@ -141,13 +113,50 @@ export async function analyseQuickUpdateAction(
 }
 
 /**
+ * The smart reader if it can answer, the rule table if it cannot.
+ *
+ * Every way the first can fail ends in the second, and the person is not told
+ * which ran — they asked for a proposal, and a proposal is what they get. What
+ * they *are* told, when neither could read the sentence, is that it was not
+ * understood.
+ */
+async function readWithBestReader(
+  text: string,
+  document: StoreDocument,
+  today: string,
+): Promise<AiProposal> {
+  const fallback = (): AiProposal => fallbackProposal(text, document, today);
+
+  const engine = provider();
+  if (engine === null) return fallback();
+  if (!withinRateLimit(document.household.id)) return fallback();
+
+  const request = buildAnalysisRequest(text, document, { today });
+  const outcome = await engine.analyse(request);
+  if (outcome.kind !== 'answered') return fallback();
+
+  const proposal = verifyProposal(outcome.output, { document, today, sentence: text });
+
+  /*
+   * A smart reading that understood nothing is worth a second opinion: the rule
+   * table recognises a set of plain sentences exactly, and there is no reason to
+   * show "not understood" when it would have succeeded.
+   */
+  if (proposal.state === 'not_understood') {
+    const local = fallback();
+    if (local.state !== 'not_understood') return local;
+  }
+
+  return proposal;
+}
+
+/**
  * Confirming. The only action here that writes.
  *
- * Two sources of a proposal arrive at one set of checks. `proposalSource` says
- * which screen sent it, and the difference is only in where the *starting* values
- * come from: re-read from the sentence, or submitted as named fields. After that
- * both are identical — every value is checked against the household that was just
- * loaded, and the same writer runs.
+ * One path, because there is one card. Whatever the reading produced decided only
+ * what the card was pre-filled with; every value arrives here as a named form
+ * field and is checked against the household read a moment ago. What reaches
+ * `applyQuickUpdate` is values this server established.
  */
 export async function confirmQuickUpdateAction(
   _previous: FormState,
@@ -155,20 +164,20 @@ export async function confirmQuickUpdateAction(
 ): Promise<FormState> {
   const reader = new FieldReader(data);
   const sourceText = reader.text('sourceText', 'המשפט', { max: MAX_QUICK_TEXT });
-  const index = reader.integer('proposalIndex', 'מספר ההצעה', { min: 0, max: 20 }) ?? 0;
-  const source = reader.choice(
-    'proposalSource',
-    'מקור ההצעה',
-    ['deterministic', 'ai'] as const,
-    'deterministic',
-  );
 
-  // The corrections a person made on the screen. Optional for the deterministic
-  // route, where the sentence supplies whatever was not edited.
+  // Every value the card is offering, as named fields.
   const amountOverride = reader.optionalMoney('amountMinor', 'סכום');
   const accountOverride = reader.id('accountId', 'חשבון');
   const debtOverride = reader.id('debtId', 'הלוואה');
   const dateOverride = reader.optionalDate('occurredOn', 'תאריך');
+  /*
+   * When a borrowed sum comes due.
+   *
+   * Read as an ordinary optional date, and it is the one date here allowed to be
+   * in the future — that is what a repayment day is. It identifies nothing and
+   * authorises nothing: it ends up as words on the lender's ledger line.
+   */
+  const dueOverride = reader.optionalDate('dueDate', 'פירעון');
   // Only a person supplies this, and only for a new debt.
   const creditorName = reader.optionalText('creditorName', 'שם המלווה', 160);
   /*
@@ -180,10 +189,10 @@ export async function confirmQuickUpdateAction(
    * is matched by it.
    */
   const merchantField = reader.optionalText('merchant', 'על מה', 160);
-  const aiIntent = reader.choice(
+  const proposedIntent = reader.choice(
     'aiIntent',
     'סוג הפעולה',
-    ['expense', 'income', 'balance', 'debt_repayment', 'new_debt'] as const,
+    ['expense', 'income', 'balance', 'debt_repayment', 'new_principal', 'new_debt'] as const,
     'expense',
   );
 
@@ -197,52 +206,31 @@ export async function confirmQuickUpdateAction(
     const document = await store.readDocument();
     const open = document.accounts.filter((account) => account.closedAt === null);
 
-    let intent: ApprovedIntent;
-    let amountMinor: number;
-    let accountId: string | null;
-    let debtId: string | null;
-    let occurredOn: string;
-    let merchant: string | null;
-
-    if (source === 'ai') {
-      /*
-       * Nothing here is taken on trust: these are named form fields, read by the
-       * same `FieldReader` every other form uses, and each one is checked against
-       * the document below. What the model produced only decided what the form
-       * was *pre-filled* with.
-       */
-      intent = aiIntent;
-      amountMinor = amountOverride ?? 0;
-      accountId = accountOverride ?? (open.length === 1 ? (open[0]?.id ?? null) : null);
-      debtId = debtOverride;
-      occurredOn = dateOverride ?? '';
-      merchant =
-        intent === 'new_debt'
-          ? creditorName === ''
-            ? null
-            : creditorName
-          : merchantField === ''
-            ? null
-            : merchantField;
-      if (occurredOn === '') return failed('צריך תאריך.');
-    } else {
-      const reading = await readQuickUpdate(sourceText);
-      const proposal = reading.proposals[index];
-      if (proposal === undefined) {
-        return failed('ההצעה הזו כבר לא קיימת. כדאי לקרוא את המשפט מחדש.');
-      }
-      intent = mapIntent(proposal.intent);
-      amountMinor = amountOverride ?? proposal.amountMinor ?? 0;
-      accountId = accountOverride ?? proposal.accountId;
-      debtId = debtOverride ?? proposal.debtId;
-      occurredOn = dateOverride ?? proposal.date;
-      merchant = proposal.description === '' ? null : proposal.description;
-    }
+    /*
+     * Everything below is a named form field, read by the same `FieldReader`
+     * every other form in the product uses. Nothing is taken on the browser's
+     * word: what the reading produced only decided what the card was *pre-filled*
+     * with, and each value is checked against the document just loaded.
+     */
+    const intent: ApprovedIntent = proposedIntent;
+    const amountMinor = amountOverride ?? 0;
+    const accountId = accountOverride ?? (open.length === 1 ? (open[0]?.id ?? null) : null);
+    const debtId = debtOverride;
+    const occurredOn = dateOverride ?? '';
+    const merchant =
+      intent === 'new_debt'
+        ? creditorName === ''
+          ? null
+          : creditorName
+        : merchantField === ''
+          ? null
+          : merchantField;
+    if (occurredOn === '') return failed('צריך תאריך.');
 
     /*
-     * The same checks for both routes, against the document just read. An id that
-     * no longer names an open account or an active debt fails here, which is what
-     * makes a stale proposal safe to submit rather than dangerous.
+     * The checks, against the document just read. An id that no longer names an
+     * open account or an active debt fails here, which is what makes a stale
+     * proposal safe to submit rather than dangerous.
      */
     if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
       return failed('צריך סכום גדול מאפס.');
@@ -251,8 +239,8 @@ export async function confirmQuickUpdateAction(
     const account = open.find((row) => row.id === accountId);
     if (account === undefined) return failed('החשבון שנבחר כבר לא קיים.');
 
-    if (intent === 'debt_repayment') {
-      if (debtId === null) return failed('צריך לבחור לאיזו הלוואה התשלום שייך.');
+    if (intent === 'debt_repayment' || intent === 'new_principal') {
+      if (debtId === null) return failed('צריך לבחור לאיזו הלוואה זה שייך.');
       const debt = document.debts.find((row) => row.id === debtId && row.status === 'active');
       if (debt === undefined) return failed('החוב שנבחר כבר לא קיים.');
     }
@@ -266,7 +254,9 @@ export async function confirmQuickUpdateAction(
         amountMinor,
         accountId,
         scope: account.scope,
-        debtId: intent === 'debt_repayment' ? debtId : null,
+        debtId: intent === 'debt_repayment' || intent === 'new_principal' ? debtId : null,
+        // Only borrowing has a repayment day, and only as a note on the event.
+        dueDate: intent === 'new_principal' || intent === 'new_debt' ? dueOverride : null,
         creditorName: intent === 'new_debt' ? creditorName : null,
         occurredOn,
         merchant,
@@ -282,20 +272,4 @@ export async function confirmQuickUpdateAction(
   refreshMoneyScreens();
   if (watch.repeated) return succeeded(ALREADY_RECORDED);
   return succeeded('נרשם.');
-}
-
-/** The deterministic reader's own intent names, mapped onto the writer's. */
-function mapIntent(intent: string): ApprovedIntent {
-  switch (intent) {
-    case 'income':
-      return 'income';
-    case 'balance':
-      return 'balance';
-    case 'new_debt':
-      return 'new_debt';
-    case 'debt_payment':
-      return 'debt_repayment';
-    default:
-      return 'expense';
-  }
 }

@@ -3,13 +3,26 @@ import { containsPhrase, normaliseDescription } from '@family-finance/transactio
 /**
  * What a sentence is asking to record.
  *
- * Five kinds, because those are the five things a family says out loud on the
- * way home. Anything else is `unknown`, which is an answer and not a failure:
- * a screen that says "לא הבנו" and offers the ordinary form is honest, and a
- * screen that guesses "probably an expense" writes money nobody meant.
+ * The things a family says out loud on the way home. Anything else is
+ * `unknown`, which is an answer and not a failure: a screen that says "לא הבנו"
+ * and offers the ordinary form is honest, and a screen that guesses "probably an
+ * expense" writes money nobody meant.
+ *
+ * `new_principal` and `new_debt` are both borrowing, and the difference between
+ * them is whether a card already exists — a fact about the household rather than
+ * about the words. Keeping them apart here is what lets "עוד" add to a lender's
+ * history instead of opening a second card beside it.
  */
 export type QuickIntent =
-  'expense' | 'income' | 'debt_payment' | 'new_debt' | 'balance' | 'unknown';
+  | 'expense'
+  | 'income'
+  | 'debt_payment'
+  /** A lender the household already has, lending more. */
+  | 'new_principal'
+  /** A lender the household does not have yet. */
+  | 'new_debt'
+  | 'balance'
+  | 'unknown';
 
 interface IntentRule {
   readonly intent: QuickIntent;
@@ -48,6 +61,32 @@ const RULES: readonly IntentRule[] = [
       'החזר הלוואה',
       'תשלום לגמח',
       'תשלום לגמ"ח',
+    ],
+  },
+  /*
+   * More money from a lender that already has a card.
+   *
+   * Ranked above `new_debt` on purpose. "קיבלתי עוד 3,000" and "לקחתי הלוואה"
+   * are both borrowing, and the difference between them is whether a card
+   * exists — which is a question about the household, not about the words. The
+   * word "עוד" is the one signal in the sentence that says "again", so it
+   * decides the reading and the matcher decides the card.
+   */
+  {
+    intent: 'new_principal',
+    priority: 35,
+    phrases: [
+      'עוד הלוואה',
+      'הלוואה נוספת',
+      'תוספת להלוואה',
+      'הגדלתי את ההלוואה',
+      'קיבלתי עוד',
+      'קיבלנו עוד',
+      'לקחתי עוד',
+      'לקחנו עוד',
+      'לוויתי עוד',
+      'הלוו לי עוד',
+      'נתנו לי עוד',
     ],
   },
   {

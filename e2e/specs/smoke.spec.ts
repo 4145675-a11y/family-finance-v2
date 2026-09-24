@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 
-import { ACCOUNT_NAME, HOUSEHOLD_NAME, LENDER_PLAIN } from '../support/household';
+import {
+  ACCOUNT_NAME,
+  ACCOUNT_SECOND_NAME,
+  HOUSEHOLD_NAME,
+  LENDER_PLAIN,
+} from '../support/household';
 import { storedDocument } from '../support/document';
 
 /**
@@ -18,7 +23,10 @@ test.describe('@smoke the suite is pointed at the synthetic household', () => {
     const document = storedDocument();
     expect(document.household.name).toBe(HOUSEHOLD_NAME);
     // Every record carries the marker. A real household's would not.
-    expect(document.accounts.map((account) => account.name)).toEqual([ACCOUNT_NAME]);
+    expect(document.accounts.map((account) => account.name)).toEqual([
+      ACCOUNT_NAME,
+      ACCOUNT_SECOND_NAME,
+    ]);
     for (const debt of document.debts) expect(debt.creditorName).toMatch(/^E2E /);
   });
 

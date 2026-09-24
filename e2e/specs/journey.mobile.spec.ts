@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { approve, interpret, onlyProposal } from '../support/quick';
+import { approve, proposeWithAccount } from '../support/quick';
 import { transactionsFor } from '../support/document';
 
 /**
@@ -122,10 +122,9 @@ test.describe('the whole quick update completes on a phone', () => {
       .getByRole('navigation', { name: 'ניווט תחתון' })
       .getByRole('link', { name: 'עדכון מהיר' })
       .click();
-    await expect(page.getByRole('heading', { level: 1, name: 'עדכון מהיר' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'מה לעדכן?' })).toBeVisible();
 
-    await interpret(page, `היום שילמתי 18 שקל ${MERCHANT}`);
-    const card = await onlyProposal(page);
+    const card = await proposeWithAccount(page, `היום שילמתי 18 שקל ${MERCHANT}`);
     // The proposal, and its controls, are reachable without sideways scrolling.
     expect(await overflowsSideways(page)).toBe(false);
 

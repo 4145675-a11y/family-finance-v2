@@ -346,3 +346,52 @@ describe('the same sentence always reads the same way', () => {
     expect(second).toEqual(first);
   });
 });
+
+describe('borrowing more from a lender who already has a card', () => {
+  const proposals = interpretQuickUpdate(
+    'קיבלתי עוד 3,000 ₪ מגמח אור החיים, לפירעון ב־10/10/2026',
+    context(),
+  );
+  const proposal = proposals[0];
+
+  test('is one update, not two', () => {
+    // The comma belongs to the number and to the clause after it, not to a
+    // second thing that happened.
+    expect(proposals).toHaveLength(1);
+  });
+
+  test('is a top-up rather than a new loan', () => {
+    // "עוד" is the one word in the sentence that says "again", so it decides the
+    // reading; which card it belongs to is then a question about the household.
+    expect(proposal?.intent).toBe('new_principal');
+    expect(proposal?.direction).toBe('inflow');
+  });
+
+  test('attached to the card the words name', () => {
+    expect(proposal?.debtId).toBe(GEMACH.id);
+    expect(proposal?.debtCandidates).toBe(1);
+  });
+
+  test('with the whole sum, not the digits of the date', () => {
+    expect(proposal?.amountMinor).toBe(300_000);
+  });
+
+  test('and nothing left to ask', () => {
+    expect(proposal?.state).toBe('ready');
+  });
+});
+
+describe('a top-up whose lender the words do not find', () => {
+  const proposal = interpretQuickUpdate('קיבלתי עוד 3,000 שקל ממישהו אחר', context())[0];
+
+  test('waits for the lender rather than picking one', () => {
+    /*
+     * The same refusal a repayment makes, for the same reason: a top-up moves an
+     * existing card's balance, and moving the wrong one is wrong in a way no
+     * later correction fully undoes.
+     */
+    expect(proposal?.intent).toBe('new_principal');
+    expect(proposal?.debtId).toBeNull();
+    expect(proposal?.state).toBe('needs_debt');
+  });
+});

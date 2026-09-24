@@ -6,9 +6,11 @@ import {
   recordDebtEvent,
   recordTransaction,
 } from '@family-finance/local-store';
-import type { RecordScope } from '@family-finance/contracts';
+import { EMPTY_DUE_DATE, type DueDate, type RecordScope } from '@family-finance/contracts';
+import { gregorianToHebrew } from '@family-finance/hebrew-calendar';
 
 import { debtEventKey } from './keys';
+import { formatDueDate } from '../format';
 import { householdStore } from '../store/server';
 
 /**
@@ -28,7 +30,14 @@ import { householdStore } from '../store/server';
  * other form in the product calls.
  */
 
-export type ApprovedIntent = 'expense' | 'income' | 'balance' | 'debt_repayment' | 'new_debt';
+export type ApprovedIntent =
+  | 'expense'
+  | 'income'
+  | 'balance'
+  | 'debt_repayment'
+  /** More money from a lender that already has a card. */
+  | 'new_principal'
+  | 'new_debt';
 
 export interface ApprovedAction {
   readonly intent: ApprovedIntent;
@@ -37,8 +46,17 @@ export interface ApprovedAction {
   /** An account of this household, verified by the caller. */
   readonly accountId: string;
   readonly scope: RecordScope;
-  /** An active debt of this household, for a repayment. */
+  /** An active debt of this household, for a repayment or a top-up. */
   readonly debtId: string | null;
+  /**
+   * When the borrowed sum comes due, for a sentence that said so.
+   *
+   * Written onto the event's note rather than onto the lender's own due date:
+   * changing a card's terms is a separate decision, made on the card, and this
+   * is a fact about this one event. Canonical `YYYY-MM-DD`, checked by the
+   * caller; it is formatted for reading here and identifies nothing.
+   */
+  readonly dueDate?: string | null;
   /** The lender's name, for a new debt. Typed by a person, never by a model. */
   readonly creditorName: string | null;
   readonly occurredOn: string;
@@ -47,6 +65,49 @@ export interface ApprovedAction {
   readonly sourceText: string;
   /** The submission's identifier (ADR-0038). Absent only for a caller with none. */
   readonly idempotencyKey: string | undefined;
+}
+
+/**
+ * What the ledger line says: what the money was, and when it goes back.
+ *
+ * A due date that a card displayed and then dropped on confirmation would be
+ * worse than never reading it, so it is recorded where a family will find it —
+ * beside the amount, in the lender's own history.
+ */
+/**
+ * A repayment day in the shape the household stores dates in.
+ *
+ * Both calendars, from the one implementation that knows how to convert between
+ * them, and `isHebrew: false` because a civil date is what was read. A day the
+ * Hebrew layer refuses is kept as a civil date rather than discarded — it is
+ * still the day the family said.
+ */
+function dueDateValue(date: string | null): DueDate | null {
+  if (date === null) return null;
+  const hebrew = (() => {
+    try {
+      return gregorianToHebrew(date as never);
+    } catch {
+      return null;
+    }
+  })();
+  return {
+    ...EMPTY_DUE_DATE,
+    gregorian: date as never,
+    hebrew,
+    sourceText: date,
+  };
+}
+
+function eventNote(action: ApprovedAction): string | null {
+  const due =
+    action.dueDate === undefined || action.dueDate === null
+      ? null
+      : `פירעון: ${formatDueDate(action.dueDate)}`;
+  const parts = [action.merchant, due].filter(
+    (part): part is string => part !== null && part.trim() !== '',
+  );
+  return parts.length === 0 ? null : parts.join(' · ').slice(0, 500);
 }
 
 export interface ApplyOptions {
@@ -134,10 +195,65 @@ export async function applyQuickUpdate(
       return;
     }
 
+    case 'new_principal': {
+      if (action.debtId === null) {
+        throw new Error('a top-up reached the writer without a verified lender');
+      }
+      /*
+       * Two records, because borrowing more is two facts: money arrived in an
+       * account, and a lender is owed more. The event is `new_principal` — the
+       * canonical kind the balance replay already understands (M1), so the card's
+       * figure moves by the arithmetic that was already there and nothing here
+       * computes a balance.
+       *
+       * Both keys derive from one submission, so a double press still leaves one
+       * of each (ADR-0038).
+       */
+      await store.run(
+        (document, context) =>
+          recordTransaction(
+            document,
+            {
+              ...keyed,
+              accountId: action.accountId,
+              counterpartAccountId: null,
+              scope: action.scope,
+              kind: 'income',
+              direction: 'inflow',
+              amountMinor: action.amountMinor,
+              categoryId: null,
+              merchant: action.merchant,
+              transactionDate: action.occurredOn,
+              note: action.sourceText,
+              status: 'confirmed',
+            },
+            context,
+          ),
+        options,
+      );
+      await store.run((document, context) =>
+        recordDebtEvent(
+          document,
+          {
+            ...(key === undefined ? {} : { idempotencyKey: debtEventKey(key) }),
+            debtId: action.debtId ?? '',
+            kind: 'new_principal',
+            amountMinor: action.amountMinor,
+            occurredOn: action.occurredOn,
+            correctionEffect: null,
+            note: eventNote(action),
+          },
+          context,
+        ),
+      );
+      return;
+    }
+
     case 'new_debt': {
       if (action.creditorName === null || action.creditorName.trim() === '') {
         throw new Error('a new debt reached the writer without a lender named by a person');
       }
+      const due = dueDateValue(action.dueDate ?? null);
       /*
        * A lender is created only here, and only from a name a person typed into
        * a field and pressed confirm on. A model naming a lender never reaches
@@ -169,6 +285,13 @@ export async function applyQuickUpdate(
               relationshipSensitivity: 'medium',
               partialPaymentAllowed: true,
               expectedCallDate: null,
+              /*
+               * A new card can hold the repayment day properly, in the household's
+               * own dual-calendar shape, because the card is being created here
+               * and nothing is being overwritten. A top-up cannot: changing an
+               * existing card's terms is a decision made on that card.
+               */
+              ...(due === null ? {} : { dueDate: due }),
               notes: action.sourceText,
             },
             context,

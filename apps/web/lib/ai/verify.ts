@@ -3,6 +3,8 @@ import 'server-only';
 import { BUDGET_CATEGORY_KEYS } from '@family-finance/contracts';
 import { formatHebrewDate, gregorianToHebrew } from '@family-finance/hebrew-calendar';
 import type { StoreDocument } from '@family-finance/local-store';
+import { normaliseLenderName } from '@family-finance/contracts';
+import { matchLender, type LenderHint } from '@family-finance/quick-update';
 import {
   CONTRACT_VERSION,
   type AiAction,
@@ -39,23 +41,39 @@ const REQUIRES_AMOUNT: readonly AiAction[] = [
   'expense',
   'income',
   'transfer',
+  'new_principal',
   'new_debt',
   'debt_repayment',
   'balance',
 ];
+/*
+ * A top-up needs an account for the same reason an income does: the money
+ * arrived somewhere, and "somewhere" is not a thing this product will guess.
+ */
 const REQUIRES_ACCOUNT: readonly AiAction[] = [
   'expense',
   'income',
   'transfer',
+  'new_principal',
   'debt_repayment',
   'balance',
 ];
-const REQUIRES_DEBT: readonly AiAction[] = ['debt_repayment'];
+/** The two actions that move an existing lender's balance. */
+const REQUIRES_DEBT: readonly AiAction[] = ['debt_repayment', 'new_principal'];
+/** The actions where money was borrowed, and so may come due on a named day. */
+const BORROWING: readonly AiAction[] = ['new_principal', 'new_debt'];
 
 export interface VerifyContext {
   readonly document: StoreDocument;
   /** Today, so a date in the future can be refused without reading a clock here. */
   readonly today: string;
+  /**
+   * The family's own sentence.
+   *
+   * Searched for a lender when the model quoted none, so the reading is at least
+   * as good as the rule-based one. Never used as an identifier.
+   */
+  readonly sentence?: string;
 }
 
 /**
@@ -120,17 +138,73 @@ function verifiedAccount(id: string | null, document: StoreDocument): string | n
 }
 
 /**
- * A debt id that names an active debt of this household, or null.
+ * This household's lenders, with every spelling each one is recorded under.
  *
- * A name is never accepted in its place, and a name that matches nothing never
- * creates a lender. That is the guard M1 and ADR-0035 both depend on: a balance
- * that moves against a lender who was invented on the spot is wrong in a way no
- * later correction can fully undo.
+ * Two debts with the same creditor are one lender with one set of spellings, so
+ * a sentence naming either spelling finds the card that already exists — which
+ * is what stops a top-up opening a duplicate beside it.
  */
-function verifiedDebt(id: string | null, document: StoreDocument): string | null {
-  if (id === null) return null;
-  const debt = document.debts.find((row) => row.id === id && row.status === 'active');
-  return debt === undefined ? null : debt.id;
+export function lenderHints(document: StoreDocument): LenderHint[] {
+  /*
+   * Grouped by the folded name, exactly as the lender cards are grouped.
+   *
+   * An alias is another spelling of **the same** lender — "גמ״ח אור" beside
+   * "גמח אור" — and never another lender's name. Getting that wrong would make
+   * every lender match every sentence, so every reading would come back
+   * ambiguous and nothing would ever resolve.
+   */
+  const byKey = new Map<string, { id: string; display: string; spellings: Set<string> }>();
+
+  for (const debt of document.debts) {
+    if (debt.status !== 'active') continue;
+    const key = normaliseLenderName(debt.creditorName);
+    const name = debt.creditorName.trim();
+    const existing = byKey.get(key);
+    if (existing === undefined) {
+      byKey.set(key, { id: debt.id, display: name, spellings: new Set([name]) });
+      continue;
+    }
+    existing.spellings.add(name);
+  }
+
+  return [...byKey.values()].map((entry) => ({
+    id: entry.id,
+    creditorName: entry.display,
+    status: 'active' as const,
+    aliases: [...entry.spellings].filter((name) => name !== entry.display),
+  }));
+}
+
+/**
+ * The lender the words name, resolved here and never supplied by a model.
+ *
+ * This is the guard M1 and ADR-0035 both depend on: a balance that moves against
+ * a lender invented on the spot is wrong in a way no later correction fully
+ * undoes. The model gives words; the matcher gives an id of this household, or
+ * nothing.
+ */
+function verifiedLender(
+  lenderText: string | null,
+  sentence: string,
+  document: StoreDocument,
+): { debtId: string | null; name: string | null; candidates: number } {
+  const hints = lenderHints(document);
+  /*
+   * The quoted fragment first, then the whole sentence. A model that named the
+   * lender precisely gets the precise answer; one that quoted nothing still lets
+   * the family's own words be searched, which is what the rule-based reader
+   * would have done anyway.
+   */
+  const fromQuote = lenderText === null ? null : matchLender(lenderText, hints);
+  const match =
+    fromQuote !== null && fromQuote.candidates > 0 ? fromQuote : matchLender(sentence, hints);
+
+  const name =
+    match.debtId === null
+      ? null
+      : (document.debts.find((row) => row.id === match.debtId)?.creditorName ?? null);
+
+  return { debtId: match.debtId, name, candidates: match.candidates };
 }
 
 /** A category key from the closed list, or null. */
@@ -160,6 +234,8 @@ const QUESTION: Readonly<
   amount: { field: 'amount', question: 'מה הסכום?' },
   account: { field: 'account', question: 'מאיזה חשבון?' },
   lender: { field: 'lender', question: 'לאיזו הלוואה זה שייך?' },
+  lender_many: { field: 'lender', question: 'לאיזה מלווה מתוך אלה?' },
+  lender_new: { field: 'lender', question: 'ממי ההלוואה? ייפתח כרטיס חדש.' },
   date: { field: 'date', question: 'באיזה תאריך?' },
 };
 
@@ -171,12 +247,43 @@ const QUESTION: Readonly<
  */
 export function verifyProposal(output: ModelOutput, context: VerifyContext): AiProposal {
   const { document, today } = context;
+  const sentence = context.sentence ?? '';
 
+  const evidence = verifiedEvidence(output);
   const amount = verifiedAmount(output.amountMinor);
   const date = canonicalDate(output.date);
   const accountId = verifiedAccount(output.accountId, document);
-  const debtId = verifiedDebt(output.debtId, document);
+  const lender = verifiedLender(output.lenderText, sentence, document);
+  const debtId = lender.debtId;
   const categoryId = verifiedCategory(output.categoryId);
+
+  /*
+   * "A new loan" from a lender who already has a card is a top-up, not a card.
+   *
+   * Decided here rather than by the reader, because it is a question about the
+   * household and not about the words: the same sentence means one thing for a
+   * family who has that lender and another for a family who does not. Getting it
+   * wrong opens a second card beside the first and splits one lender's history
+   * in two, which is the failure this whole slice exists to prevent.
+   */
+  const action: AiAction =
+    output.action === 'new_debt' && debtId !== null ? 'new_principal' : output.action;
+
+  /*
+   * When the money comes due, which is allowed to be a day that has not arrived.
+   *
+   * A borrowing sentence whose only date is in the future is read as that date:
+   * the sum cannot have arrived tomorrow, so the one coherent reading of
+   * "לפירעון ב־10/10/2026" is the day it must go back. Doing it here rather than
+   * trusting the reader keeps the two readers saying the same thing about the
+   * same sentence — the rule table has one date slot and applies the same rule.
+   */
+  const borrowing = BORROWING.includes(action);
+  const statedDue = borrowing ? canonicalDate(output.dueDate) : null;
+  const futureDate = date !== null && date > today;
+  const dueDate = statedDue ?? (borrowing && futureDate ? date : null);
+  /** The occurrence date, once a future day has been recognised as a due date. */
+  const occurred = dueDate !== null && dueDate === date ? null : date;
 
   /*
    * Which ids the model named but this household does not have.
@@ -185,13 +292,19 @@ export function verifyProposal(output: ModelOutput, context: VerifyContext): AiP
    * signal that the reading cannot be trusted as a whole, so it downgrades the
    * state even when every other field looks fine.
    */
+  /*
+   * An id the model named that this household does not have.
+   *
+   * The lender is no longer one of these: a model cannot name a lender id at
+   * all, so an unmatched lender is an ordinary "we do not know which" rather
+   * than evidence that the whole reading is untrustworthy.
+   */
   const invented =
     (output.accountId !== null && accountId === null) ||
-    (output.debtId !== null && debtId === null) ||
     (output.categoryId !== null && categoryId === null);
 
   // A date after today is not a record of something that happened.
-  const dateInFuture = date !== null && date > today;
+  const dateInFuture = occurred !== null && occurred > today;
 
   const missing = [...output.missing];
   const need = (key: keyof typeof QUESTION): void => {
@@ -201,7 +314,6 @@ export function verifyProposal(output: ModelOutput, context: VerifyContext): AiP
     missing.push(entry);
   };
 
-  const action = output.action;
   if (REQUIRES_AMOUNT.includes(action) && amount.amountMinor === null) need('amount');
   if (REQUIRES_ACCOUNT.includes(action) && accountId === null) {
     /*
@@ -211,7 +323,15 @@ export function verifyProposal(output: ModelOutput, context: VerifyContext): AiP
      */
     if (document.accounts.filter((row) => row.closedAt === null).length !== 1) need('account');
   }
-  if (REQUIRES_DEBT.includes(action) && debtId === null) need('lender');
+  if (REQUIRES_DEBT.includes(action) && debtId === null) {
+    need(lender.candidates > 1 ? 'lender_many' : 'lender');
+  }
+  /*
+   * Opening a card is never something this screen does on its own. When the
+   * words match nothing, the person names the lender themselves — so the
+   * proposal waits for that rather than arriving ready.
+   */
+  if (action === 'new_debt') need('lender_new');
   if (dateInFuture) need('date');
 
   const unknownAction = action === 'unknown';
@@ -246,13 +366,20 @@ export function verifyProposal(output: ModelOutput, context: VerifyContext): AiP
     action,
     summary: output.summary.slice(0, 200),
     confidence: output.confidence,
-    evidence: verifiedEvidence(output),
+    evidence,
     amountMinor: amount.amountMinor,
     // A date the sentence did not give is today, said out loud on the screen.
-    date: dateInFuture ? null : (date ?? today),
-    hebrewDate: hebrewFormOf(dateInFuture ? null : (date ?? today)),
+    date: dateInFuture ? null : (occurred ?? today),
+    hebrewDate: hebrewFormOf(dateInFuture ? null : (occurred ?? today)),
+    dueDate,
+    dueHebrewDate: hebrewFormOf(dueDate),
     accountId,
     debtId,
+    lenderName: lender.name,
+    // The words the sentence used for the other party, which is what a record is
+    // labelled with. Quoted from the person's own text, never composed here.
+    label: evidence.counterpartyText,
+    lenderCandidates: lender.candidates,
     categoryId,
     missing: missing.slice(0, 3),
     reason: output.reason.slice(0, 300),

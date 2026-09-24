@@ -92,7 +92,7 @@ describe('an id this household does not have is refused', () => {
     const proposal = verify(
       {
         action: 'debt_repayment',
-        debtId: '00000000-0000-4000-8000-000000000000',
+        lenderText: 'מלווה שאין לו כרטיס',
         date: TODAY,
       },
       document,
@@ -104,7 +104,7 @@ describe('an id this household does not have is refused', () => {
 
   test('and the person is asked which lender, rather than shown an error', () => {
     const proposal = verify(
-      { action: 'debt_repayment', debtId: 'nope', date: TODAY },
+      { action: 'debt_repayment', lenderText: 'מלווה שאין לו כרטיס', date: TODAY },
       document,
     );
     expect(proposal.missing.map((item) => item.field)).toContain('lender');
@@ -139,13 +139,15 @@ describe('an id this household does not have is refused', () => {
     expect(proposal.safeToConfirm).toBe(false);
   });
 
-  test('a real lender of this household is kept', () => {
+  test('a lender named in words is resolved to the card that exists', () => {
     const { document: built, debtId } = household();
     const proposal = verifyProposal(
-      exampleOutput({ action: 'debt_repayment', debtId, date: TODAY }),
-      { document: built, today: TODAY },
+      exampleOutput({ action: 'debt_repayment', lenderText: 'גמח לבדיקה', date: TODAY }),
+      { document: built, today: TODAY, sentence: 'החזרתי 120 לגמח לבדיקה' },
     );
+    // The id comes out of the matcher, never out of the answer.
     expect(proposal.debtId).toBe(debtId);
+    expect(proposal.lenderName).toBe('גמח לבדיקה');
     expect(proposal.safeToConfirm).toBe(true);
   });
 });
@@ -158,7 +160,7 @@ describe('a model claiming to be sure does not make it so', () => {
         state: 'ready',
         confidence: 'high',
         action: 'debt_repayment',
-        debtId: 'invented',
+        lenderText: 'מלווה שאין לו כרטיס',
         date: TODAY,
       }),
       { document, today: TODAY },
@@ -268,7 +270,7 @@ describe('an action nobody can act on', () => {
   });
 
   test('a repayment always needs a lender, whatever else is present', () => {
-    const proposal = verify({ action: 'debt_repayment', debtId: null, date: TODAY });
+    const proposal = verify({ action: 'debt_repayment', lenderText: null, date: TODAY });
     expect(proposal.safeToConfirm).toBe(false);
     expect(proposal.missing.map((item) => item.field)).toContain('lender');
   });
@@ -326,10 +328,250 @@ describe('what the verifier carries forward', () => {
     const proposal = verify({
       action: 'debt_repayment',
       amountMinor: null,
-      debtId: null,
+      lenderText: null,
       date: '2027-01-01',
       missing: [{ field: 'description', question: 'על מה?' }],
     });
     expect(proposal.missing.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('borrowing more from a lender who already has a card', () => {
+  const { document, debtId } = household();
+
+  test('a new loan naming a card that exists is a top-up, not a second card', () => {
+    /*
+     * The anti-duplicate rule, and the reason this whole slice exists.
+     *
+     * The reader said "new loan" and named the lender in words. Whether that is a
+     * new card or more money on an old one is a question about the household, not
+     * about the words — so the server decides it, and deciding it wrongly splits
+     * one lender's history in two.
+     */
+    const proposal = verify(
+      { action: 'new_debt', lenderText: 'גמח לבדיקה', amountMinor: 300_000, date: null },
+      document,
+    );
+    expect(proposal.action).toBe('new_principal');
+    expect(proposal.debtId).toBe(debtId);
+    expect(proposal.lenderName).toBe('גמח לבדיקה');
+    expect(proposal.safeToConfirm).toBe(true);
+  });
+
+  test('and a new loan naming nobody this household has stays a new card', () => {
+    const proposal = verify(
+      { action: 'new_debt', lenderText: 'מלווה שאין לו כרטיס', amountMinor: 300_000 },
+      document,
+    );
+    expect(proposal.action).toBe('new_debt');
+    expect(proposal.debtId).toBeNull();
+  });
+
+  test('which is never confirmable on its own, because a card is a person decision', () => {
+    const proposal = verify(
+      { action: 'new_debt', lenderText: 'מלווה שאין לו כרטיס', amountMinor: 300_000 },
+      document,
+    );
+    expect(proposal.safeToConfirm).toBe(false);
+    expect(proposal.missing.map((item) => item.question)).toContain(
+      'ממי ההלוואה? ייפתח כרטיס חדש.',
+    );
+  });
+
+  test('a top-up needs an account, because the money arrived somewhere', () => {
+    const seeded = seededHousehold();
+    const proposal = verifyProposal(
+      exampleOutput({ action: 'new_principal', lenderText: 'גמח לבדיקה' }),
+      { document: seeded.document, today: TODAY },
+    );
+    expect(proposal.missing.map((item) => item.field)).toContain('account');
+    expect(proposal.safeToConfirm).toBe(false);
+  });
+});
+
+describe('a repayment day is not the day something happened', () => {
+  const { document } = household();
+
+  test('a due date in the future is kept, where an occurrence date would be refused', () => {
+    const proposal = verify(
+      {
+        action: 'new_debt',
+        lenderText: 'גמח לבדיקה',
+        amountMinor: 300_000,
+        date: null,
+        dueDate: '2026-10-10',
+      },
+      document,
+    );
+    expect(proposal.dueDate).toBe('2026-10-10');
+    expect(proposal.date).toBe(TODAY);
+    // Still confirmable: nothing about it is in doubt.
+    expect(proposal.safeToConfirm).toBe(true);
+  });
+
+  test('with its Hebrew form, kept in step by the server', () => {
+    const proposal = verify(
+      { action: 'new_principal', lenderText: 'גמח לבדיקה', dueDate: '2026-10-10' },
+      document,
+    );
+    expect(proposal.dueHebrewDate).not.toBeNull();
+    expect(proposal.dueHebrewDate).toMatch(/תשפ/u);
+  });
+
+  test('a borrowing sentence whose only date is in the future is read as the due date', () => {
+    /*
+     * A reader that put the repayment day in `date` is describing something that
+     * has not happened. Rather than refuse the whole reading, the server reads it
+     * the only way it can be true — which is also what the rule table does with
+     * its single date slot, so one sentence means one thing either way.
+     */
+    const proposal = verify(
+      { action: 'new_principal', lenderText: 'גמח לבדיקה', date: '2026-10-10' },
+      document,
+    );
+    expect(proposal.dueDate).toBe('2026-10-10');
+    expect(proposal.date).toBe(TODAY);
+    expect(proposal.missing.map((item) => item.field)).not.toContain('date');
+  });
+
+  test('but an expense in the future is still refused, and asked about', () => {
+    const proposal = verify({ action: 'expense', date: '2026-10-10' }, document);
+    expect(proposal.dueDate).toBeNull();
+    expect(proposal.date).toBeNull();
+    expect(proposal.missing.map((item) => item.field)).toContain('date');
+  });
+
+  test('and an expense is never given a repayment day, however one arrives', () => {
+    const proposal = verify({ action: 'expense', dueDate: '2026-10-10' }, document);
+    expect(proposal.dueDate).toBeNull();
+  });
+
+  test('a due date that is not a day is dropped rather than shown', () => {
+    const proposal = verify(
+      { action: 'new_principal', lenderText: 'גמח לבדיקה', dueDate: '2026-02-30' },
+      document,
+    );
+    expect(proposal.dueDate).toBeNull();
+    expect(proposal.dueHebrewDate).toBeNull();
+  });
+});
+
+describe('the lender is resolved from the household, never supplied', () => {
+  const { document, debtId } = household();
+
+  test('the sentence alone resolves a lender when the reader quoted none', () => {
+    const proposal = verifyProposal(
+      exampleOutput({ action: 'debt_repayment', lenderText: null, amountMinor: 20_000 }),
+      { document, today: TODAY, sentence: 'החזרתי 200 שקל לגמח לבדיקה' },
+    );
+    expect(proposal.debtId).toBe(debtId);
+    expect(proposal.lenderCandidates).toBe(1);
+  });
+
+  test('words fitting no card resolve to nothing at all', () => {
+    const proposal = verifyProposal(
+      exampleOutput({ action: 'debt_repayment', lenderText: null, amountMinor: 20_000 }),
+      { document, today: TODAY, sentence: 'החזרתי 200 שקל למלווה שאין לו כרטיס' },
+    );
+    expect(proposal.debtId).toBeNull();
+    expect(proposal.lenderCandidates).toBe(0);
+    expect(proposal.safeToConfirm).toBe(false);
+  });
+
+  test('another spelling of the same lender finds the card it already has', () => {
+    /*
+     * Two cards recorded under names that differ only in a quotation mark are one
+     * lender with two spellings, so either spelling finds it. The grouping is the
+     * load-bearing part: made wrong, every lender becomes an alias of every other
+     * one and nothing ever resolves.
+     */
+    const withQuote = addDebt(
+      document,
+      {
+        creditorName: 'גמ"ח לבדיקה',
+        kind: 'gemach',
+        openingBalanceMinor: 50_000,
+        openedOn: '2026-08-02',
+        effectiveAnnualRateBp: null,
+        minimumPaymentMinor: null,
+        paymentDueDay: null,
+        urgency: 'none',
+        promiseSummary: null,
+        relationshipSensitivity: 'low',
+        partialPaymentAllowed: true,
+        expectedCallDate: null,
+        notes: null,
+      },
+      contextFor(document),
+    ).document;
+
+    const proposal = verifyProposal(
+      exampleOutput({
+        action: 'debt_repayment',
+        lenderText: 'גמ"ח לבדיקה',
+        amountMinor: 20_000,
+      }),
+      { document: withQuote, today: TODAY },
+    );
+    // One lender, one card, not two candidates.
+    expect(proposal.lenderCandidates).toBe(1);
+    expect(proposal.debtId).toBe(debtId);
+    expect(proposal.safeToConfirm).toBe(true);
+  });
+
+  test('words fitting two different lenders resolve to neither, and ask which', () => {
+    const withBranch = addDebt(
+      document,
+      {
+        creditorName: 'גמח לבדיקה נוספת',
+        kind: 'gemach',
+        openingBalanceMinor: 50_000,
+        openedOn: '2026-08-02',
+        effectiveAnnualRateBp: null,
+        minimumPaymentMinor: null,
+        paymentDueDay: null,
+        urgency: 'none',
+        promiseSummary: null,
+        relationshipSensitivity: 'low',
+        partialPaymentAllowed: true,
+        expectedCallDate: null,
+        notes: null,
+      },
+      contextFor(document),
+    ).document;
+
+    const proposal = verifyProposal(
+      exampleOutput({
+        action: 'debt_repayment',
+        lenderText: 'גמח לבדיקה נוספת',
+        amountMinor: 20_000,
+      }),
+      { document: withBranch, today: TODAY },
+    );
+    expect(proposal.debtId).toBeNull();
+    expect(proposal.lenderCandidates).toBe(2);
+    expect(proposal.lenderName).toBeNull();
+    expect(proposal.missing.map((item) => item.question)).toContain('לאיזה מלווה מתוך אלה?');
+    expect(proposal.safeToConfirm).toBe(false);
+  });
+});
+
+describe('what the record will be called', () => {
+  const { document } = household();
+
+  test('the label is the words the sentence used for the other party', () => {
+    const proposal = verify(
+      { evidence: { amountText: '120', dateText: null, counterpartyText: 'בסופר' } },
+      document,
+    );
+    expect(proposal.label).toBe('בסופר');
+  });
+
+  test('and is null when the reading named nobody', () => {
+    const proposal = verify(
+      { evidence: { amountText: '120', dateText: null, counterpartyText: null } },
+      document,
+    );
+    expect(proposal.label).toBeNull();
   });
 });

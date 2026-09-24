@@ -15,6 +15,7 @@ import type { DateReviewReason } from '@family-finance/hebrew-calendar';
 import { CURRENCY_WORDS, readAmount } from './amount';
 import { readIntent, type QuickIntent } from './intent';
 import { splitUpdates } from './split';
+import { matchLender } from './lender';
 import { readWhen } from './when';
 
 /**
@@ -38,7 +39,7 @@ export type ProposalState =
   | 'needs_amount'
   /** More than one account could be meant and the sentence did not say. */
   | 'needs_account'
-  /** A repayment whose lender was not named, or matched more than one. */
+  /** A repayment or a top-up whose lender was not named, or matched more than one. */
   | 'needs_debt'
   /** A day was named and it does not read. Never silently today. */
   | 'needs_date'
@@ -91,6 +92,8 @@ const DIRECTION: Readonly<Record<QuickIntent, 'inflow' | 'outflow' | null>> = {
   expense: 'outflow',
   income: 'inflow',
   debt_payment: 'outflow',
+  // Borrowing is money arriving, whether or not the card already exists.
+  new_principal: 'inflow',
   new_debt: 'inflow',
   balance: null,
   unknown: null,
@@ -145,28 +148,6 @@ function labelFrom(text: string, removals: readonly string[]): string {
 }
 
 /**
- * The lender a repayment names, when it names exactly one.
- *
- * The same rule the import classifier holds to, for the same reason: a balance
- * that moves against the wrong lender is wrong in two places at once, and
- * picking the nearest name is how that happens. None or several, and the person
- * chooses.
- */
-function resolveLender(
-  text: string,
-  debts: readonly DebtHint[],
-): { debtId: string | null; candidates: number } {
-  const folded = normaliseDescription(text);
-  const active = debts.filter((debt) => debt.status === 'active');
-  const hits = active.filter((debt) => {
-    const name = normaliseDescription(debt.creditorName);
-    if (name.length < 3) return false;
-    return containsPhrase(folded, name) || folded.includes(name);
-  });
-  return { debtId: hits.length === 1 ? (hits[0]?.id ?? null) : null, candidates: hits.length };
-}
-
-/**
  * The account a sentence means.
  *
  * One open account, and that is the one, because there is nothing to choose
@@ -213,6 +194,8 @@ function explain(state: ProposalState, intent: QuickIntent, candidates: number):
           return 'הבנו: כסף שנכנס.';
         case 'debt_payment':
           return 'הבנו: החזר על חשבון הלוואה. היתרה תיגזר מהאירוע.';
+        case 'new_principal':
+          return 'הבנו: תוספת להלוואה קיימת.';
         case 'new_debt':
           return 'הבנו: הלוואה חדשה שנלקחה.';
         case 'balance':
@@ -242,10 +225,15 @@ function interpretOne(
 
   const description = labelFrom(withoutDate, [amount?.matchedText ?? '']);
   const account = resolveAccount(sourceText, context.accounts);
+  /*
+   * The one matcher, shared with the smart reader (`lender.ts`). Two ways of
+   * deciding which lender a sentence means would eventually disagree, and the
+   * disagreement would be money moving against the wrong card.
+   */
   const lender =
-    intent === 'debt_payment'
-      ? resolveLender(sourceText, context.debts)
-      : { debtId: null, candidates: 0 };
+    intent === 'debt_payment' || intent === 'new_principal'
+      ? matchLender(sourceText, context.debts)
+      : { debtId: null, candidates: 0, names: [] };
 
   const direction = DIRECTION[intent];
   const date = when.outcome === 'unclear' ? context.today : when.date;
@@ -279,7 +267,9 @@ function interpretOne(
         ? 'needs_date'
         : amount === null
           ? 'needs_amount'
-          : intent === 'debt_payment' && lender.debtId === null
+          : // A repayment and a top-up both move an existing card's balance, so
+            // neither is complete until the sentence has found one.
+            (intent === 'debt_payment' || intent === 'new_principal') && lender.debtId === null
             ? 'needs_debt'
             : account.accountId === null
               ? 'needs_account'

@@ -64,7 +64,7 @@
 ## 4. פקודות
 
 ```bash
-npm run e2e                 # כל החבילה המקומית (desktop + phone)
+npm run e2e                 # כל החבילה המקומית (desktop + unconfigured + phone)
 npm run e2e:smoke           # תת־קבוצת @smoke
 npm run e2e -- e2e/specs/quick-update.spec.ts   # קובץ אחד
 npm run e2e:install         # Chromium, לתוך הפרויקט
@@ -102,7 +102,7 @@ npm run e2e:live -- --live-origin=https://family-finance-web-l2gp.onrender.com
 | | מקומי | CI | מול ייצור |
 |---|:---:|:---:|:---:|
 | `npm run verify` | ✅ | ✅ | — |
-| `npm run e2e` (72 בדיקות) | ✅ | ✅ | — |
+| `npm run e2e` (124 בדיקות) | ✅ | ✅ | — |
 | `npm run e2e:live` (8 בדיקות) | ✅ | ❌ (אין secret) | — |
 | `npm run integration` | ✅ | ❌ (אין secret) | — |
 | `npm run validate:production-path` | ✅ | ❌ | — |

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { approve, interpret, onlyProposal } from '../support/quick';
+import { approve, proposeWithAccount } from '../support/quick';
 import { asShekels, transactionsFor } from '../support/document';
 import { ACCOUNT_NAME } from '../support/household';
 
@@ -26,8 +26,7 @@ const AMOUNT_MINOR = 3_450;
 
 test.describe('@smoke a recorded expense can be found again', () => {
   test('it appears on the history screen, with its amount', async ({ page }) => {
-    await interpret(page, `היום שילמתי 34.50 שקל ${MERCHANT}`);
-    await approve(await onlyProposal(page));
+    await approve(await proposeWithAccount(page, `היום שילמתי 34.50 שקל ${MERCHANT}`));
     await expect(page.getByText('נרשם.')).toBeVisible();
     expect(transactionsFor(MERCHANT)).toHaveLength(1);
 
@@ -64,8 +63,7 @@ test.describe('@smoke a recorded expense can be found again', () => {
   });
 
   test('and money in is signed as money in', async ({ page }) => {
-    await interpret(page, 'היום קיבלתי 500 שקל החזר מהקופה');
-    await approve(await onlyProposal(page));
+    await approve(await proposeWithAccount(page, 'היום קיבלתי 500 שקל החזר מהקופה'));
     await expect(page.getByText('נרשם.')).toBeVisible();
 
     await page.goto('/activity');

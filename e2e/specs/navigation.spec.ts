@@ -47,7 +47,8 @@ test.describe('the journeys a person walks by reading', () => {
   test('home offers the quick update as the first thing to do', async ({ page }) => {
     await page.goto('/');
     // In the actions card, not only in the navigation.
-    await follow(page, 'עדכון מהיר', 'עדכון מהיר');
+    // The link says where it goes; the screen it reaches asks the question.
+    await follow(page, 'עדכון מהיר', 'מה לעדכן?');
   });
 
   test('from debts a person reaches the lender cards', async ({ page }) => {

@@ -136,6 +136,22 @@ export function formatBusinessDate(date: string): string {
 }
 
 /**
+ * `2026-10-10` → `10.10.2026`.
+ *
+ * A due date carries its year, where `formatBusinessDate` deliberately drops it:
+ * most records are about this month, and a repayment day is the opposite case —
+ * it is often next year, and the year is exactly what a family is checking.
+ * Numeric rather than spelled out so the whole day fits on one line of a card.
+ */
+export function formatDueDate(date: string): string {
+  const [year, month, day] = date.split('-');
+  if (year === undefined || month === undefined || day === undefined) {
+    throw new Error(`not a business date: ${date}`);
+  }
+  return `${day}.${month}.${year}`;
+}
+
+/**
  * `2026-08-15` → `יום שבת`.
  *
  * The Hebrew locale already includes the word "יום", so callers must not add

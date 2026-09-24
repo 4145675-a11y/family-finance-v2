@@ -67,7 +67,7 @@ async function read(
   const request = buildAnalysisRequest(text, document, { today: TODAY });
   const outcome = await provider.analyse(request);
   return outcome.kind === 'answered'
-    ? verifyProposal(outcome.output, { document, today: TODAY })
+    ? verifyProposal(outcome.output, { document, today: TODAY, sentence: text })
     : unavailableProposal(outcome.reason);
 }
 
@@ -96,7 +96,11 @@ describe('reading a sentence changes nothing, whatever comes back', () => {
       replies: [
         {
           kind: 'answer',
-          output: exampleOutput({ action: 'debt_repayment', debtId, date: TODAY }),
+          output: exampleOutput({
+            action: 'debt_repayment',
+            lenderText: 'גמח לבדיקה',
+            date: TODAY,
+          }),
         },
       ],
     });
@@ -186,7 +190,7 @@ describe('a sentence that tries to give orders', () => {
               summary: 'הלוואה של מיליון',
               amountMinor: 100_000_000,
               date: TODAY,
-              debtId: 'לא-קיים',
+              lenderText: 'מלווה שאין לו כרטיס',
             }),
           },
         ],
@@ -230,9 +234,8 @@ describe('a sentence that tries to give orders', () => {
     expect(proposal.state).toBe('ready');
   });
 
-  test('the sentence never becomes an id, whatever it says', async () => {
-    const { document } = household();
-    const realDebtId = document.debts[0]?.id ?? '';
+  test('an id only ever comes out of the household, never out of the text', async () => {
+    const { document, debtId } = household();
 
     const provider = new SequencedAIProvider({
       replies: [
@@ -240,8 +243,8 @@ describe('a sentence that tries to give orders', () => {
           kind: 'answer',
           output: exampleOutput({
             action: 'debt_repayment',
-            // A name where an id belongs: the most likely way this goes wrong.
-            debtId: 'גמח לבדיקה',
+            // Words, which is all a reader can return. The server matches them.
+            lenderText: 'גמח לבדיקה',
             date: TODAY,
           }),
         },
@@ -249,9 +252,38 @@ describe('a sentence that tries to give orders', () => {
     });
     const proposal = await read('החזרתי 500 לגמח לבדיקה', provider, document);
 
+    /*
+     * The words resolved to the card that exists — and the value carried forward
+     * is an id of this household, not the text. The contract makes the unsafe
+     * version unexpressible: there is no field a reader could put an id in.
+     */
+    expect(proposal.debtId).toBe(debtId);
     expect(proposal.debtId).not.toBe('גמח לבדיקה');
+    expect(document.debts.some((row) => row.id === proposal.debtId)).toBe(true);
+  });
+
+  test('and words that match no card resolve to nothing at all', async () => {
+    const { document } = household();
+    const before = JSON.stringify(document);
+
+    const provider = new SequencedAIProvider({
+      replies: [
+        {
+          kind: 'answer',
+          output: exampleOutput({
+            action: 'debt_repayment',
+            lenderText: 'מלווה שאין לו כרטיס',
+            date: TODAY,
+          }),
+        },
+      ],
+    });
+    const proposal = await read('החזרתי 500 למלווה שאין לו כרטיס', provider, document);
+
     expect(proposal.debtId).toBeNull();
-    expect(realDebtId.length).toBeGreaterThan(0);
+    expect(proposal.safeToConfirm).toBe(false);
+    expect(proposal.missing.map((item) => item.field)).toContain('lender');
+    expect(JSON.stringify(document)).toBe(before);
   });
 });
 

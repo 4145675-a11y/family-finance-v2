@@ -34,8 +34,19 @@ import {
 
 export const HOUSEHOLD_NAME = 'E2E משק בית בדיקה';
 
-/** One open account, so a quick update has nothing to ask about. */
+/** The account every journey records against, unless it says otherwise. */
 export const ACCOUNT_NAME = 'E2E עובר ושב';
+
+/**
+ * A second open account, so "which account" is a question that has to be asked.
+ *
+ * With one account the product fills it in and is right to: there is nothing to
+ * choose between, and asking would be ceremony. A real household has more than
+ * one, and the behaviour that matters — one short question, answered with
+ * buttons, writing nothing until confirmation — only exists when there is a
+ * choice. Seeding it is what makes that path reachable from a browser.
+ */
+export const ACCOUNT_SECOND_NAME = 'E2E חשבון שני';
 
 /**
  * A lender per concern, so one spec file cannot move a figure another asserts on.
@@ -66,6 +77,15 @@ export const LENDER_OVERPAY = 'E2E גמח שלישי';
 export const LENDER_AI = 'E2E גמח רביעי';
 
 /**
+ * The lender the top-up journey adds to.
+ *
+ * Its own card, because that journey asserts the balance moved by exactly 3,000
+ * and a figure another spec also writes to would make the two files depend on
+ * their order. Opened at 2,000 so the total after the top-up is a round 5,000.
+ */
+export const LENDER_TOPUP = 'E2E גמח חמישי';
+
+/**
  * A gemach and its branch, whose names overlap.
  *
  * Naming the longer one names the shorter one too, so "החזרתי 200 לE2E גמח אור
@@ -82,20 +102,24 @@ export const LENDER_PLAIN_OPENING_MINOR = 100_000;
 export const LENDER_CARD_OPENING_MINOR = 100_000;
 export const LENDER_OVERPAY_OPENING_MINOR = 50_000;
 export const LENDER_AI_OPENING_MINOR = 500_000;
+export const LENDER_TOPUP_OPENING_MINOR = 200_000;
 export const LENDER_OVERLAP_A_OPENING_MINOR = 50_000;
 export const LENDER_OVERLAP_B_OPENING_MINOR = 70_000;
 
-/** The account's opening balance, in agorot. */
+/** The accounts' opening balances, in agorot. Distinct, so a mix-up shows. */
 export const ACCOUNT_OPENING_MINOR = 1_250_000;
+export const ACCOUNT_SECOND_OPENING_MINOR = 340_000;
 
 export interface SeededHousehold {
   /** The data directory the server is pointed at. */
   readonly dataDirectory: string;
   readonly accountId: string;
+  readonly secondAccountId: string;
   readonly lenderPlainId: string;
   readonly lenderCardId: string;
   readonly lenderOverpayId: string;
   readonly lenderAiId: string;
+  readonly lenderTopupId: string;
   readonly lenderOverlapAId: string;
   readonly lenderOverlapBId: string;
 }
@@ -152,6 +176,23 @@ export async function seedHousehold(): Promise<SeededHousehold> {
     ),
   );
 
+  const secondAccountId = await store.run((document, context) =>
+    addAccount(
+      document,
+      {
+        name: ACCOUNT_SECOND_NAME,
+        kind: 'bank_account',
+        scope: 'household',
+        institution: null,
+        displaySuffix: null,
+        openingBalanceMinor: ACCOUNT_SECOND_OPENING_MINOR,
+        openingBalanceDirection: 'inflow',
+        openingBalanceDate: '2026-09-01',
+      },
+      context,
+    ),
+  );
+
   // A confirmed balance, so the home screen has a figure rather than a prompt.
   await store.run((document, context) =>
     recordBalance(
@@ -195,16 +236,19 @@ export async function seedHousehold(): Promise<SeededHousehold> {
   const lenderCardId = await lend(LENDER_CARD, LENDER_CARD_OPENING_MINOR);
   const lenderOverpayId = await lend(LENDER_OVERPAY, LENDER_OVERPAY_OPENING_MINOR);
   const lenderAiId = await lend(LENDER_AI, LENDER_AI_OPENING_MINOR);
+  const lenderTopupId = await lend(LENDER_TOPUP, LENDER_TOPUP_OPENING_MINOR);
   const lenderOverlapAId = await lend(LENDER_OVERLAP_A, LENDER_OVERLAP_A_OPENING_MINOR);
   const lenderOverlapBId = await lend(LENDER_OVERLAP_B, LENDER_OVERLAP_B_OPENING_MINOR);
 
   return {
     dataDirectory,
     accountId,
+    secondAccountId,
     lenderPlainId,
     lenderCardId,
     lenderOverpayId,
     lenderAiId,
+    lenderTopupId,
     lenderOverlapAId,
     lenderOverlapBId,
   };

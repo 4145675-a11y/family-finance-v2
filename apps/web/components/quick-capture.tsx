@@ -3,27 +3,30 @@
 import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { AiProposalCard } from './ai-proposal-card';
-import { QuickProposals } from './quick-proposals';
-import { idleQuick, MAX_QUICK_TEXT, type QuickState } from '../lib/quick/state';
+import { QuickProposalCard } from './quick-proposal-card';
+import { Disclosure } from './ui';
+import { MAX_QUICK_TEXT, idleQuick, type QuickState } from '../lib/quick/state';
 import { quick } from '../lib/copy/quick';
 
 /**
- * Saying what happened, in one sentence.
+ * Saying what to update, in one sentence.
  *
- * Two ways in, and they are not a main road and a back road: **typing is the
- * whole feature**, and dictation is a shortcut into the same box. Whatever the
- * microphone produces lands in the textarea where the person can see it, fix it
- * and decide whether to send it. Nothing is interpreted from audio the person
- * has not read.
+ * One field, one button, one proposal. A person is never asked which machinery
+ * should read their sentence — that is not a question anybody can answer, and
+ * the answer would not change what can happen to their money. Whether a remote
+ * reader or the local rule table produced the proposal is decided on the server
+ * and is invisible here on purpose.
  *
- * That ordering is what makes the microphone safe to offer at all. The browser's
- * own `SpeechRecognition` is a black box — some implementations do the
- * recognition on the device and some send audio to the vendor — and this product
- * cannot promise which. So it says so plainly on the screen, never starts
- * listening on its own, and keeps the typed path complete for anyone who would
- * rather not use it. A browser without the API simply does not show the button;
- * the screen is not diminished.
+ * Dictation is a shortcut into the same box rather than a second road. Whatever
+ * the microphone produces lands in the textarea where it can be read, fixed and
+ * decided on; nothing is interpreted from audio nobody has seen. A browser
+ * without the API simply does not show the button, and the screen is not
+ * diminished.
+ *
+ * What used to be here and is not: a second interpretation button, a paragraph
+ * of privacy prose above the fold, and the quoted evidence for every extracted
+ * field. The one sentence that remains says where the point of no return is; the
+ * rest is behind `פרטים`, closed.
  */
 
 interface SpeechResultLike {
@@ -62,45 +65,21 @@ function recognitionConstructor(): RecognitionConstructor | null {
   return scope.SpeechRecognition ?? scope.webkitSpeechRecognition ?? null;
 }
 
-/*
- * The proposals are rendered from here rather than handed in as a render prop.
- * A server component cannot pass a function to a client component at all, so a
- * page that tried would serve a 500 rather than a screen. Both halves of this
- * feature are client components; keeping the state between them is the whole
- * reason they are one subtree.
- */
 export function QuickCapture({
-  action,
-  analyse,
-  aiConfigured,
+  propose,
 }: {
-  action: (state: QuickState, data: FormData) => Promise<QuickState>;
-  /** The smart reading. A second action, not a second write path. */
-  analyse: (state: QuickState, data: FormData) => Promise<QuickState>;
-  /** Whether this deployment has a reader at all, known before anybody presses. */
-  aiConfigured: boolean;
+  /** The one reading action. Writes nothing. */
+  propose: (state: QuickState, data: FormData) => Promise<QuickState>;
 }) {
-  /*
-   * Two readers, two action states, one box.
-   *
-   * Kept separate so a screen can never show one reader's result under the
-   * other's name, and so that pressing one does not discard what the other said
-   * until its own answer arrives. Which of the two a person is looking at is then
-   * a fact about which state is populated, rather than a flag somebody has to
-   * remember to clear.
-   */
-  const [state, formAction] = useActionState(action, idleQuick);
-  const [aiState, aiFormAction] = useActionState(analyse, idleQuick);
+  const [state, formAction] = useActionState(propose, idleQuick);
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const recognition = useRef<RecognitionLike | null>(null);
 
   /*
-   * Whether the browser has the API is a fact about the browser: it is not
-   * React state, it never changes while the page is open, and the server
-   * rendering the page has no microphone at all. Read as an external value, so
-   * the server says "no" and the browser says the truth without a render pass
-   * in between where the button would flicker.
+   * Whether the browser has the API is a fact about the browser: not React
+   * state, unchanging while the page is open, and false on the server, which has
+   * no microphone. Read as an external value so the button does not flicker.
    */
   const dictationAvailable = useSyncExternalStore(
     subscribeToNothing,
@@ -108,8 +87,8 @@ export function QuickCapture({
     () => false,
   );
 
-  // The one thing that does need tearing down: a recogniser still listening
-  // when the person navigates away.
+  // The one thing that needs tearing down: a recogniser still listening when
+  // the person navigates away.
   useEffect(
     () => () => {
       recognition.current?.stop();
@@ -134,8 +113,8 @@ export function QuickCapture({
         heard += result[0]?.transcript ?? '';
       }
       if (heard !== '') {
-        // Appended to what is already there, never replacing it: a person who
-        // typed half a sentence and then spoke the rest keeps both.
+        // Appended rather than replacing: somebody who typed half a sentence and
+        // then spoke the rest keeps both.
         setText((current) => `${current} ${heard}`.trim().slice(0, MAX_QUICK_TEXT));
       }
     };
@@ -154,29 +133,27 @@ export function QuickCapture({
   return (
     <div className="flex flex-col gap-4">
       <form action={formAction} className="flex flex-col gap-3">
-        <label htmlFor="quick-text" className="font-medium">
+        {/*
+         * The label is the page's own heading, so it is not printed twice.
+         * Present for anybody reading the page with a screen reader, absent for
+         * anybody reading it with their eyes — the same words either way.
+         */}
+        <label htmlFor="quick-text" className="sr-only">
           {quick.captureLabel}
         </label>
         <textarea
           id="quick-text"
           name="text"
-          rows={3}
+          rows={2}
           maxLength={MAX_QUICK_TEXT}
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder={quick.placeholder}
-          className="min-h-24 w-full rounded-control border border-border bg-surface px-3 py-2 text-text-primary"
+          className="min-h-20 w-full rounded-control border border-border bg-surface px-3 py-2 text-text-primary"
         />
-        <p className="text-small text-text-secondary">{quick.hint}</p>
 
         <div className="flex flex-wrap items-center gap-3">
-          <InterpretButton />
-          {/*
-           * A second submit button on the same form, with its own `formAction`.
-           * One box, one sentence, two ways of reading it — and the browser sends
-           * the same field either way, so nothing has to be kept in step.
-           */}
-          <AnalyseButton formAction={aiFormAction} />
+          <ProposeButton />
           {dictationAvailable ? (
             <button
               type="button"
@@ -198,25 +175,15 @@ export function QuickCapture({
           ) : null}
         </div>
 
-        {dictationAvailable ? (
-          <p className="text-small text-text-secondary">
-            {listening ? quick.listening : quick.dictationNotice}
-          </p>
-        ) : (
-          <p className="text-small text-text-secondary">{quick.noDictation}</p>
-        )}
-
-        {/*
-         * What leaves the building, said before anybody presses the button that
-         * sends it — and said whether or not a reader is configured, because a
-         * person deciding whether to type something private needs to know now.
-         */}
-        <p className="text-small text-text-secondary" data-testid="ai-privacy">
-          {aiConfigured ? quick.aiPrivacy : quick.aiNotConfigured}
+        {/* The one sentence, and the only one, on the main path. */}
+        <p className="text-small text-text-secondary" data-testid="quick-promise">
+          {listening ? quick.listening : quick.promise}
         </p>
       </form>
 
-      {state.message !== '' ? (
+      {state.message === '' ? (
+        <span role="status" aria-live="polite" className="sr-only" />
+      ) : (
         <p
           role="status"
           aria-live="polite"
@@ -226,43 +193,26 @@ export function QuickCapture({
         >
           {state.message}
         </p>
-      ) : (
-        <span role="status" aria-live="polite" className="sr-only" />
       )}
 
+      <QuickProposalCard state={state} />
+
       {/*
-       * The smart reading's own result, above the deterministic one's. Both can be
-       * on screen at once — a person who pressed both is entitled to see both —
-       * and each is labelled with which reader produced it.
+       * Everything a person might want to know and does not need in order to act.
+       * Closed by default, and it carries no household figure, no model output
+       * and nothing technical.
        */}
-      <AiProposalCard state={aiState} />
-      <QuickProposals state={state} />
+      <Disclosure summary={quick.detailsSummary}>
+        <p className="text-small text-text-secondary">{quick.detailsBody}</p>
+        {dictationAvailable ? null : (
+          <p className="mt-2 text-small text-text-secondary">{quick.noDictation}</p>
+        )}
+      </Disclosure>
     </div>
   );
 }
 
-/**
- * The smart reading's button.
- *
- * `formAction` on the button rather than on the form: that is how one box can be
- * submitted to two different actions, and it means the textarea, the dictation
- * and the character limit are shared rather than duplicated.
- */
-function AnalyseButton({ formAction }: { formAction: (data: FormData) => void }) {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      formAction={formAction}
-      disabled={pending}
-      className="inline-flex min-h-11 items-center justify-center rounded-control border border-primary/40 bg-primary/5 px-4 py-2 font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
-    >
-      {pending ? quick.aiWorking : quick.aiButton}
-    </button>
-  );
-}
-
-function InterpretButton() {
+function ProposeButton() {
   const { pending } = useFormStatus();
   return (
     <button
@@ -270,7 +220,7 @@ function InterpretButton() {
       disabled={pending}
       className="inline-flex min-h-11 items-center justify-center rounded-control bg-primary px-4 py-2 font-medium text-surface transition-colors hover:bg-primary-hover disabled:opacity-60"
     >
-      {pending ? quick.reading : quick.interpret}
+      {pending ? quick.proposing : quick.propose}
     </button>
   );
 }

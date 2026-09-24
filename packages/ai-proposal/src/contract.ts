@@ -33,6 +33,9 @@ export const aiActionSchema = z.enum([
   'expense',
   'income',
   'transfer',
+  /** A lender the household already has, lending more. */
+  'new_principal',
+  /** A lender the household does not have yet. */
   'new_debt',
   'debt_repayment',
   'balance',
@@ -125,9 +128,33 @@ export const modelOutputSchema = z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/u)
       .nullable(),
+    /**
+     * When a borrowed sum has to be given back, `YYYY-MM-DD`.
+     *
+     * A different fact from `date`, and conflating the two is an error rather
+     * than an imprecision: "קיבלתי עוד 3,000 לפירעון ב־10/10/2026" happened
+     * today and comes due in a fortnight. A single date field would have to be
+     * one or the other, and reading the repayment day as the day it happened
+     * puts a record in the future — which the verifier rightly refuses, so the
+     * fact would be lost twice over. Null unless the sentence said when.
+     */
+    dueDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/u)
+      .nullable(),
     /** A stable id from the context. Never a name, never invented. */
     accountId: z.string().max(64).nullable(),
-    debtId: z.string().max(64).nullable(),
+    /**
+     * The lender, **in the words of the sentence**.
+     *
+     * Deliberately not an id. A model that could return a lender identifier
+     * could return one belonging to a different card, and the screen would have
+     * to trust it or re-derive it — so it is never offered the chance. What it
+     * returns is the fragment of the family's own text that names the lender,
+     * and the server resolves that against the cards this household actually
+     * has, with the one matcher both readers use.
+     */
+    lenderText: z.string().max(160).nullable(),
     categoryId: z.string().max(64).nullable(),
     missing: z
       .array(
@@ -164,8 +191,9 @@ export const MODEL_OUTPUT_JSON_SCHEMA = {
     'evidence',
     'amountMinor',
     'date',
+    'dueDate',
     'accountId',
-    'debtId',
+    'lenderText',
     'categoryId',
     'missing',
     'reason',
@@ -209,16 +237,22 @@ export const MODEL_OUTPUT_JSON_SCHEMA = {
     },
     date: {
       type: ['string', 'null'],
-      description: 'The date as YYYY-MM-DD. Null when the text named no day.',
+      description:
+        'The day the money actually moved, as YYYY-MM-DD. Never a future day. Null when the text named no day.',
+    },
+    dueDate: {
+      type: ['string', 'null'],
+      description:
+        'The day a borrowed sum must be repaid, as YYYY-MM-DD. May be in the future. Null unless the text said when it comes due.',
     },
     accountId: {
       type: ['string', 'null'],
       description: 'An id copied exactly from the accounts list. Never a name, never invented.',
     },
-    debtId: {
+    lenderText: {
       type: ['string', 'null'],
       description:
-        'An id copied exactly from the lenders list, and only when the text names exactly one of them.',
+        'The words in the sentence that name the lender, copied exactly. Never an id, never a name from the list that the sentence did not use.',
     },
     categoryId: {
       type: ['string', 'null'],
@@ -261,8 +295,28 @@ export const aiProposalSchema = z
     date: z.string().nullable(),
     /** The Hebrew form of `date`, when there is one. Filled by the server. */
     hebrewDate: z.string().nullable(),
+    /** When a borrowed sum comes due. May be in the future; `date` may not. */
+    dueDate: z.string().nullable(),
+    /** The Hebrew form of `dueDate`, kept in step with it by the server. */
+    dueHebrewDate: z.string().nullable(),
     accountId: z.string().nullable(),
+    /** An id the **server** resolved, or null. Never one a model supplied. */
     debtId: z.string().nullable(),
+    /** The lender's own recorded name, for the card to show. */
+    lenderName: z.string().nullable(),
+    /**
+     * What the record will be labelled with: the shop, the payer, the thing bought.
+     *
+     * Filled by the server from the person's own words — the quoted fragment when
+     * a reader gave one, what is left of the sentence when the rule table read it.
+     * It names nothing and authorises nothing: no id is derived from it and no
+     * lender is ever matched by it. It exists because a record labelled with
+     * nothing cannot be found again, which is how a family stops trusting the
+     * figures.
+     */
+    label: z.string().nullable(),
+    /** How many existing lenders the words could have meant. */
+    lenderCandidates: z.number().int().min(0),
     categoryId: z.string().nullable(),
     missing: z.array(z.object({ field: missingFieldSchema, question: z.string() })),
     reason: z.string(),
@@ -327,8 +381,13 @@ export function unavailableProposal(reason: AiUnavailableReason): AiProposal {
     amountMinor: null,
     date: null,
     hebrewDate: null,
+    dueDate: null,
+    dueHebrewDate: null,
     accountId: null,
     debtId: null,
+    lenderName: null,
+    label: null,
+    lenderCandidates: 0,
     categoryId: null,
     missing: [],
     reason: '',

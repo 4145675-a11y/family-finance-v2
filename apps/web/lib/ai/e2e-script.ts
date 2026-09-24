@@ -25,9 +25,21 @@ import {
  * an amount with a fraction, and a sentence that tries to give orders.
  */
 
-/** Ids that do not exist in any household. The verifier must reject them. */
-const INVENTED_DEBT = '00000000-0000-4000-8000-00000000dead';
+/** An account id that exists in no household. The verifier must reject it. */
 const INVENTED_ACCOUNT = '00000000-0000-4000-8000-00000000beef';
+
+/** A lender name no seeded household has. The matcher must find nothing. */
+const UNKNOWN_LENDER = 'מלווה שאינו קיים';
+
+/**
+ * The synthetic lender the top-up journey borrows more from.
+ *
+ * The words a reader would quote out of that journey's sentence, and the name the
+ * browser suite seeds — every lender in that household begins with `E2E` so that
+ * a record from it could never be mistaken for a real one. No real household's
+ * lender is named in this file, or anywhere else in this repository.
+ */
+const TOPUP_LENDER = 'E2E גמח חמישי';
 
 export function e2eScriptRules(): readonly ScriptRule[] {
   return [
@@ -53,9 +65,15 @@ export function e2eScriptRules(): readonly ScriptRule[] {
       },
     },
 
-    // A repayment that names no lender: one focused question, and no write.
+    /*
+     * A repayment of a specific sum: one focused question, and no write.
+     *
+     * Matched on the figure as well as the verb, so the ordinary repayment
+     * sentences other specs type fall through to the rule reader instead of
+     * collecting this journey's amount.
+     */
     {
-      when: /החזרתי/u,
+      when: /החזרתי 3,000/u,
       reply: {
         kind: 'answer',
         output: exampleOutput({
@@ -65,7 +83,7 @@ export function e2eScriptRules(): readonly ScriptRule[] {
           confidence: 'medium',
           amountMinor: 300_000,
           date: null,
-          debtId: null,
+          lenderText: null,
           categoryId: null,
           evidence: { amountText: '3,000', dateText: null, counterpartyText: null },
           missing: [{ field: 'lender', question: 'לאיזו הלוואה ההחזר שייך?' }],
@@ -75,11 +93,50 @@ export function e2eScriptRules(): readonly ScriptRule[] {
     },
 
     /*
+     * More money from a lender the household already has.
+     *
+     * The case this slice exists for. The reader returns the words that name the
+     * lender — never an id — and the server matches them against the cards that
+     * exist. "עוד" is what makes it a top-up rather than a new card.
+     */
+    {
+      when: /קיבלתי עוד/u,
+      reply: {
+        kind: 'answer',
+        output: exampleOutput({
+          action: 'new_principal',
+          summary: 'תוספת להלוואה קיימת',
+          amountMinor: 300_000,
+          /*
+           * The money arrived today and goes back in a fortnight, which is two
+           * facts and two fields. A reader that put the repayment day in `date`
+           * would be describing something that has not happened yet.
+           */
+          date: null,
+          dueDate: '2026-10-10',
+          /*
+           * Words, not an id. The server matches them against the cards this
+           * household holds, so the same answer attaches to an existing card for
+           * one family and becomes a question for another.
+           */
+          lenderText: TOPUP_LENDER,
+          categoryId: null,
+          evidence: {
+            amountText: '3,000',
+            dateText: '10/10/2026',
+            counterpartyText: TOPUP_LENDER,
+          },
+          reason: 'המשפט אומר שהתקבל כסף נוסף ממלווה קיים.',
+        }),
+      },
+    },
+
+    /*
      * A model naming a lender this household does not have.
      *
-     * The single most important case in this file: a well-formed answer, high
-     * confidence, `ready` — and an id that exists nowhere. It must come out of
-     * the verifier as a question, and it must never create a lender.
+     * A well-formed answer, high confidence, `ready` — and a name that matches
+     * nothing. It must come out of the verifier as a question, and it must never
+     * create a lender.
      */
     {
       when: /לקחתי .*הלוואה/u,
@@ -90,7 +147,7 @@ export function e2eScriptRules(): readonly ScriptRule[] {
           summary: 'הלוואה חדשה',
           amountMinor: 800_000,
           date: null,
-          debtId: INVENTED_DEBT,
+          lenderText: UNKNOWN_LENDER,
           categoryId: null,
           evidence: { amountText: '8,000', dateText: 'היום', counterpartyText: 'מדוד' },
           reason: 'המשפט אומר שנלקחה הלוואה.',

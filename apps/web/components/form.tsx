@@ -51,6 +51,15 @@ export interface ActionFormProps {
   className?: string;
   /** A quieter variant for a form embedded in a list row. */
   tone?: 'primary' | 'secondary' | 'danger';
+  /**
+   * Whether the form can be submitted yet.
+   *
+   * For a form whose remaining question is answered in the page rather than in a
+   * field — "which account", as buttons — so the control that writes is visible
+   * but inert until the answer exists. A button that can only fail is worse than
+   * one a person can see is not ready.
+   */
+  disabled?: boolean;
 }
 
 /**
@@ -109,6 +118,7 @@ export function ActionForm({
   resetOnSuccess = false,
   className = '',
   tone = 'primary',
+  disabled = false,
 }: ActionFormProps) {
   const [state, formAction] = useActionState(action, idleForm);
   // One slot per form on the page, stable across renders and refreshes.
@@ -135,7 +145,7 @@ export function ActionForm({
         />
         {children}
         <div className="flex flex-wrap items-center gap-3">
-          <SubmitButton label={submitLabel} tone={tone} />
+          <SubmitButton label={submitLabel} tone={tone} disabled={disabled} />
           <FormMessage />
         </div>
       </form>
@@ -146,9 +156,12 @@ export function ActionForm({
 export function SubmitButton({
   label,
   tone = 'primary',
+  disabled = false,
 }: {
   label: string;
   tone?: 'primary' | 'secondary' | 'danger';
+  /** Set while the form is waiting for an answer given outside its fields. */
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
 
@@ -162,7 +175,7 @@ export function SubmitButton({
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       className={`inline-flex min-h-11 items-center justify-center rounded-control px-4 py-2 font-medium transition-colors disabled:opacity-60 ${styles[tone] ?? styles['primary']}`}
     >
       {pending ? screens.common.saving : label}
