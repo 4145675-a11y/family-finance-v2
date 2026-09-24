@@ -25,7 +25,7 @@
 | Fail-closed (misconfigured process serves nothing) + data-layer readiness | `npm run check:fail-closed` | כן | PDL/HPO | ✅ 27/27 |
 | Render blueprint ↔ repository | בתוך `npm run unit` (`tools/render-blueprint.test.mjs`) | כן | HPO | ✅ 38/38 |
 | Property | `npm run property` | כן | 5 | ✅ (רץ מקומית; אין remote) |
-| E2E דפדפן (מקומי, בלי סודות) | `npm run e2e` | כן | 6/B1 | ✅ 72 בדיקות (desktop + phone) |
+| E2E דפדפן (מקומי, בלי סודות) | `npm run e2e` | כן | 6/B1 | ✅ 113 בדיקות (desktop + unconfigured + phone) |
 | E2E חי (כניסה, RLS, בידוד) | `npm run e2e:live` | כן | B1 | ✅ 8 בדיקות מקומית — דורש `SUPABASE_DB_URL`, לא ב־CI |
 | Production smoke (קריאה בלבד) | `npm run smoke:production` | לא (אחרי פריסה) | B1 | ✅ workflow נפרד: `workflow_run` אחרי CI ירוק ב־main, וגם יומי |
 | Accessibility / RTL visual | `npm run a11y` | כן | 6 | — |
