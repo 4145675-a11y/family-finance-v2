@@ -1,0 +1,14 @@
+{
+  /* The browser suite.
+     Its own project because the specs carry callbacks that run *inside* the page
+     — `page.evaluate`, `addInitScript` — and those need the DOM types. The rest
+     of the repository deliberately does not have them: a server module that can
+     name `window` is a server module that can ship a browser assumption. */
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["**/*.ts"]
+}

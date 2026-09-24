@@ -1,0 +1,70 @@
+name: Production smoke
+
+# The deployed service, checked from outside and without signing in.
+#
+# Separate from CI on purpose. CI proves the code; this proves the thing a family
+# can actually reach — and the two fail for different reasons. It is read-only:
+# GET requests, no account, no session, no write. See docs/BROWSER-TESTS.md.
+#
+# `workflow_run` rather than a step inside CI, because Render deploys *after* CI
+# goes green: a check in the same job would test the previous version. There is a
+# wait before the first attempt for the same reason, and the script itself retries
+# a sleeping free-plan service.
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+  schedule:
+    # Once a day. A deployment that rots — an expired certificate, a database that
+    # stops answering — does so without anybody pushing anything.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+    inputs:
+      origin:
+        description: 'Origin to check (defaults to the production service)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Deployed service (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # After a CI run, only when that run succeeded: a red build is not deployed,
+    # so smoking the old version would report a green that means nothing.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # Zero dependencies: the script is Node built-ins only, so there is nothing
+      # to install and nothing third-party running against production.
+      - name: Wait for the deploy to land
+        if: github.event_name == 'workflow_run'
+        run: sleep 240
+
+      - name: Smoke the deployed service
+        env:
+          FAMILY_FINANCE_SMOKE_ORIGIN: ${{ inputs.origin }}
+        run: |
+          set -o pipefail
+          node tools/production-smoke.mjs
+          code=$?
+          exit "$code"

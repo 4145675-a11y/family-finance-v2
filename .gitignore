@@ -49,3 +49,9 @@ Thumbs.db
 # logs
 *.log
 npm-debug.log*
+
+# Playwright browser binaries, kept inside the project (CLAUDE.md: no global installs)
+.playwright-browsers/
+
+# Facts about one browser-suite run: synthetic record ids and a pid. Removed at teardown.
+.e2e-run/

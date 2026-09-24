@@ -3,10 +3,15 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  /* Root-level TypeScript that belongs to no workspace: build configuration and
-     the integration suite, which targets the database rather than a package.
-     Without this the linter's type-aware rules cannot resolve these files. */
+  /* Root-level TypeScript that belongs to no workspace: build configuration, the
+     integration suite, which targets the database rather than a package, and the
+     browser suite, which drives the built application from outside it. Without
+     this the linter's type-aware rules cannot resolve these files — and an E2E
+     spec that is neither type-checked nor linted is the easiest place in the
+     repository for a silently passing test to hide. */
   "include": [
+    "playwright.config.ts",
+    "playwright.live.config.ts",
     "vitest.config.ts",
     "vitest.integration.config.ts",
     "vitest.property.config.ts",

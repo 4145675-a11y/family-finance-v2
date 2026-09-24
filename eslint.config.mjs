@@ -18,6 +18,11 @@ export default tseslint.config(
       '**/build/**',
       '**/coverage/**',
       '.npm-cache/**',
+      // Chromium, downloaded into the project so nothing is installed globally.
+      '.playwright-browsers/**',
+      // Traces and screenshots from a failed browser run.
+      'test-results/**',
+      'playwright-report/**',
       'apps/web/next-env.d.ts',
     ],
   },

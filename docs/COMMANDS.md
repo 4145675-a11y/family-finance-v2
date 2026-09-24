@@ -29,7 +29,9 @@ Package manager: **npm**, נעול לפי `ADR-0001`. אין להחליף בלי
 | 11 | verify (M0 subset) | `npm run verify:m0` | שערי M0 בלבד — נשמר כדי ש־checkpoint M0 יישאר משחזר | 0 | **Active** |
 | 12 | property | `npm run property` → `vitest run --config vitest.property.config.ts` (fast-check, seed קבוע) | Property | 5 | **Active** |
 | 13 | integration | `npm run integration` → `vitest run --config vitest.integration.config.ts` (כולל RLS negative tests) | Integration/RLS | 2 | **Active** — נכשל במכוון ללא `SUPABASE_DB_URL` |
-| 14 | E2E | `npm run e2e` → `playwright test` | E2E | 6 | Defined |
+| 14 | E2E | `npm run e2e` → `node tools/playwright.mjs test` — הבנייה הבנויה מול חנות קבצים בתיקייה זמנית, משק בית סינתטי שכל שם בו מתחיל ב־`E2E`, ניקוי בהצלחה ובכשל. `e2e:smoke` לתת־קבוצה, `e2e:install` ל־Chromium בתוך הפרויקט. החוזה המלא: `docs/BROWSER-TESTS.md` | E2E | 6/B1 | **Active** — 72 בדיקות |
+| 14a | E2E live | `npm run e2e:live` → `playwright test --config playwright.live.config.ts` — כניסה דרך Supabase Auth, RLS ובידוד, שני משתמשים סינתטיים שנמחקים והמחיקה **נמדדת**. נכשל במכוון ללא `SUPABASE_DB_URL` | Auth/RLS בדפדפן | B1 | **Active** — 8 בדיקות (מקומי) |
+| 14b | production smoke | `npm run smoke:production` → `node tools/production-smoke.mjs [origin]` — קריאה בלבד: health ומוכנות, המסך הציבורי בלי נתונים ובלי סוד, וכל מסך כספי מפנה מבקר אנונימי לכניסה. אינו נכנס לחשבון ואינו טוען לאיזה commit חי | פריסה | B1 | **Active** |
 | 15 | a11y/visual | `npm run a11y` → axe + RTL golden snapshots ב־360/390/768/1280 | Accessibility/RTL | 6 | Defined |
 | 16 | built shell | `npm run check:shell` → `node tools/check-built-shell.mjs` | Hebrew RTL, landmarks ו־manifest **על השרת הרץ** (`ADR-0027`) | 1/7 | **Active** |
 | 17 | client secrets | `npm run check:client-secrets` → `node tools/check-client-secrets.mjs` | גבול service role | 2 | **Active** |

@@ -70,6 +70,26 @@ jobs:
       - name: Built-shell contract (lang/dir/overflow/a11y)
         run: npm run check:shell
 
+      # The browser suite runs against the build the previous step produced, with
+      # the file-backed store in a temporary directory. No credentials of any kind
+      # are needed, which is why it can run here at all — and why it is the local
+      # suite and not the live one (docs/BROWSER-TESTS.md explains the split).
+      - name: Install Chromium (project-local, with its system dependencies)
+        run: npm run e2e:install -- --with-deps
+
+      - name: Browser journeys (real server, real writes, real reloads)
+        run: npm run e2e
+
+      # Only on a failure, and only the synthetic run's own artefacts.
+      - name: Upload browser failure artefacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-artefacts
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Client-secret boundary (no service role in the browser)
         run: npm run check:client-secrets
 
