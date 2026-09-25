@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import type { AiProposal } from '@family-finance/ai-proposal';
+import { normaliseLenderName } from '@family-finance/contracts';
 
 import { ActionForm, HiddenValue, MoneyField, SelectField, TextField } from './form';
 import { Badge, Card, Money, Notice } from './ui';
@@ -247,17 +248,21 @@ function Proposal({ proposal, state }: { proposal: AiProposal; state: QuickState
         </ActionForm>
 
         {/*
-         * Once the reference is verified, the card is reachable — and only then.
-         * A link to a lender the server did not resolve would be a link to
-         * nothing, or worse, to somebody else's.
+         * Once the reference is verified, **that lender's own card** is one tap
+         * away — not the list it sits in. A person reading "כרטיס קיים" wants to
+         * see the card they are being told about, and making them find it again
+         * in a list of seven is the small friction that stops people checking.
+         *
+         * Only when the server resolved it. A link to a lender it did not
+         * resolve would be a link to nothing, or worse, to somebody else's.
          */}
-        {proposal.debtId === null ? null : (
+        {proposal.debtId === null || proposal.lenderName === null ? null : (
           <p>
             <Link
-              href="/lenders"
+              href={`/lenders/${encodeURIComponent(normaliseLenderName(proposal.lenderName))}`}
               className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
             >
-              {quick.goToLenders}
+              {quick.goToLenderCard}
             </Link>
           </p>
         )}

@@ -193,12 +193,20 @@ test.describe('the quick update stays compact', () => {
     expect(JSON.stringify(storedDocument())).toBe(before);
   });
 
-  test('and a person reaches that lender card from the proposal', async ({ page }) => {
+  test('and a person reaches that lender own card from the proposal, in one tap', async ({
+    page,
+  }) => {
+    /*
+     * The card it just named, not the list it sits in. Being told "כרטיס קיים"
+     * and then having to find it again among seven is the small friction that
+     * stops people checking.
+     */
     await propose(page, `קיבלתי עוד 3,000 ₪ מ${LENDER_PLAIN}, לפירעון ב־10/10/2026`);
     const card = await onlyProposal(page);
 
-    await card.getByRole('link', { name: 'לכרטיסי המלווים' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'חובות ומלווים' })).toBeVisible();
+    await card.getByRole('link', { name: 'לכרטיס המלווה' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: LENDER_PLAIN })).toBeVisible();
+    await expect(page.getByRole('table')).toBeVisible();
   });
 });
 
@@ -209,7 +217,18 @@ test.describe('every ordinary screen has one obvious next action', () => {
      * screen is more than one "do this now". A screen with none is a screen for
      * reading, which is a legitimate answer for history and indexes.
      */
-    for (const href of ['/', '/quick', '/activity', '/lenders', '/more', '/upload']) {
+    for (const href of [
+      '/',
+      '/quick',
+      '/activity',
+      '/lenders',
+      '/more',
+      '/upload',
+      '/entry',
+      '/accounts',
+      '/budget',
+      '/tasks',
+    ]) {
       await page.goto(href);
       const reading = await read(page);
       expect(

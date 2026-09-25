@@ -279,13 +279,16 @@ export default async function HomePage() {
   if (plan !== null) {
     attention.push({ key: 'action', text: actionTitle, detail: plan });
   }
+  /*
+   * The engine's own warnings, as lines and nothing more.
+   *
+   * No link: a warning says what is true, and the screen it might send somebody
+   * to is already one press away at the bottom of this page. A second copy of
+   * that link beside every warning is the kind of duplication this screen just
+   * lost.
+   */
   for (const warning of decision.warnings) {
-    attention.push({
-      key: `warning:${warning.code}`,
-      text: sayNotice(warning),
-      href: '/more',
-      link: copy.home.moreLink,
-    });
+    attention.push({ key: `warning:${warning.code}`, text: sayNotice(warning) });
   }
 
   return (

@@ -5,6 +5,8 @@ import {
   recordIncomeAction,
   recordMovementAction,
 } from '../../lib/actions/entries';
+import Link from 'next/link';
+
 import { AppShell } from '../../components/app-shell';
 import {
   ActionForm,
@@ -15,7 +17,7 @@ import {
   TextField,
 } from '../../components/form';
 import { NoHousehold, StatusChips } from '../../components/screen';
-import { Card, EmptyPrompt, LinkButton, Notice, SectionTitle } from '../../components/ui';
+import { Card, Disclosure, EmptyPrompt, Notice } from '../../components/ui';
 import { screens } from '../../lib/copy/screens';
 import { loadDashboardView } from '../../lib/dashboard/load';
 import { todayInJerusalem } from '../../lib/forms';
@@ -157,71 +159,14 @@ export default async function EntryPage() {
         </ActionForm>
       </Card>
 
-      <Card title={screens.entry.incomeTitle}>
-        <ActionForm action={recordIncomeAction} submitLabel={screens.entry.save} resetOnSuccess>
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <MoneyField name="amountMinor" label={screens.entry.amount} />
-              <TextField
-                name="transactionDate"
-                label={screens.entry.date}
-                type="date"
-                defaultValue={today}
-              />
-            </div>
-            <TextField name="merchant" label={screens.entry.from} maxLength={160} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <SelectField
-                name="accountId"
-                label={screens.entry.account}
-                options={accountOptions}
-              />
-              {hasBusiness ? (
-                <SelectField
-                  name="scope"
-                  label={screens.entry.scope}
-                  defaultValue="household"
-                  options={scopeOptions}
-                />
-              ) : null}
-            </div>
-          </>
-        </ActionForm>
-      </Card>
-
-      <Card title={screens.entry.movementTitle}>
-        <Notice tone="primary">{screens.entry.movementHint}</Notice>
-        <div className="mt-4">
+      <Card>
+        <Disclosure summary={screens.entry.incomeTitle}>
           <ActionForm
-            action={recordMovementAction}
+            action={recordIncomeAction}
             submitLabel={screens.entry.save}
             resetOnSuccess
           >
             <>
-              <SelectField
-                name="kind"
-                label={screens.entry.movementKind}
-                defaultValue="transfer"
-                options={[
-                  { value: 'transfer', label: screens.entry.movementKinds['transfer'] ?? '' },
-                  {
-                    value: 'settlement',
-                    label: screens.entry.movementKinds['settlement'] ?? '',
-                  },
-                ]}
-              />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <SelectField
-                  name="accountId"
-                  label={screens.entry.account}
-                  options={accountOptions}
-                />
-                <SelectField
-                  name="counterpartAccountId"
-                  label={screens.entry.toAccount}
-                  options={accountOptions}
-                />
-              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <MoneyField name="amountMinor" label={screens.entry.amount} />
                 <TextField
@@ -231,86 +176,153 @@ export default async function EntryPage() {
                   defaultValue={today}
                 />
               </div>
+              <TextField name="merchant" label={screens.entry.from} maxLength={160} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectField
+                  name="accountId"
+                  label={screens.entry.account}
+                  options={accountOptions}
+                />
+                {hasBusiness ? (
+                  <SelectField
+                    name="scope"
+                    label={screens.entry.scope}
+                    defaultValue="household"
+                    options={scopeOptions}
+                  />
+                ) : null}
+              </div>
             </>
           </ActionForm>
-        </div>
+        </Disclosure>
       </Card>
 
-      <Card title={screens.entry.plannedTitle} subtitle={screens.entry.plannedHint}>
-        <ActionForm
-          action={addPlannedItemAction}
-          submitLabel={screens.entry.save}
-          resetOnSuccess
-        >
-          <>
-            <TextField name="label" label={screens.entry.label} maxLength={160} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <MoneyField name="amountMinor" label={screens.entry.amount} />
+      <Card>
+        <Disclosure summary={screens.entry.movementTitle}>
+          <Notice tone="primary">{screens.entry.movementHint}</Notice>
+          <div className="mt-4">
+            <ActionForm
+              action={recordMovementAction}
+              submitLabel={screens.entry.save}
+              resetOnSuccess
+            >
+              <>
+                <SelectField
+                  name="kind"
+                  label={screens.entry.movementKind}
+                  defaultValue="transfer"
+                  options={[
+                    { value: 'transfer', label: screens.entry.movementKinds['transfer'] ?? '' },
+                    {
+                      value: 'settlement',
+                      label: screens.entry.movementKinds['settlement'] ?? '',
+                    },
+                  ]}
+                />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <SelectField
+                    name="accountId"
+                    label={screens.entry.account}
+                    options={accountOptions}
+                  />
+                  <SelectField
+                    name="counterpartAccountId"
+                    label={screens.entry.toAccount}
+                    options={accountOptions}
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <MoneyField name="amountMinor" label={screens.entry.amount} />
+                  <TextField
+                    name="transactionDate"
+                    label={screens.entry.date}
+                    type="date"
+                    defaultValue={today}
+                  />
+                </div>
+              </>
+            </ActionForm>
+          </div>
+        </Disclosure>
+      </Card>
+
+      <Card>
+        <Disclosure summary={screens.entry.plannedTitle}>
+          <p className="mb-3 text-small text-text-secondary">{screens.entry.plannedHint}</p>
+          <ActionForm
+            action={addPlannedItemAction}
+            submitLabel={screens.entry.save}
+            resetOnSuccess
+          >
+            <>
+              <TextField name="label" label={screens.entry.label} maxLength={160} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <MoneyField name="amountMinor" label={screens.entry.amount} />
+                <SelectField
+                  name="direction"
+                  label={screens.entry.direction}
+                  defaultValue="outflow"
+                  options={[
+                    { value: 'outflow', label: screens.entry.directions['outflow'] ?? '' },
+                    { value: 'inflow', label: screens.entry.directions['inflow'] ?? '' },
+                  ]}
+                />
+              </div>
               <SelectField
-                name="direction"
-                label={screens.entry.direction}
-                defaultValue="outflow"
+                name="certainty"
+                label={screens.entry.certainty}
+                hint={screens.entry.certaintyHint}
+                defaultValue="certain"
                 options={[
-                  { value: 'outflow', label: screens.entry.directions['outflow'] ?? '' },
-                  { value: 'inflow', label: screens.entry.directions['inflow'] ?? '' },
+                  { value: 'certain', label: screens.entry.certainties['certain'] ?? '' },
+                  { value: 'probable', label: screens.entry.certainties['probable'] ?? '' },
+                  { value: 'possible', label: screens.entry.certainties['possible'] ?? '' },
                 ]}
               />
-            </div>
-            <SelectField
-              name="certainty"
-              label={screens.entry.certainty}
-              hint={screens.entry.certaintyHint}
-              defaultValue="certain"
-              options={[
-                { value: 'certain', label: screens.entry.certainties['certain'] ?? '' },
-                { value: 'probable', label: screens.entry.certainties['probable'] ?? '' },
-                { value: 'possible', label: screens.entry.certainties['possible'] ?? '' },
-              ]}
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextField
-                name="expectedDate"
-                label={screens.entry.expectedDate}
-                type="date"
-                defaultValue={today}
-              />
-              <TextField
-                name="dueDate"
-                label={screens.entry.dueDate}
-                type="date"
-                required={false}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <SelectField
-                name="categoryId"
-                label={screens.entry.category}
-                required={false}
-                emptyLabel={screens.entry.categoryNone}
-                options={categories}
-              />
-              {hasBusiness ? (
-                <SelectField
-                  name="scope"
-                  label={screens.entry.scope}
-                  defaultValue="household"
-                  options={scopeOptions}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextField
+                  name="expectedDate"
+                  label={screens.entry.expectedDate}
+                  type="date"
+                  defaultValue={today}
                 />
-              ) : null}
-            </div>
-            <CheckboxField
-              name="essential"
-              label={screens.entry.essential}
-              hint={screens.entry.essentialHint}
-            />
-          </>
-        </ActionForm>
+                <TextField
+                  name="dueDate"
+                  label={screens.entry.dueDate}
+                  type="date"
+                  required={false}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectField
+                  name="categoryId"
+                  label={screens.entry.category}
+                  required={false}
+                  emptyLabel={screens.entry.categoryNone}
+                  options={categories}
+                />
+                {hasBusiness ? (
+                  <SelectField
+                    name="scope"
+                    label={screens.entry.scope}
+                    defaultValue="household"
+                    options={scopeOptions}
+                  />
+                ) : null}
+              </div>
+              <CheckboxField
+                name="essential"
+                label={screens.entry.essential}
+                hint={screens.entry.essentialHint}
+              />
+            </>
+          </ActionForm>
+        </Disclosure>
       </Card>
 
       {debts.length === 0 ? null : (
-        <>
-          <SectionTitle>{screens.entry.debtTitle}</SectionTitle>
-          <Card>
+        <Card>
+          <Disclosure summary={screens.entry.debtTitle}>
             <Notice tone="primary">{screens.entry.debtHint}</Notice>
             <div className="mt-4">
               <ActionForm
@@ -346,18 +358,31 @@ export default async function EntryPage() {
                 </>
               </ActionForm>
             </div>
-          </Card>
-        </>
+          </Disclosure>
+        </Card>
       )}
 
-      <div className="flex flex-wrap gap-3 px-1">
-        <LinkButton href="/upload" tone="secondary">
+      {/*
+       * Two ways onward, as links rather than as buttons.
+       *
+       * They were filled buttons, which made three primary controls compete on
+       * one screen — the expense form's save among them. A link says "elsewhere";
+       * a filled button says "do this now", and only one thing on a screen may.
+       */}
+      <p className="flex flex-wrap gap-x-5 gap-y-1 px-1">
+        <Link
+          href="/upload"
+          className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+        >
           {screens.upload.title}
-        </LinkButton>
-        <LinkButton href="/accounts" tone="secondary">
+        </Link>
+        <Link
+          href="/accounts"
+          className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+        >
           {screens.accounts.title}
-        </LinkButton>
-      </div>
+        </Link>
+      </p>
     </AppShell>
   );
 }

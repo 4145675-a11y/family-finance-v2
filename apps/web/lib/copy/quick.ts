@@ -86,6 +86,8 @@ export const quick = {
   } as Record<string, string>,
   goToEntry: 'למסך הרישום',
   goToLenders: 'לכרטיסי המלווים',
+  /** Straight to the card the proposal just named, not to the list it is in. */
+  goToLenderCard: 'לכרטיס המלווה',
 
   emptyTitle: 'עוד אין משק בית',
   emptyReason: 'כדי לרשום עדכון צריך קודם להקים משק בית וחשבון אחד.',
