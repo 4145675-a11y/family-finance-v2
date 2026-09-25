@@ -48,6 +48,7 @@
 | — | **Production Data Layer** | **Complete — evidenced, merged to `main`** | [production-data-layer](docs/checkpoints/production-data-layer.md) | **האפליקציה קוראת וכותבת דרך Supabase כמשתמש מחובר; RLS מוכח על 32 טבלאות; ריצה חיה** |
 | — | **Debt Import & Dual Calendar** | **Complete — evidenced** | ADR-0035 | **מקצה לקצה**: `hebrew-calendar` 69 · זיהוי חובות 28 · xlsx מלא 21 · חנות 14 · מיגרציה `20260922120000` (סוג `note`, מועד מובְנה, `lender_aliases` עם RLS, 33 טבלאות) · מסך סקירה · `/lenders` + כרטיס מלווה עם היסטוריה, סינון והוספת פעולה |
 | — | **Transaction Intelligence** | **Complete — evidenced** | ADR-0036 | **מסווג דטרמיניסטי**: חבילה `transaction-intelligence` 81 בדיקות · חנות 19 · round-trip 4 · מיגרציה `20260923090000` (`learned_rules` עם RLS — 34 טבלאות; `classification` על ההצעה; `apply_household_document`) · מסך סקירה עם ביטחון, הסבר וקישור הלוואה חוסם · `/rules` לצפייה, שינוי, כיבוי ומחיקה |
+| — | **UX Simplification** | **Complete — evidenced** | [UX-SIMPLIFICATION-AUDIT](docs/UX-SIMPLIFICATION-AUDIT.md) | **ניווט 15 → 5**, זהה בטלפון ובמחשב · בית מקיר של 9 מקטעים ו־10 פעולות למרכז שליטה של 5 מקטעים ו־6 (2.7 → 1.7 מסכי טלפון, 824 → 571 תווים), והעדכון המהיר כפעולה הראשית היחידה · `/debts` ו־`/lenders` מוזגו למסך אחד ו־`/debts` מפנה מאחורי המנעול · פעולה ראשית אחת בכל מסך רגיל · **מדידה בדפדפן לפני ואחרי, 8 מסעות, בשני רוחבים** |
 | — | **One Flow & One Card** | **Complete — evidenced** | ADR-0042 | **זרימה אחת במסך העדכון המהיר**: כפתור אחד (`הצע עדכון`) שהקורא שלו נבחר בשרת, נפילה שקטה לטבלת הכללים כחוסן, מתאם מלווים משותף, חוזה שבו מודל אינו יכול לבטא מזהה מלווה (`lenderText`), `new_debt` מול כרטיס קיים שמועלה ל־`new_principal`, `dueDate` נפרד שנרשם ולא רק מוצג, וכרטיס בן חמש שורות ששאלתו כפתורים. **124 בדיקות דפדפן** + המסע נצפה בצילום מסך ב־1280×900 וב־390×844 |
 | — | **Hosting & Production-Origin** | **Complete — evidenced, merged; first deploy failed at build → hotfix on branch** | [hosting-production-origin](docs/checkpoints/hosting-production-origin.md) · [hotfix-render-build](docs/checkpoints/hotfix-render-build.md) | **`render.yaml` + בדיקה; origin חובה ומוכח; cookies Secure/HttpOnly/Lax; `/auth/callback` + קביעת סיסמה; ריצה חיה 18/18. יצירת השירות, Supabase Auth ודומיין — פעולות בעלים** |
 
@@ -61,7 +62,7 @@
 | Format | Active | `prettier --check .`, exit 0 |
 | Typecheck | Active | שורש + 7 workspaces |
 | Lint | Active | `--max-warnings=0`, type-aware |
-| **Unit** | Active | **2597/2597**, 85 קבצים, 0 מדולגות (כולל 39 על `render.yaml`, 10 על Edge-safety, 4 על שער ה־build, 14 על "שם ולא ערך" בבעיות תצורה) |
+| **Unit** | Active | **2596/2596**, 85 קבצים, 0 מדולגות (כולל 39 על `render.yaml`, 10 על Edge-safety, 4 על שער ה־build, 14 על "שם ולא ערך" בבעיות תצורה) |
 | **Property** | Active | **41/41**, כולל אינווריאנטים של צ׳קים תחת רצפי פעולות שרירותיים |
 | **Build** | Active (`check:build`) | 34 מסלולים; **`NODE_ENV=production` כמו ב־Render, אף אזהרה** (ADR-0034) |
 | **Built-shell** | Active | **14/14 מול השרת הרץ** — 5 מסלולים, משק בית מוזרע (`ADR-0027`) |
@@ -72,7 +73,7 @@
 | **Integration / RLS** | Active (מקומי, `npm run integration`) | **233/233 מול Supabase** (8 קבצים, 32 טבלאות, 9 תחומי store), 2026-09-15; לא חלק מ־`verify` — דורש `SUPABASE_DB_URL` מקומי |
 | **Production path (live)** | Active (מקומי, `npm run validate:production-path`) | **18/18** דרך Supabase Auth + PostgREST, כולל קישורי auth ו־cookies על origin http ו־https, 2026-09-15 |
 | **Fail-closed + readiness** | Active | **27/27** — תצורה פגומה: התהליך רץ, כל בקשה 503, health `misconfigured` בשמות, ערך שהודבק אינו מופיע בשום מקום (ADR-0034) |
-| **E2E (דפדפן)** | Active (`npm run e2e`) | **124/124**, 2026-09-25 — שלושה projects: `desktop` 1280×900, `unconfigured` (שרת בלי קורא חכם כלל, כמו הייצור היום) ו־`phone` 390×844. מול ה־build האמיתי וחנות קבצים בתיקייה זמנית (`ADR-0040`) |
+| **E2E (דפדפן)** | Active (`npm run e2e`) | **136/136**, 2026-09-25 — שלושה projects: `desktop` 1280×900, `unconfigured` (שרת בלי קורא חכם כלל, כמו הייצור היום) ו־`phone` 390×844. מול ה־build האמיתי וחנות קבצים בתיקייה זמנית (`ADR-0040`) |
 | axe אוטומטי | Defined, לא פעיל | ביקורת מבנית הורצה במקום ומוצהרת ככזו |
 
 ## פערים פתוחים

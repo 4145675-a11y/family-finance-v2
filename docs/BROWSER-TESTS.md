@@ -102,7 +102,7 @@ npm run e2e:live -- --live-origin=https://family-finance-web-l2gp.onrender.com
 | | מקומי | CI | מול ייצור |
 |---|:---:|:---:|:---:|
 | `npm run verify` | ✅ | ✅ | — |
-| `npm run e2e` (124 בדיקות) | ✅ | ✅ | — |
+| `npm run e2e` (136 בדיקות) | ✅ | ✅ | — |
 | `npm run e2e:live` (8 בדיקות) | ✅ | ❌ (אין secret) | — |
 | `npm run integration` | ✅ | ❌ (אין secret) | — |
 | `npm run validate:production-path` | ✅ | ❌ | — |
