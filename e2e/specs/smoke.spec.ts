@@ -38,7 +38,7 @@ test.describe('@smoke the suite is pointed at the synthetic household', () => {
   });
 
   test('the seeded lender is on the debts screen', async ({ page }) => {
-    await page.goto('/debts');
+    await page.goto('/lenders');
     await expect(page.getByText(LENDER_PLAIN).first()).toBeVisible();
   });
 });

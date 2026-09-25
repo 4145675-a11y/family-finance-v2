@@ -120,8 +120,8 @@ test.describe('a repayment recorded on the card', () => {
     await expect(balanceAfterColumn(page).first()).toContainText(
       asShekels(LENDER_CARD_OPENING_MINOR - PAID_MINOR).replace(/\s/g, ' '),
     );
-    // And the debts screen, which reaches the same number by its own route.
-    await page.goto('/debts');
+    // And the list screen, which reaches the same number by its own route.
+    await page.goto('/lenders');
     await expect(page.getByText(expected).first()).toBeVisible();
   });
 

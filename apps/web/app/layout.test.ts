@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -6,7 +6,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 
-import { NAV_GROUPS, NAV_ITEMS, PHONE_NAV } from '../components/app-shell';
+import { NAV_ITEMS, PHONE_NAV } from '../components/app-shell';
 import { copy } from '../lib/copy/copy';
 import { Badge, EmptyState, Figure, Money, StatRow } from '../components/ui';
 import RootLayout, { metadata, viewport } from './layout';
@@ -110,26 +110,54 @@ describe('navigation', () => {
     }
   });
 
-  test('the phone bar carries five destinations, and they are the daily ones', () => {
+  test('there are five destinations, and only five', () => {
     /*
-     * '/quick' rather than '/entry' since Q1. The bar is for what a person does
-     * standing up, and a sentence is what they can manage with shopping in the
-     * other hand; the six-field form is still one tap away in the sidebar.
+     * Five is the number a person can hold without being taught. It was fifteen,
+     * and the screens that left are all indexed on `/more`.
      */
-    expect(PHONE_NAV.map((item) => item.href)).toEqual([
+    expect(NAV_ITEMS.map((item) => item.href)).toEqual([
       '/',
       '/quick',
-      '/approvals',
-      '/budget',
+      '/activity',
+      '/lenders',
       '/more',
     ]);
   });
 
-  test('the sidebar groups the rest rather than listing twenty links flat', () => {
-    expect(NAV_GROUPS.length).toBeGreaterThanOrEqual(2);
-    for (const group of NAV_GROUPS) {
-      expect(group.title.length).toBeGreaterThan(0);
-      expect(group.items.length).toBeGreaterThan(0);
+  test('a phone and a desktop show the same five', () => {
+    /*
+     * They used to differ, which meant learning where something lived on one
+     * screen told you nothing about the other.
+     */
+    expect(PHONE_NAV.map((item) => item.href)).toEqual(NAV_ITEMS.map((item) => item.href));
+  });
+
+  test('every screen that left the navigation is indexed on /more', () => {
+    /*
+     * The rule that keeps a screen from disappearing: it is either in the five,
+     * or it is a link on `/more`. A screen in neither place does not exist as
+     * far as a person is concerned.
+     */
+    const more = readFileSync(join(WEB_ROOT, 'app/more/page.tsx'), 'utf8');
+    const primary = new Set(NAV_ITEMS.map((item) => item.href));
+    const everyScreen = [
+      '/accounts',
+      '/activity',
+      '/approvals',
+      '/budget',
+      '/business',
+      '/entry',
+      '/forecast',
+      '/gemach',
+      '/reports',
+      '/rules',
+      '/settings',
+      '/tasks',
+      '/upload',
+    ];
+    for (const href of everyScreen) {
+      if (primary.has(href)) continue;
+      expect(more.includes(`'${href}'`), `${href} is not linked from /more`).toBe(true);
     }
   });
 

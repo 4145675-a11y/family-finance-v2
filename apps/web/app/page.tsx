@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 import { AppShell } from '../components/app-shell';
 import {
@@ -9,15 +10,10 @@ import {
   Hero,
   LinkButton,
   Money,
-  Notice,
-  ProgressBar,
-  SectionTitle,
-  StatCard,
   StatRow,
 } from '../components/ui';
 import { pendingImportRowCount } from '@family-finance/local-store';
 
-import { addTaskAction } from '../lib/actions/entries';
 import { ActionForm, HiddenValue, SelectField } from '../components/form';
 import { NoHousehold } from '../components/screen';
 import { screens } from '../lib/copy/screens';
@@ -30,27 +26,37 @@ import {
   sayNotice,
 } from '../lib/copy/notices';
 import { loadDashboardView } from '../lib/dashboard/load';
+import { addTaskAction } from '../lib/actions/entries';
 import { formatBusinessDate, money } from '../lib/format';
 import { checkAlert } from '../lib/gemach';
 import { gemach } from '../lib/copy/gemach';
 
 /**
- * The home screen.
+ * The home screen: today's answer, today's action, and what needs attention.
  *
- * It exists to make today's decision, and nothing else. 01-PRODUCT-SPEC.md gives
- * it three questions — how much can we spend, are the debts going down, what
- * should we do now — and the layout answers those first and puts everything else
- * one level away:
+ * It had grown into a wall. Nine sections, ten competing links, three large
+ * figures — two of them the same number meaning different things — and the thing
+ * a person actually came to do, saying what happened, was a small button in the
+ * ninth card, below the fold on a phone. A screen like that is read once and
+ * thereafter scrolled past.
  *
- *   1. one dominant answer, beside one recommended action;
- *   2. four compact cards: food this week, debts, month end, business;
- *   3. quick updates;
- *   4. everything else, collapsed.
+ * Four things now, in the order a person needs them:
  *
- * Two rules the screen holds itself to. It never calculates: every figure comes
- * from the engine snapshot. And it never shows a bare frightening zero — when the
- * safe amount is zero the screen says what that means in words, and the
- * arithmetic follows underneath.
+ *   1. **How much can we spend** — one dominant figure, with the arithmetic
+ *      behind a closed disclosure;
+ *   2. **say what happened** — the quick update, as the one primary action;
+ *   3. **what needs attention** — one card, or nothing at all when there is
+ *      nothing to say;
+ *   4. **two summary lines** — what is owed, and how the month ends.
+ *
+ * What left did not disappear. Assigning a task belongs on `/tasks`, recording a
+ * form belongs on `/entry`, the budget on `/budget`, the business on `/business`
+ * — each reachable from `עוד`, each announcing itself here only when it has
+ * something urgent to say. An empty module no longer takes a whole card.
+ *
+ * Two rules the screen still holds itself to. It never calculates: every figure
+ * comes from the engine snapshot. And it never shows a bare frightening zero —
+ * when the safe amount is zero the screen says what that means in words.
  */
 
 /*
@@ -60,7 +66,7 @@ import { gemach } from '../lib/copy/gemach';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const { descriptor, snapshot, input, food, document } = await loadDashboardView();
+  const { descriptor, snapshot, input, document } = await loadDashboardView();
 
   if (snapshot === null || input === null) {
     return <NoHousehold active="/" title={copy.home.title} reason={descriptor.reason} />;
@@ -69,9 +75,6 @@ export default async function HomePage() {
   const { safeSpend, decision, quality } = snapshot;
   const forecast = snapshot.forecastConservative;
   const trend = snapshot.debtTrend;
-
-  const certainInMinor =
-    safeSpend.breakdown.find((line) => line.key === 'certain_income')?.amountMinor ?? 0;
 
   const cannotCalculate = decision.status === 'insufficient_data';
   const hasGap = safeSpend.fundingGapMinor > 0;
@@ -86,20 +89,24 @@ export default async function HomePage() {
   /** The one thing worth saying about post-dated checks today, or nothing. */
   const alert = checkAlert(snapshot);
 
-  /** The recommendation, in the words the task list will carry. */
-  const actionTitle =
-    ACTION_COPY[snapshot.nextAction.key]?.(snapshot.nextAction.params) ?? copy.home.actionTitle;
+  /** The recommendation, in one line. The plan behind it lives on `/tasks`. */
+  const actionTitle = ACTION_COPY[snapshot.nextAction.key]?.(snapshot.nextAction.params) ?? '';
   const actionReason = ACTION_WHY[snapshot.nextAction.key]?.(snapshot.nextAction.params) ?? '';
+  const nothingUrgent = snapshot.nextAction.key === 'nothing_urgent';
 
-  const members = (document?.profiles ?? []).map((profile) => ({
-    value: profile.id,
-    label: profile.displayName,
-  }));
+  /** Money that is certain to arrive, for the plan to point at. */
+  const certainInMinor =
+    safeSpend.breakdown.find((line) => line.key === 'certain_income')?.amountMinor ?? 0;
 
   /** Non-essential household payments still to leave this month — what can move. */
   const movablePayments = input.plannedItems.filter(
     (item) => item.scope === 'household' && item.direction === 'outflow' && !item.essential,
   );
+
+  const members = (document?.profiles ?? []).map((profile) => ({
+    value: profile.id,
+    label: profile.displayName,
+  }));
 
   const freshnessLabel =
     snapshot.freshnessAgeDays === null
@@ -129,6 +136,158 @@ export default async function HomePage() {
     </>
   );
 
+  /*
+   * Everything that wants a person's attention, gathered once.
+   *
+   * Three separate cards — rows waiting, cheques outstanding, a warning from the
+   * engine — trained a reader to skip the second and third. One list of short
+   * lines is read; three cards are not.
+   */
+  const attention: {
+    key: string;
+    text: string;
+    href?: string;
+    link?: string;
+    detail?: ReactNode;
+  }[] = [];
+  if (waitingRows > 0) {
+    attention.push({
+      key: 'waiting',
+      text: copy.home.waitingRows(waitingRows),
+      href: '/approvals',
+      link: copy.home.waitingLink,
+    });
+  }
+  if (alert !== null) {
+    attention.push({
+      key: 'checks',
+      text:
+        alert.kind === 'returned'
+          ? gemach.returnedLine(alert.count)
+          : alert.kind === 'overdue'
+            ? gemach.overdueLine(alert.count, money(alert.amountMinor, snapshot.currency))
+            : gemach.outstandingCount(alert.count, money(alert.amountMinor, snapshot.currency)),
+      href: '/gemach',
+      link: gemach.details,
+    });
+  }
+  /*
+   * The recommendation, with its plan folded away.
+   *
+   * It used to be a card of its own beside the answer, carrying a paragraph, a
+   * list of options and a form for assigning it to somebody — the second-largest
+   * thing on the screen, every day, whether or not it mattered. What it says is
+   * worth one line; what it *offers* is worth reading only when a person decides
+   * to act on it, so the options and the form are one press away.
+   */
+  const plan =
+    nothingUrgent || actionTitle === '' ? null : (
+      <Disclosure summary={copy.plan.howTitle} tone="action">
+        {snapshot.nextAction.key === 'close_funding_gap' ? (
+          <>
+            <p className="mb-2 text-small text-text-secondary">{copy.plan.gapIntro}</p>
+            <ul className="flex flex-col gap-2.5">
+              <li>
+                <p className="font-medium">{copy.plan.movePayments}</p>
+                <p className="text-small text-text-secondary">
+                  {movablePayments.length > 0
+                    ? copy.plan.movePaymentsWhy(movablePayments.length)
+                    : copy.plan.noMovable}
+                </p>
+              </li>
+              <li>
+                <p className="font-medium">
+                  {snapshot.safeTransfer.resultMinor > 0
+                    ? copy.plan.businessTransfer(snapshot.safeTransfer.resultMinor)
+                    : copy.plan.noBusinessTransfer}
+                </p>
+              </li>
+              <li>
+                <p className="font-medium">{copy.plan.expectedIncome(certainInMinor)}</p>
+              </li>
+              {quality.missingData.length > 0 ? (
+                <li>
+                  <p className="font-medium">{copy.plan.updateDetails}</p>
+                </li>
+              ) : null}
+            </ul>
+          </>
+        ) : snapshot.nextAction.key === 'move_a_payment' &&
+          forecast.firstFailureDate !== null ? (
+          <>
+            <p className="mb-2 text-small text-text-secondary">
+              {copy.plan.failureDayIntro(forecast.firstFailureDate)}
+            </p>
+            {movablePayments.length === 0 ? (
+              <p>{copy.plan.noMovable}</p>
+            ) : (
+              <ul className="flex flex-col">
+                {movablePayments.map((item) => (
+                  <li key={item.id}>
+                    <StatRow
+                      label={item.label}
+                      value={
+                        <Money amountMinor={item.amountMinor} currency={snapshot.currency} />
+                      }
+                      hint={formatBusinessDate(item.dueDate ?? item.expectedDate)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : snapshot.nextAction.key === 'confirm_balances' ? (
+          <ul className="flex list-inside list-disc flex-col gap-1.5">
+            {quality.missingData.map((item) => (
+              <li key={item.code}>{sayNotice(item)}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-text-secondary">{copy.plan.holdIntro}</p>
+        )}
+
+        {/*
+          The recommendation becomes something with a name against it. Creating
+          the task changes no figure — the money moves when the money moves, and
+          this is a note the two of you leave each other.
+        */}
+        <div className="mt-4 border-t border-border pt-4">
+          <ActionForm
+            action={addTaskAction}
+            submitLabel={screens.tasks.addFromAction}
+            tone="secondary"
+          >
+            <>
+              <HiddenValue name="title" value={actionTitle} />
+              <HiddenValue name="reason" value={actionReason} />
+              <HiddenValue name="recommendationKey" value={snapshot.nextAction.key} />
+              {members.length === 0 ? null : (
+                <SelectField
+                  name="assignedMemberId"
+                  label={screens.tasks.who}
+                  required={false}
+                  emptyLabel={screens.tasks.whoNobody}
+                  options={members}
+                />
+              )}
+            </>
+          </ActionForm>
+        </div>
+      </Disclosure>
+    );
+
+  if (plan !== null) {
+    attention.push({ key: 'action', text: actionTitle, detail: plan });
+  }
+  for (const warning of decision.warnings) {
+    attention.push({
+      key: `warning:${warning.code}`,
+      text: sayNotice(warning),
+      href: '/more',
+      link: copy.home.moreLink,
+    });
+  }
+
   return (
     <AppShell
       source={descriptor}
@@ -137,234 +296,85 @@ export default async function HomePage() {
       showHeading={false}
       status={statusChips}
     >
-      {/* The answer and what to do about it, side by side once there is room. */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="flex flex-col lg:col-span-2">
-          <Hero
-            asHeading
-            label={copy.home.safeTitle}
-            amountMinor={showsAmount ? safeSpend.resultMinor : null}
-            headline={
-              cannotCalculate ? copy.home.safeCannotCalculate : copy.home.safeZeroHeadline
-            }
-            currency={snapshot.currency}
-            caption={showsAmount ? copy.home.safeUntil(snapshot.periodEnd) : undefined}
-            note={
-              cannotCalculate
-                ? copy.home.safeCannotCalculateWhy(quality.missingData.length)
-                : hasGap
-                  ? copy.home.safeGap(safeSpend.fundingGapMinor)
-                  : showsAmount
-                    ? copy.home.safeMeaning
-                    : copy.home.safeZeroNote
-            }
-            tone={cannotCalculate || hasGap ? 'attention' : 'primary'}
-          />
+      {/* 1. The answer. */}
+      <Hero
+        asHeading
+        label={copy.home.safeTitle}
+        amountMinor={showsAmount ? safeSpend.resultMinor : null}
+        headline={cannotCalculate ? copy.home.safeCannotCalculate : copy.home.safeZeroHeadline}
+        currency={snapshot.currency}
+        caption={showsAmount ? copy.home.safeUntil(snapshot.periodEnd) : undefined}
+        note={
+          cannotCalculate
+            ? copy.home.safeCannotCalculateWhy(quality.missingData.length)
+            : hasGap
+              ? copy.home.safeGap(safeSpend.fundingGapMinor)
+              : showsAmount
+                ? copy.home.safeMeaning
+                : copy.home.safeZeroNote
+        }
+        tone={cannotCalculate || hasGap ? 'attention' : 'primary'}
+      />
 
-          <Disclosure summary={copy.home.howWeCalculated}>
-            <p className="mb-2 text-small text-text-secondary">{copy.home.calculationNote}</p>
-            <BreakdownList
-              lines={safeSpend.breakdown}
-              currency={snapshot.currency}
-              labelFor={breakdownLabel}
-            />
-            <ul className="mt-3 flex list-inside list-disc flex-col gap-1 text-small text-text-secondary">
-              {safeSpend.assumptions.map((assumption) => (
-                <li key={assumption.code}>{sayNotice(assumption)}</li>
-              ))}
-            </ul>
-          </Disclosure>
+      {/*
+        2. The one thing this screen asks a person to do.
+
+        A whole card, above everything else, because saying what happened is the
+        habit the product lives or dies by. It used to be one of four buttons in
+        the ninth section.
+      */}
+      <Card title={copy.home.recordTitle} tone="primary">
+        <p className="text-text-secondary">{copy.home.recordIntro}</p>
+        <div className="mt-4">
+          <LinkButton href="/quick">{copy.actions.quickUpdate}</LinkButton>
         </div>
+      </Card>
 
-        {/* One recommendation, and a way to act on it. */}
-        <Card title={copy.home.actionTitle} tone="primary" className="lg:self-start">
-          {snapshot.nextAction.key === 'close_funding_gap' ? (
-            <>
-              <p className="text-text-secondary">{copy.plan.gapIntro}</p>
-              <Disclosure summary={copy.plan.gapTitle} tone="action">
-                <ul className="flex flex-col gap-2.5">
-                  <li>
-                    <p className="font-medium">{copy.plan.movePayments}</p>
-                    <p className="text-small text-text-secondary">
-                      {movablePayments.length > 0
-                        ? copy.plan.movePaymentsWhy(movablePayments.length)
-                        : copy.plan.noMovable}
-                    </p>
-                  </li>
-                  <li>
-                    <p className="font-medium">
-                      {snapshot.safeTransfer.resultMinor > 0
-                        ? copy.plan.businessTransfer(snapshot.safeTransfer.resultMinor)
-                        : copy.plan.noBusinessTransfer}
-                    </p>
-                  </li>
-                  <li>
-                    <p className="font-medium">{copy.plan.expectedIncome(certainInMinor)}</p>
-                  </li>
-                  {quality.missingData.length > 0 ? (
-                    <li>
-                      <p className="font-medium">{copy.plan.updateDetails}</p>
-                    </li>
-                  ) : null}
-                </ul>
-              </Disclosure>
-            </>
-          ) : snapshot.nextAction.key === 'move_a_payment' &&
-            forecast.firstFailureDate !== null ? (
-            <>
-              <p className="text-text-secondary">
-                {copy.plan.failureDayIntro(forecast.firstFailureDate)}
-              </p>
-              <Disclosure summary={copy.plan.failureDayTitle} tone="action">
-                {movablePayments.length === 0 ? (
-                  <p>{copy.plan.noMovable}</p>
-                ) : (
-                  <ul className="flex flex-col">
-                    {movablePayments.map((item) => (
-                      <li key={item.id}>
-                        <StatRow
-                          label={item.label}
-                          value={
-                            <Money
-                              amountMinor={item.amountMinor}
-                              currency={snapshot.currency}
-                            />
-                          }
-                          hint={formatBusinessDate(item.dueDate ?? item.expectedDate)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
+      {/* 3. What needs attention — one card, or nothing at all. */}
+      {attention.length === 0 ? null : (
+        <Card title={copy.home.attentionTitle} tone="attention">
+          <ul className="flex flex-col gap-3">
+            {attention.map((item) => (
+              <li key={item.key} className="flex flex-col gap-1">
+                <span className="font-medium">{item.text}</span>
+                {item.detail ?? null}
+                {item.href === undefined ? null : (
+                  <Link
+                    href={item.href}
+                    className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+                  >
+                    {item.link}
+                  </Link>
                 )}
-              </Disclosure>
-            </>
-          ) : snapshot.nextAction.key === 'confirm_balances' ? (
-            <>
-              <p className="text-text-secondary">{copy.plan.confirmIntro}</p>
-              <Disclosure summary={copy.plan.confirmTitle} tone="action">
-                <ul className="flex list-inside list-disc flex-col gap-1.5">
-                  {quality.missingData.map((item) => (
-                    <li key={item.code}>{sayNotice(item)}</li>
-                  ))}
-                </ul>
-              </Disclosure>
-            </>
-          ) : (
-            <>
-              <p className="font-medium">{copy.plan.holdTitle}</p>
-              <p className="mt-1.5 text-text-secondary">{copy.plan.holdIntro}</p>
-            </>
-          )}
-
-          {/*
-            The recommendation becomes something with a name against it. Creating
-            the task changes no figure — the money moves when the money moves, and
-            this is a note the two of you leave each other.
-          */}
-          {snapshot.nextAction.key === 'hold_position' ? null : (
-            <div className="mt-4 border-t border-border pt-4">
-              <ActionForm
-                action={addTaskAction}
-                submitLabel={screens.tasks.addFromAction}
-                tone="secondary"
-              >
-                <HiddenValue name="title" value={actionTitle} />
-                <HiddenValue name="reason" value={actionReason} />
-                <HiddenValue name="recommendationKey" value={snapshot.nextAction.key} />
-                {members.length === 0 ? null : (
-                  <SelectField
-                    name="assignedMemberId"
-                    label={screens.tasks.who}
-                    required={false}
-                    emptyLabel={screens.tasks.whoNobody}
-                    options={members}
-                  />
-                )}
-              </ActionForm>
-            </div>
-          )}
+              </li>
+            ))}
+          </ul>
         </Card>
-      </div>
-
-      {waitingRows === 0 ? null : (
-        <Notice tone="attention" title={copy.home.waitingTitle}>
-          <p>{copy.home.waitingRows(waitingRows)}</p>
-          <p className="mt-2">
-            <Link
-              href="/approvals"
-              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
-            >
-              {copy.home.waitingLink}
-            </Link>
-          </p>
-        </Notice>
       )}
 
-      {/* The four compact daily cards. */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard
-          title={copy.food.title}
-          tone={
-            food === null || food.status === 'insufficient_data'
-              ? 'neutral'
-              : food.status === 'on_track'
-                ? 'success'
-                : 'attention'
-          }
-          headline={
-            food === null || food.status === 'insufficient_data'
-              ? copy.food.noPlan
-              : copy.food.remaining(food.weekRemainingMinor, food.weekEndsOn)
-          }
-          meaning={
-            food === null
-              ? undefined
-              : copy.food.monthProgress(food.monthSpentMinor, food.monthPlannedMinor)
-          }
-          footer={
-            <Link
-              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
-              href="/budget"
-            >
-              {copy.food.budgetLink}
-            </Link>
-          }
-        >
-          {food === null ? null : (
-            <div className="flex flex-col gap-2">
-              <ProgressBar
-                value={food.monthSpentMinor}
-                max={Math.max(food.monthPlannedMinor, food.monthSpentMinor)}
-                tone={food.status === 'on_track' ? 'success' : 'attention'}
-                label={copy.food.ariaProgress(food.monthSpentMinor, food.monthPlannedMinor)}
-              />
-              <p className="text-small text-text-secondary">
-                {food.status === 'over_month'
-                  ? copy.food.overMonth
-                  : food.weekOverPaceMinor > 0
-                    ? copy.food.overPace(food.weekOverPaceMinor, food.nextWeekAllowanceMinor)
-                    : food.status === 'ahead_of_pace'
-                      ? copy.food.projection(food.projectedMonthMinor)
-                      : copy.food.onTrack}
-              </p>
-            </div>
-          )}
-        </StatCard>
+      {/*
+        4. Two lines of picture: what is owed, and how the month ends.
 
-        <StatCard
-          title={copy.home.debtTitle}
-          tone={
-            noDebts || trend === null
-              ? 'neutral'
-              : trend.consumerDirection === 'down'
-                ? 'success'
-                : trend.consumerDirection === 'up'
-                  ? 'attention'
-                  : 'neutral'
+        Lines rather than cards. A figure with a label and a link is what a person
+        reads at breakfast; a card with a progress bar, a meaning, a footer and a
+        trend is what they scroll past.
+      */}
+      <Card title={copy.home.pictureTitle}>
+        <StatRow
+          label={copy.home.debtTotalNow}
+          value={
+            noDebts ? (
+              <span className="text-text-secondary">{copy.home.debtNone}</span>
+            ) : (
+              <Money
+                amountMinor={snapshot.debtTotals.consumerDebtMinor}
+                currency={snapshot.currency}
+              />
+            )
           }
-          headline={
+          hint={
             noDebts
-              ? copy.home.debtNone
+              ? copy.home.debtNoneNote
               : trend === null
                 ? copy.home.debtFlat
                 : trend.consumerDirection === 'down'
@@ -373,178 +383,58 @@ export default async function HomePage() {
                     ? copy.home.debtUp(trend.netConsumerChangeMinor)
                     : copy.home.debtFlat
           }
-          meaning={
-            noDebts
-              ? copy.home.debtNoneNote
-              : trend === null
-                ? undefined
-                : trend.consumerDirection === 'down'
-                  ? copy.home.debtDownNote
-                  : trend.consumerDirection === 'up'
-                    ? copy.home.debtUpNote
-                    : copy.home.debtFlatNote
-          }
-          footer={
-            <Link
-              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
-              href="/debts"
-            >
-              {copy.home.debtLink}
-            </Link>
-          }
-        >
-          {noDebts ? null : (
-            <StatRow
-              label={copy.home.debtTotalNow}
-              value={
-                <Money
-                  amountMinor={snapshot.debtTotals.consumerDebtMinor}
-                  currency={snapshot.currency}
-                />
-              }
+        />
+        <StatRow
+          label={copy.home.monthEndTitle}
+          value={
+            <Money
+              amountMinor={forecast.endOfPeriodMinor}
+              currency={snapshot.currency}
+              signed
             />
-          )}
-        </StatCard>
-
-        <StatCard
-          title={copy.home.monthEndTitle}
-          headline={
-            <Money amountMinor={forecast.lowPointMinor} currency={snapshot.currency} signed />
           }
-          tone={forecast.firstFailureDate === null ? 'neutral' : 'attention'}
-          meaning={
-            forecast.firstFailureDate === null
-              ? copy.home.tightestDayOn(forecast.lowPointDate)
-              : copy.home.runsOutOn(forecast.firstFailureDate)
-          }
-          footer={
-            <Link
-              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
-              href="/forecast"
-            >
-              {copy.home.forecastLink}
-            </Link>
-          }
-        >
-          <StatRow
-            label={copy.home.certainIn}
-            value={<Money amountMinor={certainInMinor} currency={snapshot.currency} />}
-          />
-          <StatRow
-            label={copy.home.mustGoOut}
-            value={
-              <Money
-                amountMinor={safeSpend.committedOutflowMinor}
-                currency={snapshot.currency}
-              />
-            }
-          />
-        </StatCard>
-
-        <StatCard
-          title={copy.home.businessTitle}
-          tone={snapshot.safeTransfer.resultMinor > 0 ? 'success' : 'neutral'}
-          headline={
-            snapshot.businessProfit === null
-              ? copy.home.businessNone
-              : snapshot.safeTransfer.resultMinor > 0
-                ? copy.home.businessSafeTransfer(snapshot.safeTransfer.resultMinor)
-                : copy.home.businessNotSafe
-          }
-          meaning={
-            snapshot.businessProfit === null
-              ? undefined
-              : copy.business.limits[snapshot.safeTransfer.bindingConstraint] !== undefined
-                ? `${copy.business.limitedBy}: ${copy.business.limits[snapshot.safeTransfer.bindingConstraint]}`
-                : undefined
-          }
-          footer={
-            <Link
-              className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
-              href="/business"
-            >
-              {copy.home.businessLink}
-            </Link>
+          hint={
+            forecast.firstFailureDate !== null
+              ? copy.home.runsOutOn(forecast.firstFailureDate)
+              : copy.home.tightestDayOn(forecast.lowPointDate)
           }
         />
-      </div>
 
-      {/*
-        Post-dated checks, and only when there is something to do about them.
-        A household with no gemach never sees this; a household whose checks are
-        all still in the chequebook never sees it either, because paper nobody
-        else holds is a plan rather than an exposure. What it says when it does
-        appear is a number and a date — no adjectives, because the fact is
-        alarming enough on its own and dressing it up would make it easier to
-        stop reading.
-      */}
-      {alert === null ? null : (
-        <Card
-          title={gemach.checksOutstanding}
-          tone={
-            alert.kind === 'returned'
-              ? 'danger'
-              : alert.kind === 'overdue'
-                ? 'attention'
-                : 'neutral'
-          }
-        >
-          <p className="font-medium">
-            {alert.kind === 'returned'
-              ? gemach.returnedLine(alert.count)
-              : alert.kind === 'overdue'
-                ? gemach.overdueLine(alert.count, money(alert.amountMinor, snapshot.currency))
-                : gemach.outstandingCount(
-                    alert.count,
-                    money(alert.amountMinor, snapshot.currency),
-                  )}
-          </p>
-          {alert.next === null ? null : (
-            <p className="mt-2 text-text-secondary">
-              {gemach.nextCheckLine(
-                formatBusinessDate(alert.next.dueDate),
-                money(alert.next.amountMinor, snapshot.currency),
-              )}
-            </p>
-          )}
-          <div className="mt-4">
-            <LinkButton href="/gemach" tone="secondary">
-              {gemach.details}
-            </LinkButton>
-          </div>
-        </Card>
-      )}
-
-      {/* Quick updates. Every one of these opens a working screen. */}
-      <Card title={copy.home.updatesTitle}>
-        <div className="flex flex-wrap gap-2.5">
-          <LinkButton href="/quick">{copy.actions.quickUpdate}</LinkButton>
-          <LinkButton href="/entry" tone="secondary">
-            {copy.actions.addExpense}
-          </LinkButton>
-          <LinkButton href="/accounts" tone="secondary">
-            {copy.actions.updateBalance}
-          </LinkButton>
-          <LinkButton href="/upload" tone="secondary">
-            {copy.actions.uploadStatement}
-          </LinkButton>
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
+          <Link
+            className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+            href="/lenders"
+          >
+            {copy.home.debtLink}
+          </Link>
+          <Link
+            className="inline-flex min-h-11 items-center text-primary underline underline-offset-4"
+            href="/forecast"
+          >
+            {copy.home.forecastLink}
+          </Link>
         </div>
       </Card>
 
-      {/* Everything else, collapsed. */}
-      <SectionTitle>{copy.home.moreTitle}</SectionTitle>
-
-      {decision.warnings.length > 0 ? (
-        <Card title={copy.sections.needsAttention} tone="attention">
-          <ul className="flex list-inside list-disc flex-col gap-1.5">
-            {decision.warnings.map((warning) => (
-              <li key={warning.code}>{sayNotice(warning)}</li>
+      {/*
+        The arithmetic, and how complete the picture is. Both true, neither what
+        a person came for — so both are closed, and one press away.
+      */}
+      <Card>
+        <Disclosure summary={copy.home.howWeCalculated}>
+          <p className="mb-2 text-small text-text-secondary">{copy.home.calculationNote}</p>
+          <BreakdownList
+            lines={safeSpend.breakdown}
+            currency={snapshot.currency}
+            labelFor={breakdownLabel}
+          />
+          <ul className="mt-3 flex list-inside list-disc flex-col gap-1 text-small text-text-secondary">
+            {safeSpend.assumptions.map((assumption) => (
+              <li key={assumption.code}>{sayNotice(assumption)}</li>
             ))}
           </ul>
-        </Card>
-      ) : null}
+        </Disclosure>
 
-      <Card>
         <Disclosure summary={copy.sections.ourProgress}>
           <dl className="flex flex-col">
             {quality.components.map((component) => (
@@ -557,29 +447,6 @@ export default async function HomePage() {
               </div>
             ))}
           </dl>
-        </Disclosure>
-
-        <Disclosure summary={copy.sections.allAccounts}>
-          {input.accounts
-            .filter((account) => account.scope === 'household')
-            .map((account) => (
-              <StatRow
-                key={account.id}
-                label={account.name}
-                value={
-                  <Money
-                    amountMinor={
-                      account.balance.direction === 'outflow'
-                        ? -account.balance.amountMinor
-                        : account.balance.amountMinor
-                    }
-                    currency={snapshot.currency}
-                    signed
-                  />
-                }
-                hint={account.verifiedAt === null ? copy.freshness.never : undefined}
-              />
-            ))}
         </Disclosure>
 
         <p className="mt-3 px-1 text-small text-text-secondary">

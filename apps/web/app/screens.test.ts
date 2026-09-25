@@ -52,12 +52,12 @@ describe('the routes that exist', () => {
     }
   });
 
-  test('the phone bar carries the five things a person does standing up', () => {
+  test('the phone bar carries five destinations, the same five as a desktop', () => {
     expect(PHONE_NAV.map((item) => item.label)).toEqual([
       'בית',
       'עדכון מהיר',
-      'אישורים',
-      'תכנון',
+      'כסף ותנועה',
+      'חובות ומלווים',
       'עוד',
     ]);
   });
@@ -154,43 +154,64 @@ describe('screens fail closed', () => {
 describe('the home screen keeps its hierarchy', () => {
   const home = read('page.tsx');
 
-  test('the dominant answer comes before the four cards', () => {
-    expect(home.indexOf('copy.home.safeTitle')).toBeLessThan(
-      home.indexOf('copy.home.debtTitle'),
-    );
+  /*
+   * The order the screen is built in, and the rule behind it: the answer first,
+   * then the one thing a person is asked to do, then anything wrong, then the
+   * picture. The screen used to carry nine sections and ten links with the
+   * recording action ninth, so these exist to stop that returning by accretion.
+   */
+  const order = [
+    'copy.home.safeTitle',
+    'copy.home.recordTitle',
+    'copy.home.attentionTitle',
+    'copy.home.pictureTitle',
+  ];
+
+  test('saying what happened is the one primary action, above everything else', () => {
+    const record = home.indexOf('copy.home.recordTitle');
+    expect(record).toBeGreaterThan(0);
+    expect(record).toBeLessThan(home.indexOf('copy.home.attentionTitle'));
+    expect(record).toBeLessThan(home.indexOf('copy.home.pictureTitle'));
+    // And it points at the sentence screen, not at a form.
+    expect(home).toContain('href="/quick"');
   });
 
-  test('the one action comes before the four cards', () => {
-    expect(home.indexOf('copy.home.actionTitle')).toBeLessThan(
-      home.indexOf('copy.home.debtTitle'),
-    );
-  });
-
-  test('the four daily cards are food, debts, month end and business, in that order', () => {
-    // Food leads: it is the figure a family steers week by week, and the one they
-    // open the app for on most days.
-    const order = [
-      'copy.food.title',
-      'copy.home.debtTitle',
-      'copy.home.monthEndTitle',
-      'copy.home.businessTitle',
-    ];
+  test('the four things appear in that order and no other', () => {
     const positions = order.map((key) => home.indexOf(key));
     expect(positions.every((position) => position > 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
   });
 
-  test('quick updates come after the cards', () => {
-    expect(home.indexOf('copy.home.updatesTitle')).toBeGreaterThan(
-      home.indexOf('copy.home.businessTitle'),
-    );
+  test('there is exactly one call to action on the screen', () => {
+    // A LinkButton is the product's primary control. Four in a row was the
+    // "quick actions" card, and it is why the recording action was invisible.
+    expect((home.match(/<LinkButton\b/g) ?? []).length).toBe(1);
   });
 
-  test('the deeper detail is last, and collapsed', () => {
-    expect(home.indexOf('copy.home.moreTitle')).toBeGreaterThan(
-      home.indexOf('copy.home.updatesTitle'),
-    );
-    expect(home).toContain('Disclosure');
+  test('the screens that left are not re-added as cards', () => {
+    for (const gone of [
+      'copy.food.title',
+      'copy.home.businessTitle',
+      'copy.home.updatesTitle',
+    ]) {
+      expect(home.includes(gone), `${gone} is back on the home screen`).toBe(false);
+    }
+  });
+
+  test('what needs attention is one card, not one card each', () => {
+    // Rows waiting, cheques outstanding, the recommendation and engine warnings
+    // join one list. Three cards taught a reader to skip the last two.
+    expect(home).toContain('copy.home.attentionTitle');
+    expect(home).toContain('attention.push');
+    expect(home).not.toContain('copy.home.waitingTitle');
+  });
+
+  test('the recommendation is still offered, with its plan behind a disclosure', () => {
+    // Folded away, not deleted: the options and the "make it a task" form are
+    // one press from the line that names the recommendation.
+    expect(home).toContain('copy.plan.howTitle');
+    expect(home).toContain('copy.plan.movePayments');
+    expect(home).toContain('addTaskAction');
   });
 
   test('exactly one hero is rendered', () => {
@@ -198,17 +219,13 @@ describe('the home screen keeps its hierarchy', () => {
   });
 
   test('the full monthly budget is not on the home screen', () => {
-    // The budget belongs to its own screen; only the weekly food figure appears here.
     expect(home).not.toContain('budget.lines');
-    expect(home).toContain('copy.food.title');
   });
-  test('every quick action on the home screen opens a working screen', () => {
-    // These were "בקרוב" chips while there was nothing to save into. There is
-    // now, so a chip would be a lie in the other direction.
-    expect(home).not.toContain('SoonChip');
-    expect(home).toContain('href="/entry"');
-    expect(home).toContain('href="/accounts"');
-    expect(home).toContain('href="/upload"');
+
+  test('the detail a person did not ask for is collapsed', () => {
+    expect(home).toContain('Disclosure');
+    expect(home).toContain('copy.home.howWeCalculated');
+    expect(home).toContain('copy.sections.ourProgress');
   });
 });
 
@@ -265,7 +282,6 @@ describe('the daily screen stays a daily screen', () => {
   });
 
   test('the recommendation offers a concrete plan, not only a sentence', () => {
-    expect(home).toContain('copy.plan.gapTitle');
     expect(home).toContain('copy.plan.movePayments');
     expect(home).toContain('copy.plan.businessTransfer');
     expect(home).toContain('copy.plan.expectedIncome');
@@ -287,10 +303,10 @@ describe('the daily screen stays a daily screen', () => {
     expect(more).toContain('POLICY_VERSION');
   });
 
-  test('the month-end card leads with the amount, not with a date', () => {
+  test('the month-end line leads with the amount, not with a date', () => {
     const monthEnd = home.slice(home.indexOf('copy.home.monthEndTitle'));
-    const headline = monthEnd.slice(0, monthEnd.indexOf('meaning='));
-    expect(headline).toContain('forecast.lowPointMinor');
+    const line = monthEnd.slice(0, monthEnd.indexOf('hint='));
+    expect(line).toContain('forecast.endOfPeriodMinor');
   });
 });
 

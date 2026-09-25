@@ -60,7 +60,7 @@ async function assertTouchTargets(page: Page): Promise<void> {
   expect(tooSmall, JSON.stringify(tooSmall)).toEqual([]);
 }
 
-const SCREENS = ['/', '/quick', '/debts', '/lenders', '/upload', '/approvals', '/more'];
+const SCREENS = ['/', '/quick', '/activity', '/lenders', '/upload', '/approvals', '/more'];
 
 test.describe('@smoke nothing is clipped on a phone', () => {
   for (const path of SCREENS) {
@@ -102,14 +102,27 @@ test.describe('the bottom bar is how a thumb navigates', () => {
     await expect(page.getByRole('navigation', { name: 'ניווט ראשי' })).toBeHidden();
   });
 
-  test('lenders are still reachable by reading, in two taps', async ({ page }) => {
+  test('lenders are one tap now, not two', async ({ page }) => {
+    // They were behind "עוד". A household with debts looks at them daily.
+    await page.goto('/');
+    await page
+      .getByRole('navigation', { name: 'ניווט תחתון' })
+      .getByRole('link', { name: 'חובות ומלווים' })
+      .click();
+    await expect(page.getByRole('heading', { level: 1, name: 'חובות ומלווים' })).toBeVisible();
+  });
+
+  test('and the screens that left are two taps, through "עוד"', async ({ page }) => {
     await page.goto('/');
     await page
       .getByRole('navigation', { name: 'ניווט תחתון' })
       .getByRole('link', { name: 'עוד' })
       .click();
-    await page.getByRole('link', { name: 'מלווים' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'מלווים' })).toBeVisible();
+    await page
+      .getByRole('link', { name: /העלאת מסמך/u })
+      .first()
+      .click();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   });
 });
 

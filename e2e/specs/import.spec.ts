@@ -133,7 +133,9 @@ test.describe('approving is what creates the debts', () => {
     expect(debt?.dueDate?.gregorian ?? null).toBeNull();
 
     await page.goto('/lenders');
-    await expect(page.getByText('מועדים שצריך להשלים')).toBeVisible();
+    // One attention card now, rather than one per kind of thing to attend to.
+    await expect(page.getByRole('heading', { name: 'מה דורש טיפול' })).toBeVisible();
+    await expect(page.getByText(/תאריך פירעון שלא הצלחנו לקרוא/u)).toBeVisible();
   });
 });
 

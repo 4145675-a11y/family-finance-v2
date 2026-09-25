@@ -26,23 +26,21 @@ export const copy = {
     tagline: 'תמונה אחת ברורה של הבית, העסק והחובות',
   },
 
+  /**
+   * The five destinations, and the same five on a phone and on a desktop.
+   *
+   * There used to be fifteen in three groups, and the phone showed five of them —
+   * two different maps of one product, so knowing where something lives on one
+   * screen told you nothing about the other. Everything that left is in `עוד`,
+   * which was already a good index and is now the only one.
+   */
   nav: {
     home: 'בית',
     quick: 'עדכון מהיר',
-    entry: 'רישום',
-    upload: 'העלאה',
-    approvals: 'אישורים',
-    accounts: 'חשבונות',
-    planning: 'תכנון',
-    debts: 'חובות',
-    lenders: 'מלווים',
-    forecast: 'תחזית',
-    business: 'עסק',
-    tasks: 'משימות',
-    reports: 'דוחות',
-    activity: 'תנועה',
+    activity: 'כסף ותנועה',
+    lenders: 'חובות ומלווים',
     more: 'עוד',
-    groupToday: 'היום',
+    /** The headings inside `/more`, which is now the only index. */
     groupPicture: 'התמונה',
     groupKeeping: 'סדר',
     ariaMain: 'ניווט ראשי',
@@ -115,6 +113,21 @@ export const copy = {
     waitingLink: 'לעבור עליהן',
 
     actionTitle: 'מה כדאי לעשות עכשיו',
+    actionLink: 'לצעדים שהחלטנו עליהם',
+
+    /*
+     * The one thing the home screen asks for.
+     *
+     * It is a card of its own, above the picture, because saying what happened
+     * is the habit the whole product depends on — and it used to be one small
+     * button among four, in the ninth section, below the fold on a phone.
+     */
+    recordTitle: 'לרשום משהו שקרה',
+    recordIntro: 'משפט אחד — מוקלד או מוקלט — ואנחנו נציע מה לרשום. שום דבר לא נשמר בלי אישור.',
+
+    attentionTitle: 'מה דורש טיפול',
+    pictureTitle: 'התמונה בקצרה',
+
     updatesTitle: 'פעולות מהירות',
     moreTitle: 'עוד דברים שאפשר לבדוק',
     moreLink: 'לכל המסכים והפירוטים',
@@ -124,6 +137,8 @@ export const copy = {
   // moves the engine can already point at, so "close the gap" stops being an
   // instruction to conjure money and becomes a short list of real options.
   plan: {
+    /** The one summary the recommendation is folded behind, whatever it is. */
+    howTitle: 'מה אפשר לעשות בקשר לזה',
     gapTitle: 'בואו נבנה תוכנית לסגירת הפער',
     gapIntro: 'אף אחד לא משלים סכום כזה ביום אחד. אלה הכיוונים שאפשר לבדוק כבר עכשיו:',
     movePayments: 'לבדוק אילו תשלומים אפשר להזיז',
@@ -234,6 +249,9 @@ export const copy = {
 
   debts: {
     title: 'החובות שלנו',
+    subtitle: 'למי אנחנו חייבים, כמה נשאר ומתי — לפי ההיסטוריה עצמה',
+    /** The rare things, behind a closed disclosure rather than in the way. */
+    moreActions: 'פעולות נוספות: פתיחת מלווה והחלפה בין נושים',
     realStoryTitle: 'מה קרה באמת החודש',
     startOfMonth: 'בתחילת החודש',
     now: 'עכשיו',

@@ -17,6 +17,11 @@ import { gemach } from '../../lib/copy/gemach';
  * the detail screens for investigating, the housekeeping, and the technical
  * evidence. Grouping matters more than completeness here — a flat list of twelve
  * links is a list nobody reads.
+ *
+ * Since the primary navigation came down to five, this is the **only** index of
+ * the other screens, so every one of them has to be reachable from here. A screen
+ * that is in neither place does not exist as far as a person is concerned, and
+ * `/entry` was in that position for exactly as long as it took to notice.
  */
 
 export const dynamic = 'force-dynamic';
@@ -27,13 +32,7 @@ export default async function MorePage() {
 
   const picture = [
     { href: '/forecast', title: copy.forecast.title, description: copy.forecast.endQuestion },
-    { href: '/debts', title: copy.debts.title, description: copy.debts.realStoryTitle },
     { href: '/gemach', title: gemach.title, description: gemach.subtitle },
-    {
-      href: '/lenders',
-      title: 'מלווים',
-      description: 'כרטיס לכל מלווה: יתרה, מועדים בשני הלוחות וכל ההיסטוריה',
-    },
     {
       href: '/rules',
       title: 'כללים',
@@ -50,6 +49,7 @@ export default async function MorePage() {
   ];
 
   const keeping = [
+    { href: '/entry', title: screens.entry.title, description: screens.entry.subtitle },
     { href: '/tasks', title: screens.tasks.title, description: screens.tasks.subtitle },
     { href: '/upload', title: screens.upload.title, description: screens.upload.subtitle },
     {

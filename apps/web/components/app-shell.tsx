@@ -28,52 +28,30 @@ import { Mark, SourceBanner } from './ui';
 export interface NavItem {
   readonly href: string;
   readonly label: string;
-  /** Whether the destination also appears in the phone's bottom bar. */
-  readonly onPhone: boolean;
 }
 
-export interface NavGroup {
-  readonly title: string;
-  readonly items: readonly NavItem[];
-}
-
-export const NAV_GROUPS: readonly NavGroup[] = [
-  {
-    title: copy.nav.groupToday,
-    items: [
-      { href: '/', label: copy.nav.home, onPhone: true },
-      { href: '/quick', label: copy.nav.quick, onPhone: true },
-      { href: '/entry', label: copy.nav.entry, onPhone: false },
-      { href: '/upload', label: copy.nav.upload, onPhone: false },
-      { href: '/approvals', label: copy.nav.approvals, onPhone: true },
-    ],
-  },
-  {
-    title: copy.nav.groupPicture,
-    items: [
-      { href: '/accounts', label: copy.nav.accounts, onPhone: false },
-      { href: '/budget', label: copy.nav.planning, onPhone: true },
-      { href: '/debts', label: copy.nav.debts, onPhone: false },
-      { href: '/lenders', label: copy.nav.lenders, onPhone: false },
-      { href: '/forecast', label: copy.nav.forecast, onPhone: false },
-      { href: '/business', label: copy.nav.business, onPhone: false },
-    ],
-  },
-  {
-    title: copy.nav.groupKeeping,
-    items: [
-      { href: '/tasks', label: copy.nav.tasks, onPhone: false },
-      { href: '/reports', label: copy.nav.reports, onPhone: false },
-      { href: '/activity', label: copy.nav.activity, onPhone: false },
-      { href: '/more', label: copy.nav.more, onPhone: true },
-    ],
-  },
+/**
+ * The whole primary navigation: five destinations, in the order of a day.
+ *
+ * It was fifteen, in three groups, and a phone showed a different five — so a
+ * person who learned where something lived on a desktop had to learn it again on
+ * a phone. Five is the number a person can hold without being taught, and the
+ * same five everywhere means there is one map.
+ *
+ * What left did not disappear: `/more` is an index of every other screen with a
+ * line of explanation each, and the screens that matter announce themselves from
+ * the home screen when they have something to say.
+ */
+export const NAV_ITEMS: readonly NavItem[] = [
+  { href: '/', label: copy.nav.home },
+  { href: '/quick', label: copy.nav.quick },
+  { href: '/activity', label: copy.nav.activity },
+  { href: '/lenders', label: copy.nav.lenders },
+  { href: '/more', label: copy.nav.more },
 ];
 
-export const NAV_ITEMS: readonly NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
-
-/** The five destinations a phone shows, in the order a thumb reaches them. */
-export const PHONE_NAV: readonly NavItem[] = NAV_ITEMS.filter((item) => item.onPhone);
+/** The same five, named for the bar a thumb reaches. */
+export const PHONE_NAV: readonly NavItem[] = NAV_ITEMS;
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   return (
@@ -145,37 +123,22 @@ export function AppShell({
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
         {/* First child, and therefore the right-hand column in a Hebrew document. */}
+        {/*
+          Five links and no group labels. The groups existed to make fifteen
+          items readable; at five they would be three headings over one line
+          each, which is more structure than the thing it structures.
+        */}
         <nav
           aria-label={copy.nav.ariaMain}
-          className="hidden shrink-0 flex-col gap-3 rounded-card border border-border bg-surface p-2 shadow-card sm:flex sm:w-44"
+          className="hidden shrink-0 flex-col gap-0.5 rounded-card border border-border bg-surface p-2 shadow-card sm:flex sm:w-44"
         >
-          {NAV_GROUPS.map((group, index) => (
-            <div
-              key={group.title}
-              className={`flex flex-col gap-0.5 ${index > 0 ? 'border-t border-border pt-2' : ''}`}
-            >
-              {/*
-                A label for a list, not a section of the document — so it is not a
-                heading. The sidebar renders before `main`, and three `h2`s ahead of
-                the page's own `h1` is an outline that starts in the wrong place.
-                It is set smaller, lighter and letter-spaced so a reader scanning
-                the column can still tell in one glance which lines are clickable.
-              */}
-              <p
-                id={`nav-group-${index}`}
-                className="px-3 pt-0.5 pb-1 text-[12px] font-semibold tracking-[0.06em] text-text-secondary/70"
-              >
-                {group.title}
-              </p>
-              <ul aria-labelledby={`nav-group-${index}`} className="flex flex-col gap-0.5">
-                {group.items.map((item) => (
-                  <li key={item.href} className="flex">
-                    <NavLink item={item} active={item.href === active} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <ul className="flex flex-col gap-0.5">
+            {NAV_ITEMS.map((item) => (
+              <li key={item.href} className="flex">
+                <NavLink item={item} active={item.href === active} />
+              </li>
+            ))}
+          </ul>
         </nav>
 
         <main id="main" className="flex min-w-0 flex-1 flex-col gap-4">

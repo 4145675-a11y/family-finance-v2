@@ -144,9 +144,9 @@ test.describe('both calendars survive approval and a reload', () => {
       expect(debt?.dueDate?.gregorian ?? null, name).toBeNull();
     }
 
-    // The lenders screen says which ones still need a person.
+    // The merged screen says which ones still need a person.
     await page.goto('/lenders');
-    await expect(page.getByText('מועדים שצריך להשלים')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'מה דורש טיפול' })).toBeVisible();
     await expect(page.getByRole('link', { name: HEDGED })).toBeVisible();
   });
 });
