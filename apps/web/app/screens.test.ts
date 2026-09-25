@@ -139,6 +139,29 @@ describe('screens fail closed', () => {
     expect(source, `${page} must branch on a missing source`).toMatch(/=== null/);
   });
 
+  test('a route kept only as a forwarding address passes the lock first', () => {
+    /*
+     * The failure this catches, found by the production smoke check rather than
+     * by anybody's judgement: `/debts` was merged into `/lenders` and left behind
+     * as a bare redirect — and a bare redirect answers an anonymous visitor.
+     * Every other path in the product sends them to sign in first, and one that
+     * does not is the exception somebody later builds on.
+     *
+     * A forwarding page reads no household, so the data-page rules above never
+     * see it. This is the rule that does. It is deliberately about
+     * `permanentRedirect`, which is what a moved route uses; the sign-in screens
+     * redirect conditionally and are meant to answer a stranger.
+     */
+    const forwarding = pages.filter((page) => read(page).includes('permanentRedirect('));
+    expect(forwarding.length, 'no forwarding routes found to check').toBeGreaterThan(0);
+
+    for (const page of forwarding) {
+      expect(read(page), `${page} forwards without passing the lock`).toMatch(
+        /requireUnlocked|loadDashboardView/,
+      );
+    }
+  });
+
   test.each(MONEY_PAGES)('%s cannot show invented figures without saying so', (page) => {
     // The banner is the shell's job now, and passing the descriptor is what turns
     // it on. A screen that renders money and does not pass it could show fixture
