@@ -234,6 +234,52 @@ export function documentFromLoaded(loaded: LoadedHousehold): StoreDocument {
   }
 }
 
+/**
+ * A person in a household, with the capacity they hold there.
+ *
+ * `role` is administrative only — who may invite and who may revoke. Both roles
+ * read and write the household's money identically, which is the product
+ * decision this type must not quietly reverse (01-PRODUCT-SPEC.md).
+ */
+export interface HouseholdMember {
+  readonly profileId: string;
+  readonly displayName: string;
+  readonly role: 'owner' | 'member';
+  readonly status: 'active' | 'revoked';
+}
+
+/**
+ * The members of a loaded household, each with their display name.
+ *
+ * Built from the two row sets the loader already returns, so it costs no extra
+ * query and cannot disagree with what the rest of the screen was built from. A
+ * membership whose profile is missing is skipped rather than shown as a blank
+ * name: the loader returns profiles only for people in the household, so an
+ * absence means a row this caller may not read.
+ */
+export function membersFromLoaded(loaded: LoadedHousehold): HouseholdMember[] {
+  const names = new Map<string, string>();
+  for (const profile of loaded.profiles) {
+    const row = rowToCamel(profile);
+    names.set(str(row, 'id'), str(row, 'displayName'));
+  }
+
+  const members: HouseholdMember[] = [];
+  for (const membership of loaded.members) {
+    const row = rowToCamel(membership);
+    const profileId = str(row, 'profileId');
+    const displayName = names.get(profileId);
+    if (displayName === undefined) continue;
+    members.push({
+      profileId,
+      displayName,
+      role: row['role'] === 'owner' ? 'owner' : 'member',
+      status: row['status'] === 'revoked' ? 'revoked' : 'active',
+    });
+  }
+  return members;
+}
+
 export function invitationsFromLoaded(loaded: LoadedHousehold): HouseholdInvitation[] {
   return loaded.invitations.map((r) => {
     const row = rowToCamel(r);

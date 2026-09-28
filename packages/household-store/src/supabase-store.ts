@@ -13,6 +13,8 @@ import {
   changesBetween,
   documentFromLoaded,
   invitationsFromLoaded,
+  membersFromLoaded,
+  type HouseholdMember,
   isEmptyChangeSet,
   type HouseholdInvitation,
 } from './document-mapping';
@@ -145,6 +147,36 @@ export class SupabaseHouseholdStore implements HouseholdStorePort {
     const loaded = await this.guarded(() => this.transport.load(householdId));
     if (loaded === null) throw new StoreNotInitialisedError();
     return invitationsFromLoaded(loaded);
+  }
+
+  /**
+   * Who belongs to the household, and in what capacity.
+   *
+   * The role is administrative only: an owner may invite and revoke, and both
+   * roles have exactly the same rights over money (01-PRODUCT-SPEC.md). It is
+   * read here so a screen can stop offering an action the database would refuse
+   * — the refusal is the guarantee, and this is the courtesy.
+   */
+  async members(): Promise<HouseholdMember[]> {
+    const householdId = await this.resolveHousehold();
+    const loaded = await this.guarded(() => this.transport.load(householdId));
+    if (loaded === null) throw new StoreNotInitialisedError();
+    return membersFromLoaded(loaded);
+  }
+
+  /**
+   * Whether the signed-in person may administer this household's membership.
+   *
+   * Answered from the same rows the screen shows, rather than from a second
+   * query, so the button and the list cannot disagree with each other.
+   */
+  async isOwner(): Promise<boolean> {
+    return (await this.members()).some(
+      (member) =>
+        member.profileId === this.actorProfileId &&
+        member.status === 'active' &&
+        member.role === 'owner',
+    );
   }
 
   /** Mints an invitation. The token is shown once and never stored. */

@@ -194,21 +194,31 @@ describe('household_members: membership cannot be self-granted', () => {
   });
 
   test('the revoke policy cannot be used to re-activate a membership', async () => {
-    // The per-test savepoint undoes this revocation once the test is over.
+    /*
+     * Bob rather than Carol, since roles arrived.
+     *
+     * This used to revoke Carol, who is household B's only member and therefore
+     * its owner — and a household keeps at least one owner, so the setup itself
+     * is now refused. Bob is a member of household A and not its last owner, so
+     * revoking him is a legitimate thing for the test to arrange, and the
+     * question it asks is unchanged.
+     *
+     * The per-test savepoint undoes this revocation once the test is over.
+     */
     await ownerClient().query(
       `update public.household_members set status = 'revoked', revoked_at = now()
        where household_id = $1 and profile_id = $2`,
-      [householdB, carol.id],
+      [householdA, bob.id],
     );
-    // Carol is revoked, so she is no longer a member. Whether the policy
-    // refuses the statement or its USING clause simply matches nothing, the
-    // one outcome that must never happen is a changed row.
-    const changed = await asUser(carol, async (c) => {
+    // Bob is revoked, so he is no longer a member. Whether the policy refuses
+    // the statement or its USING clause simply matches nothing, the one outcome
+    // that must never happen is a changed row.
+    const changed = await asUser(bob, async (c) => {
       try {
         const { rowCount } = await c.query(
           `update public.household_members set status = 'active', revoked_at = null
            where household_id = $1 and profile_id = $2`,
-          [householdB, carol.id],
+          [householdA, bob.id],
         );
         return rowCount ?? 0;
       } catch {
@@ -219,9 +229,25 @@ describe('household_members: membership cannot be self-granted', () => {
 
     const { rows } = await ownerClient().query(
       'select status from public.household_members where household_id = $1 and profile_id = $2',
-      [householdB, carol.id],
+      [householdA, bob.id],
     );
     expect(rows[0].status).toBe('revoked');
+  });
+
+  test('and a household can never be left without an owner, whoever is asking', async () => {
+    /*
+     * The trigger is not a policy, so it holds for the migration role as well —
+     * which is what makes it an invariant of the table rather than a rule about
+     * one kind of caller. Asserted here with owner rights precisely because
+     * that is the caller a policy could not stop.
+     */
+    await expect(
+      ownerClient().query(
+        `update public.household_members set status = 'revoked', revoked_at = now()
+         where household_id = $1 and profile_id = $2`,
+        [householdB, carol.id],
+      ),
+    ).rejects.toThrow(/at least one owner/u);
   });
 });
 

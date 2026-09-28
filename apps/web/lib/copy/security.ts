@@ -49,6 +49,12 @@ export const accountScreen = {
   invitationOpen: 'ממתינה',
   invitationExpired: 'פג תוקפה',
   invitationRevoked: 'בוטלה',
+  roleOwner: 'בעלים',
+  roleMember: 'שותף',
+  roleRevoked: 'הוסרה הגישה',
+  /** Said where the invite form would be, to somebody who is not an owner. */
+  inviteOwnerOnly:
+    'הזמנה של אדם נוסף נעשית בידי הבעלים של משק הבית. בכל השאר — רישום, אישור וצפייה — אין הבדל בין בעלים לשותף.',
   membersTitle: 'חברי משק הבית',
   forgotLink: 'שכחתם את הסיסמה?',
   forgotTitle: 'איפוס סיסמה',

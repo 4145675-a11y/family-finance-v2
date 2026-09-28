@@ -81,7 +81,7 @@ export default tseslint.config(
 
   {
     name: 'project/node-tooling',
-    files: ['tools/**/*.mjs', '**/*.config.{js,mjs,ts}'],
+    files: ['tools/**/*.mjs', 'supabase/validation/**/*.mjs', '**/*.config.{js,mjs,ts}'],
     languageOptions: {
       globals: globals.node,
     },

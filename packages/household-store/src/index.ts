@@ -15,6 +15,8 @@ export {
   type HouseholdChanges,
   type HouseholdInvitation,
   type LoadedHousehold,
+  membersFromLoaded,
+  type HouseholdMember,
 } from './document-mapping';
 
 export {

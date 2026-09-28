@@ -62,6 +62,16 @@ export default async function AccountPage() {
   const store = await supabaseHouseholdStore();
   const document = await store.readDocumentOrNull();
   const invitations = document === null ? [] : await listInvitations(store);
+  /*
+   * Who belongs, and whether this person may change that.
+   *
+   * The database refuses an invitation from a member whatever this screen
+   * renders — that is the guarantee. Reading the role here is the courtesy:
+   * offering a form that can only fail teaches a person the product argues
+   * with them.
+   */
+  const members = document === null ? [] : await store.members();
+  const isOwner = document === null ? false : await store.isOwner();
 
   return (
     <AppShell active="/more" title={accountScreen.membersTitle}>
@@ -81,13 +91,27 @@ export default async function AccountPage() {
       ) : (
         <>
           <Card title={accountScreen.membersTitle}>
-            {document.profiles.map((profile) => (
-              <StatRow key={profile.id} label={profile.displayName} value="" />
+            {members.map((member) => (
+              <StatRow
+                key={member.profileId}
+                label={member.displayName}
+                value={
+                  member.status === 'revoked'
+                    ? accountScreen.roleRevoked
+                    : member.role === 'owner'
+                      ? accountScreen.roleOwner
+                      : accountScreen.roleMember
+                }
+              />
             ))}
           </Card>
 
           <Card title={accountScreen.inviteTitle}>
-            <InviteForm />
+            {isOwner ? (
+              <InviteForm />
+            ) : (
+              <p className="text-text-secondary">{accountScreen.inviteOwnerOnly}</p>
+            )}
           </Card>
 
           {invitations.length === 0 ? null : (
