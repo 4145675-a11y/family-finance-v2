@@ -26,6 +26,7 @@ import {
 const KEY_VAR = 'OPENAI_API_KEY';
 const MODEL_VAR = 'OPENAI_MODEL';
 const FLAG_VAR = 'FAMILY_FINANCE_AI_PROVIDER';
+const ENABLED_VAR = 'FAMILY_FINANCE_AI_ENABLED';
 
 const saved: Record<string, string | undefined> = {};
 
@@ -43,7 +44,14 @@ function setEnv(name: string, value: string | undefined): void {
 }
 
 beforeEach(() => {
-  for (const name of [KEY_VAR, MODEL_VAR, FLAG_VAR, 'NODE_ENV', 'FAMILY_FINANCE_E2E']) {
+  for (const name of [
+    KEY_VAR,
+    MODEL_VAR,
+    FLAG_VAR,
+    ENABLED_VAR,
+    'NODE_ENV',
+    'FAMILY_FINANCE_E2E',
+  ]) {
     saved[name] = process.env[name];
     setEnv(name, undefined);
   }
@@ -94,6 +102,40 @@ describe('with a key configured', () => {
     // Construction is what is checked here; which model reaches the wire is
     // asserted in the provider's own tests, where the request body is visible.
     expect(provider()?.name).toBe('openai');
+  });
+
+  test('the key on its own is enough, with no second variable to remember', () => {
+    /*
+     * The release blocker this guards.
+     *
+     * `deployment.ts` used to require `FAMILY_FINANCE_AI_ENABLED=on` beside the
+     * key before reporting the reader as on, while this module built the
+     * provider from the key alone. The runbook documented only the key — so
+     * following it exactly produced a deployment whose reader worked and whose
+     * `/api/health` answered `aiEnabled: false`.
+     */
+    process.env[KEY_VAR] = 'placeholder-not-a-real-key';
+    setEnv(ENABLED_VAR, undefined);
+    resetProvider();
+
+    expect(process.env[ENABLED_VAR]).toBeUndefined();
+    expect(provider()?.name).toBe('openai');
+    expect(aiConfigured()).toBe(true);
+  });
+
+  test('and the flag can still turn it off, for real', () => {
+    /*
+     * The other half, and the more dangerous half. Setting the flag to `off`
+     * used to change what the health endpoint reported and nothing else: the
+     * screen went on sending sentences to a remote service while the deployment
+     * was being told it had stopped.
+     */
+    process.env[KEY_VAR] = 'placeholder-not-a-real-key';
+    process.env[ENABLED_VAR] = 'off';
+    resetProvider();
+
+    expect(provider()).toBeNull();
+    expect(aiConfigured()).toBe(false);
   });
 });
 

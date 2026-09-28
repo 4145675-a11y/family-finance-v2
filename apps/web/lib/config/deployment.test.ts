@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  aiEnabledIn,
   DeploymentConfigError,
   deploymentProblems,
   publicPrefixedSecrets,
@@ -66,7 +67,7 @@ describe('a well-formed production deployment', () => {
     expect(config.rpId).toBe('money.family.co.il');
   });
 
-  test('has AI off until it is deliberately turned on', () => {
+  test('has AI off when no key is configured', () => {
     expect(readDeploymentConfig(PRODUCTION).aiEnabled).toBe(false);
   });
 
@@ -289,12 +290,78 @@ describe('AI is off unless it can actually run', () => {
     expect(config.aiEnabled).toBe(true);
   });
 
-  test('a key without the flag leaves it off', () => {
+  test('a key on its own turns it on', () => {
+    /*
+     * The release blocker this replaced.
+     *
+     * It used to require a second variable, `FAMILY_FINANCE_AI_ENABLED=on`,
+     * that the runbook never mentioned — so the ordinary outcome of following
+     * the documented steps was a deployment whose reader worked and whose health
+     * endpoint reported `aiEnabled: false`. Adding a paid key to a hosted
+     * service is deliberate enough on its own.
+     */
     const config = readDeploymentConfig({
       ...PRODUCTION,
       OPENAI_API_KEY: PRESENT,
     });
+    expect(config.aiEnabled).toBe(true);
+  });
+
+  test('and the flag can turn it off while the key stays where it is', () => {
+    // A way to stop sending sentences out without destroying a key and having
+    // to mint another one.
+    const config = readDeploymentConfig({
+      ...PRODUCTION,
+      OPENAI_API_KEY: PRESENT,
+      FAMILY_FINANCE_AI_ENABLED: 'off',
+    });
     expect(config.aiEnabled).toBe(false);
+  });
+
+  test('the word "off" disables however it is capitalised or spaced', () => {
+    // Strict about switching on, lenient about switching off: somebody typing
+    // OFF to stop sentences leaving the machine has said what they want.
+    for (const value of ['off', 'OFF', ' Off ']) {
+      const config = readDeploymentConfig({
+        ...PRODUCTION,
+        OPENAI_API_KEY: PRESENT,
+        FAMILY_FINANCE_AI_ENABLED: value,
+      });
+      expect(config.aiEnabled, value).toBe(false);
+    }
+  });
+
+  test('and nothing else in the flag disables it', () => {
+    // A stray value must not silently stop the reader either.
+    for (const value of ['', ' ', 'no', 'false', '0', 'on']) {
+      const config = readDeploymentConfig({
+        ...PRODUCTION,
+        OPENAI_API_KEY: PRESENT,
+        FAMILY_FINANCE_AI_ENABLED: value,
+      });
+      expect(config.aiEnabled, value).toBe(true);
+    }
+  });
+
+  test('the health report and the reader cannot disagree', () => {
+    /*
+     * The one rule, asserted as one rule. `ai/server.ts` calls `aiEnabledIn`
+     * and so does `readDeploymentConfig`; this states that they still do, for
+     * every combination that matters.
+     */
+    const cases = [
+      { OPENAI_API_KEY: undefined, FAMILY_FINANCE_AI_ENABLED: undefined },
+      { OPENAI_API_KEY: PRESENT, FAMILY_FINANCE_AI_ENABLED: undefined },
+      { OPENAI_API_KEY: PRESENT, FAMILY_FINANCE_AI_ENABLED: 'on' },
+      { OPENAI_API_KEY: PRESENT, FAMILY_FINANCE_AI_ENABLED: 'off' },
+      { OPENAI_API_KEY: '   ', FAMILY_FINANCE_AI_ENABLED: undefined },
+    ];
+    for (const overrides of cases) {
+      const env = { ...PRODUCTION, ...overrides };
+      expect(readDeploymentConfig(env).aiEnabled, JSON.stringify(overrides)).toBe(
+        aiEnabledIn(env),
+      );
+    }
   });
 });
 

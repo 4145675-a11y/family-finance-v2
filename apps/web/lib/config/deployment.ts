@@ -128,6 +128,40 @@ export function supabaseProjectRefOf(url: string): string | null {
 /** The one literal that turns a boolean environment flag on. Anything else is off. */
 const ON = 'on';
 
+/** The one literal that turns the remote reader off while its key stays in place. */
+const OFF = 'off';
+
+/**
+ * Whether this deployment should use the remote reader. **The one rule.**
+ *
+ * The key is the switch. Adding a paid API key to a hosted service is already a
+ * deliberate act by the only person who can do it, and requiring a second
+ * variable beside it bought nothing: the runbook documented only the key, so the
+ * ordinary outcome was a deployment whose reader worked and whose health
+ * endpoint said it did not.
+ *
+ * The flag survives as an override that can only **disable** — a way to stop
+ * sending sentences out without deleting the key and having to mint another one.
+ * It used to be read here and nowhere else, which meant setting it to `off` left
+ * the reader running: the screen would go on calling a remote service while this
+ * file reported that it was not. That is the direction of divergence that
+ * matters, and it is why both callers now come through this function.
+ */
+export function aiEnabledIn(env: RawEnvironment): boolean {
+  const hasKey = (env.OPENAI_API_KEY ?? '').trim().length > 0;
+  /*
+   * Strict about switching on, lenient about switching off.
+   *
+   * `on` has to be exact, because a typo that enables something is a typo that
+   * spends money. The off switch is case-insensitive for the mirror-image
+   * reason: somebody typing `OFF` to stop sentences leaving the machine has
+   * said what they want, and honouring the capital letters by carrying on would
+   * be the worst way to be precise.
+   */
+  const off = env.FAMILY_FINANCE_AI_ENABLED?.trim().toLowerCase() === OFF;
+  return hasKey && !off;
+}
+
 /**
  * A host that only exists on the machine serving it.
  *
@@ -357,7 +391,7 @@ export function readDeploymentConfig(env: RawEnvironment = process.env): Deploym
     }
   }
 
-  // --- AI is off unless it is deliberately on, with a key ------------------
+  // --- AI follows the key; the flag may only turn it off -------------------
   const aiRequested = env.FAMILY_FINANCE_AI_ENABLED?.trim() === ON;
   const hasKey = (env.OPENAI_API_KEY ?? '').trim().length > 0;
 
@@ -384,7 +418,7 @@ export function readDeploymentConfig(env: RawEnvironment = process.env): Deploym
     backend,
     appOrigin: origin?.origin ?? originValue,
     rpId: origin?.rpId ?? '',
-    aiEnabled: aiRequested && hasKey,
+    aiEnabled: aiEnabledIn(env),
     // The fixture is a development convenience and is unreachable in production
     // no matter what the environment says (ADR-0017).
     fixtureAllowed: !isProduction && env.NEXT_PUBLIC_DEV_DATA_SOURCE?.trim() === ON,

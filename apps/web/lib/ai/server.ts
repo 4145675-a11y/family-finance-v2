@@ -6,6 +6,7 @@ import {
   type AIProvider,
 } from '@family-finance/ai-proposal';
 
+import { aiEnabledIn } from '../config/deployment';
 import { e2eFallback, e2eScriptRules } from './e2e-script';
 
 /**
@@ -27,9 +28,13 @@ import { e2eFallback, e2eScriptRules } from './e2e-script';
  *
  *   * a key is set → the real provider;
  *   * `FAMILY_FINANCE_AI_PROVIDER=scripted` → the deterministic one, for tests;
- *   * neither → **no provider**, and the screen says smart reading is not set up
- *     on this service. It does not pretend, and the deterministic route stays
- *     exactly where it was.
+ *   * neither → **no provider**, and the sentence is read by the rule table
+ *     instead. The screen does not say so, because which reader answered is not
+ *     a question a family can act on (`ADR-0042`); what it never does is pretend
+ *     something was read when nothing was.
+ *
+ * Whether a key counts as "set" is decided by `aiEnabledIn`, which is also what
+ * `/api/health` reports. One rule, one answer.
  */
 
 /** Set by a test runtime only. A production process that asks for it refuses. */
@@ -112,8 +117,19 @@ function build(): AIProvider | null {
     return new ScriptedAIProvider(e2eScriptRules(), e2eFallback());
   }
 
+  /*
+   * The same decision the health endpoint reports, from the same function.
+   *
+   * This used to read the key directly and ignore `FAMILY_FINANCE_AI_ENABLED`,
+   * while `deployment.ts` required that flag before reporting the reader as on.
+   * Two rules for one question, and both directions were wrong: a deployment
+   * with only a key had a working reader and a health endpoint that denied it,
+   * and a deployment that set the flag to `off` kept sending sentences out while
+   * being told it had stopped.
+   */
+  if (!aiEnabledIn(process.env)) return null;
+
   const key = (process.env['OPENAI_API_KEY'] ?? '').trim();
-  if (key === '') return null;
 
   const model = (process.env['OPENAI_MODEL'] ?? '').trim();
 

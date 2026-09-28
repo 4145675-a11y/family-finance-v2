@@ -166,4 +166,25 @@ test.describe('what cannot be read is said plainly', () => {
     const body = (await response.json()) as { status: string };
     expect(body.status).toBe('ok');
   });
+
+  test('and says so in the one field that reports it', async ({ request }) => {
+    /*
+     * The unconfigured half of the field that blocked a release.
+     *
+     * `aiEnabled` had no assertion anywhere — not here, not in the health unit
+     * tests, not in the production smoke check — which is how it went on
+     * answering `false` on a deployment whose reader would have worked. This
+     * server genuinely has no key, so `false` here is the truth.
+     */
+    const response = await request.get('/api/health');
+    const body = (await response.json()) as { aiEnabled?: boolean };
+    expect(body.aiEnabled).toBe(false);
+  });
+
+  test('and the health answer carries nothing that could be a key', async ({ request }) => {
+    // A health endpoint is public. It may say whether a reader is configured;
+    // it may never say anything about what was configured.
+    const raw = await (await request.get('/api/health')).text();
+    expect(raw).not.toMatch(/sk-|OPENAI|api[_-]?key/iu);
+  });
 });
