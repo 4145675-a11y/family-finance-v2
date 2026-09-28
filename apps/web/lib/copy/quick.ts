@@ -33,6 +33,8 @@ export const quick = {
 
   /** The one primary action. */
   propose: 'הצע עדכון',
+  /** Said out loud because a textarea does not usually submit on Enter. */
+  enterHint: 'Enter לשליחה · Shift+Enter לשורה חדשה',
   proposing: 'קוראים…',
   clear: 'ניקוי',
 
