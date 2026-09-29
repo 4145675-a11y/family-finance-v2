@@ -390,6 +390,36 @@ describe('asking for a household', () => {
   });
 });
 
+describe('the question the navigation asks', () => {
+  test('answers true for the platform owner', async () => {
+    const answer = await asUser(
+      mallory,
+      async (c) => (await c.query('select public.is_platform_owner() as yes')).rows[0],
+    );
+    expect(answer.yes).toBe(true);
+  });
+
+  test('and false for an ordinary member, an owner of a household, and a stranger', async () => {
+    for (const person of [alice, bob, carol]) {
+      const answer = await asUser(
+        person,
+        async (c) => (await c.query('select public.is_platform_owner() as yes')).rows[0],
+      );
+      expect(answer.yes, person.id).toBe(false);
+    }
+  });
+
+  test('and it tells them nothing about who is', async () => {
+    // The wrapper answers about the caller only. The list of administrators is
+    // not readable through the API by anybody.
+    const rows = await asUser(
+      alice,
+      async (c) => (await c.query('select profile_id from public.platform_admins')).rows,
+    );
+    expect(rows).toHaveLength(0);
+  });
+});
+
 describe('the platform owner is not a financial identity', () => {
   beforeAll(async () => {
     await ownerClient().query(

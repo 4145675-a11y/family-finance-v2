@@ -6,7 +6,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 
-import { NAV_ITEMS, PHONE_NAV } from '../components/app-shell';
+import { ADMIN_NAV_ITEM, NAV_ITEMS, PHONE_NAV, navItemsFor } from '../components/app-shell';
 import { copy } from '../lib/copy/copy';
 import { Badge, EmptyState, Figure, Money, StatRow } from '../components/ui';
 import RootLayout, { metadata, viewport } from './layout';
@@ -122,6 +122,42 @@ describe('navigation', () => {
       '/lenders',
       '/more',
     ]);
+  });
+
+  test('the administration screen is not one of them', () => {
+    /*
+     * Administering the service is not a household task. It is not in the five
+     * a family learns, and an ordinary person's navigation never mentions it.
+     */
+    expect(NAV_ITEMS.map((item) => item.href)).not.toContain('/admin');
+  });
+
+  test('a signed-in ordinary person sees the five and nothing more', () => {
+    const items = navItemsFor(false);
+    expect(items.map((item) => item.href)).toEqual(NAV_ITEMS.map((item) => item.href));
+    expect(items.map((item) => item.href)).not.toContain('/admin');
+  });
+
+  test('an unauthenticated visitor is in the same position, for the same reason', () => {
+    /*
+     * `isPlatformOwner()` returns false when nobody is signed in, so the shell
+     * asks for `navItemsFor(false)` and the link is absent. The same call is
+     * what a signed-in non-owner gets: there is one answer and one code path.
+     */
+    expect(navItemsFor(false).map((item) => item.href)).not.toContain('/admin');
+  });
+
+  test('a confirmed platform owner sees it, last, and labelled in Hebrew', () => {
+    const items = navItemsFor(true);
+    expect(items.map((item) => item.href)).toEqual([...NAV_ITEMS.map((i) => i.href), '/admin']);
+    expect(items.at(-1)?.label).toBe('ניהול משקי בית');
+    expect(ADMIN_NAV_ITEM.href).toBe('/admin');
+  });
+
+  test('and it is the same list on a phone as on a desktop', () => {
+    // The shell draws one array in both bars, so this cannot drift.
+    const shell = readFileSync(join(WEB_ROOT, 'components/app-shell.tsx'), 'utf8');
+    expect(shell.split('{items.map(').length - 1).toBe(2);
   });
 
   test('a phone and a desktop show the same five', () => {

@@ -333,6 +333,46 @@ describe('the daily screen stays a daily screen', () => {
   });
 });
 
+describe('the administration link is gated on the server', () => {
+  const shellSource = readFileSync(join(APP_ROOT, '..', 'components', 'app-shell.tsx'), 'utf8');
+
+  test('the shell asks the shared authorisation helper, and nothing else', () => {
+    /*
+     * The one mechanism, reused. Not an email comparison, not a claim read off
+     * the session, not a flag in storage: isPlatformOwner() asks the database
+     * through public.is_platform_owner(), which calls app.is_platform_admin().
+     */
+    expect(shellSource).toContain("from '../lib/auth/platform'");
+    expect(shellSource).toContain('await isPlatformOwner()');
+  });
+
+  test('and decides nothing for itself', () => {
+    // A second rule about who is an administrator is a second rule to get wrong.
+    for (const forbidden of ['email', 'localStorage', 'process.env']) {
+      expect(shellSource.includes(forbidden), `the shell judges by ${forbidden}`).toBe(false);
+    }
+  });
+
+  test('the admin screen checks again, whatever the navigation drew', () => {
+    /*
+     * Hiding a link is a courtesy. The screen behind it is the boundary, and it
+     * turns away a person who is not the platform owner even when they type the
+     * address — which is what somebody reading the page's JavaScript would do.
+     */
+    const admin = read('admin/page.tsx');
+    expect(admin).toContain('isPlatformOwner');
+    expect(admin).toContain("redirect('/')");
+  });
+
+  test('and so does every action behind it', () => {
+    // A third time, in the database: requireOwner is the readable sentence, and
+    // the function it calls checks app.is_platform_admin() for itself.
+    const actions = readFileSync(join(APP_ROOT, '..', 'lib', 'actions', 'platform.ts'), 'utf8');
+    expect(actions).toContain('isPlatformOwner');
+    expect(actions).toContain('requireOwner');
+  });
+});
+
 describe('the shell', () => {
   const home = homeSource;
   const shell = readFileSync(join(APP_ROOT, '..', 'components', 'app-shell.tsx'), 'utf8');

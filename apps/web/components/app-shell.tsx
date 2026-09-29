@@ -2,6 +2,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { copy } from '../lib/copy/copy';
+import { platform } from '../lib/copy/platform';
+import { isPlatformOwner } from '../lib/auth/platform';
 import type { DataSourceDescriptor } from '../lib/dashboard/source';
 import { Mark, SourceBanner } from './ui';
 
@@ -53,12 +55,36 @@ export const NAV_ITEMS: readonly NavItem[] = [
 /** The same five, named for the bar a thumb reaches. */
 export const PHONE_NAV: readonly NavItem[] = NAV_ITEMS;
 
+/**
+ * The sixth destination, for the one person who has it.
+ *
+ * Administering the service is not a household task, so it is not one of the
+ * five a family learns. It is appended for the platform owner and absent for
+ * everybody else — which keeps the promise that the navigation is the same on a
+ * phone and a desktop, without making everybody carry a door they cannot open.
+ */
+export const ADMIN_NAV_ITEM: NavItem = { href: '/admin', label: platform.title };
+
+/**
+ * The navigation a given person sees.
+ *
+ * A pure function of one boolean, so the shape can be asserted without a
+ * database, a session or a rendered tree. **It is not the authorisation.** The
+ * boolean comes from `isPlatformOwner()`, which asks the database; `/admin`
+ * checks again before it renders; and every action behind it is checked a third
+ * time by a function that consults `app.is_platform_admin()` itself. Hiding a
+ * link is a courtesy to the person reading the screen, never a boundary.
+ */
+export function navItemsFor(platformOwner: boolean): readonly NavItem[] {
+  return platformOwner ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
+}
+
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
       aria-current={active ? 'page' : undefined}
-      className={`flex min-h-11 min-w-11 flex-1 items-center justify-center rounded-control px-2 py-2 text-center text-small font-medium transition-colors sm:justify-start sm:px-3 sm:text-body ${
+      className={`flex min-h-11 min-w-11 flex-1 items-center justify-center rounded-control px-2 py-2 text-center text-small leading-tight font-medium transition-colors sm:justify-start sm:px-3 sm:text-body ${
         active
           ? 'bg-primary text-surface'
           : 'text-text-secondary hover:bg-surface-muted hover:text-text-primary'
@@ -69,7 +95,7 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
-export function AppShell({
+export async function AppShell({
   active,
   title,
   status,
@@ -100,6 +126,15 @@ export function AppShell({
   subtitle?: string;
   children: ReactNode;
 }) {
+  /*
+   * Asked once per request. `isPlatformOwner` is React-cached, so a page that
+   * also asks — `/admin` does — shares this answer rather than making a second
+   * round trip, and on the file backend it returns false without asking anything
+   * at all. What crosses the wire is one boolean: no household, member,
+   * invitation or request data is loaded to decide whether to draw a link.
+   */
+  const items = navItemsFor(await isPlatformOwner());
+
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-4 px-4 pt-4 pb-24 sm:px-6 sm:pb-8">
       <a
@@ -133,7 +168,7 @@ export function AppShell({
           className="hidden shrink-0 flex-col gap-0.5 rounded-card border border-border bg-surface p-2 shadow-card sm:flex sm:w-44"
         >
           <ul className="flex flex-col gap-0.5">
-            {NAV_ITEMS.map((item) => (
+            {items.map((item) => (
               <li key={item.href} className="flex">
                 <NavLink item={item} active={item.href === active} />
               </li>
@@ -157,13 +192,25 @@ export function AppShell({
         </main>
       </div>
 
-      {/* Mobile bottom navigation. Every target is at least 44px, per the design system. */}
+      {/*
+        Mobile bottom navigation. Every target is at least 44px, per the design
+        system — which is what bounds how many destinations this bar can hold.
+        At the narrowest supported width, 390px, the bar has 374px of content
+        after its padding and loses 5px per gap, so six equal columns are about
+        59px each and five are about 71px. Both clear 44px, so the platform
+        owner's sixth link does not make this bar scroll sideways. What it does
+        do is wrap to two lines, exactly as `חובות ומלווים` and `עדכון מהיר`
+        already wrap at five — so the bar's height is unchanged, and
+        `leading-tight` on the link keeps a wrapped label compact for everyone.
+        A seventh destination would be the one that breaks this, at about 50px
+        a column: the honest fix then is fewer destinations, not smaller text.
+      */}
       <nav
         aria-label={copy.nav.ariaBottom}
         className="fixed inset-x-0 bottom-0 border-t border-border bg-surface sm:hidden"
       >
         <ul className="mx-auto flex max-w-6xl items-stretch gap-1 px-2 py-2">
-          {PHONE_NAV.map((item) => (
+          {items.map((item) => (
             <li key={item.href} className="flex flex-1">
               <NavLink item={item} active={item.href === active} />
             </li>

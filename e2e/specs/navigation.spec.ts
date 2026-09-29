@@ -46,6 +46,52 @@ test.describe('@smoke the navigation is five things, and the same five everywher
   });
 });
 
+test.describe('the administration screen is not an ordinary destination', () => {
+  test('its link is nowhere in the navigation for a person who is not the platform owner', async ({
+    page,
+  }) => {
+    /*
+     * This suite signs in as an ordinary household member, so the link must be
+     * absent from both bars. Absence here is a courtesy rather than the
+     * boundary — the test below is the boundary — but a link nobody can use
+     * would teach a family that parts of the product argue with them.
+     */
+    await page.goto('/');
+    for (const bar of ['ניווט ראשי', 'ניווט תחתון']) {
+      const nav = page.getByRole('navigation', { name: bar });
+      await expect(nav.getByRole('link', { name: 'ניהול משקי בית' })).toHaveCount(0);
+    }
+    await expect(page.locator('a[href="/admin"]')).toHaveCount(0);
+  });
+
+  test('and typing the address gets them nowhere', async ({ page }) => {
+    // The screen turns away anybody who is not the platform owner, whatever the
+    // navigation drew. Here the backend has no platform owner at all.
+    await page.goto('/admin');
+    await expect(page).not.toHaveURL(/\/admin$/u);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  });
+
+  test('and no household, member or invitation data is fetched to decide that', async ({
+    page,
+  }) => {
+    /*
+     * Drawing a navigation must not become a reason to load somebody's people.
+     * What decides the link is one boolean; nothing here should ask for members,
+     * invitations or requests.
+     */
+    const asked: string[] = [];
+    page.on('request', (request) => asked.push(request.url()));
+    await page.goto('/');
+    for (const table of ['household_members', 'household_invitations', 'household_requests']) {
+      expect(
+        asked.filter((url) => url.includes(table)),
+        table,
+      ).toHaveLength(0);
+    }
+  });
+});
+
 test.describe('the journeys a person walks by reading', () => {
   test('home offers recording something as its one action', async ({ page }) => {
     await page.goto('/');
