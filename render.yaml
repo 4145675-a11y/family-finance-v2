@@ -19,10 +19,22 @@ services:
     name: family-finance-web
     runtime: node
     region: frankfurt
-    # `free` is chosen on purpose: the default (`0.5c-512mb`, Starter) costs
-    # money, and spending is the owner's decision (ADR-0033). Free instances
-    # spin down after inactivity; the first request afterwards is slow.
-    plan: free
+    # Starter — `0.5c-512mb` (0.5 CPU, 512 MB), $7/month, confirmed in the
+    # Render dashboard on 2026-09-29 and live there.
+    #
+    # Chosen for one reason: a Free instance spins down after fifteen minutes
+    # without traffic, and the first request afterwards waits for a cold start —
+    # which on a screen somebody opens in a shop is the difference between using
+    # the product and giving up on it.
+    #
+    # **The dashboard made this change, not this line.** Spending is the owner's
+    # decision (ADR-0033), and it was taken where the price is shown before it is
+    # confirmed. What this line does is stop a blueprint sync putting the service
+    # back on Free: the file used to say `free` so that the repository could
+    # never create a charge by accident, which was right while the service was
+    # free and became a trap the moment it was not. It follows the dashboard; it
+    # does not lead it, and changing it is not how the plan is changed.
+    plan: 0.5c-512mb
     branch: main
     # Deploy only after GitHub reports the commit's checks as passed — the CI
     # gates run before Render builds, not instead of it.

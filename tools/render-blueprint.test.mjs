@@ -100,6 +100,30 @@ describe('the blueprint describes one Node web service', () => {
     expect(typeof service.plan).toBe('string');
     expect(service.plan).not.toBe('');
   });
+
+  test('the plan is the paid one the owner chose, by its exact identifier', () => {
+    /*
+     * Pinned, and pinned in both directions.
+     *
+     * The service runs on Starter — `0.5c-512mb`, $7/month, chosen in the Render
+     * dashboard on 2026-09-29 because a Free instance spins down after fifteen
+     * minutes and the first request afterwards waits for a cold start.
+     *
+     * This line does not make that true; the dashboard does. What it stops is
+     * the file quietly disagreeing with it. A blueprint sync applies whatever is
+     * here, so an edit back to `free` would take a paid, warm service and put it
+     * to sleep — and nothing else in this repository would notice. A typo would
+     * be worse: an identifier Render does not recognise is not obviously an
+     * identifier Render will refuse.
+     *
+     * So changing the plan means changing it in the dashboard, where the price
+     * is shown before it is confirmed, and then changing this line and this test
+     * to match. That is deliberately two steps: spending is the owner's decision
+     * (ADR-0033), and a decision that can be made by editing a file in passing
+     * is not one they took.
+     */
+    expect(service.plan).toBe('0.5c-512mb');
+  });
 });
 
 describe('build, start and health agree with the repository', () => {

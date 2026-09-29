@@ -25,7 +25,7 @@
 
 | רכיב | קובץ | מה הוא קובע | איך זה מוכח |
 |---|---|---|---|
-| Blueprint | `render.yaml` | Web Service, runtime Node, Frankfurt, `plan: free`, `branch: main`, deploy רק אחרי ש־CI ירוק (`autoDeployTrigger: checksPass`), `healthCheckPath: /api/health` | `tools/render-blueprint.test.mjs` — 38 בדיקות: מבנה, Node = `.nvmrc`, build = CI, `start` קיים, כל משתנה נדרש מוצהר, **אף ערך שנראה כסוד** |
+| Blueprint | `render.yaml` | Web Service, runtime Node, Frankfurt, `plan: 0.5c-512mb` (Starter, $7/חודש), `branch: main`, deploy רק אחרי ש־CI ירוק (`autoDeployTrigger: checksPass`), `healthCheckPath: /api/health` | `tools/render-blueprint.test.mjs` — 38 בדיקות: מבנה, Node = `.nvmrc`, build = CI, `start` קיים, כל משתנה נדרש מוצהר, **אף ערך שנראה כסוד** |
 | Node | `NODE_VERSION=24.18.1` ב־blueprint | הגרסה ש־`.nvmrc` נועל ו־CI מריץ | הבדיקה משווה את שלושת המקומות |
 | Build | `npm ci --ignore-scripts --include=dev && npm run build` | אותה התקנה ואותו build כמו CI; devDependencies במפורש (ה־build צריך אותן) | `npm run check:build` — ה־build עם `NODE_ENV=production` כמו ב־Render, כל דיאגנוסטיקה של Turbopack = כישלון; רץ ב־`verify` וב־CI |
 | Start | `npm run start` → `next start` דרך `tools/next.mjs` | נקשר ל־`0.0.0.0:$PORT` (Render מגדיר `PORT`); טלמטריה כבויה | הורץ מקומית עם `PORT=3177` |
@@ -65,7 +65,18 @@
    - ה־deploy נכשל ב־build — פתחו את ה־logs. build שעובר `npm run check:build` ב־CI אמור לעבור גם כאן; אם לא, ההבדל הוא בסביבה (למשל `NODE_ENV` שנוסף בלוח).
 4. פתחו `https://<הכתובת>/api/health` בדפדפן. ודאו `"backend":"supabase"`, `"credentials":"accepted"`, `"readiness":"ready"`. אם הכתובת שונה ממה שהזנתם ב־`FAMILY_FINANCE_APP_ORIGIN` — עדכנו את המשתנה ל־origin המדויק (בלי `/` בסוף) ו־Manual Deploy. **במקרה שלכם**: Render הקצה `https://family-finance-web-l2gp.onrender.com`, והערך שהוזן השמיט את `-l2gp` — תקנו לערך המדויק הזה.
 
-**Free plan**: השירות נרדם אחרי ~15 דקות ללא תעבורה; הבקשה הראשונה אחר כך איטית (עשרות שניות). זה מקובל ל־smoke; ל־שימוש יומיומי — שדרוג ל־Starter הוא **החלטת הוצאה שלכם**, ומבוצע בלוח Render (לא בקובץ).
+**התוכנית: Starter** (`0.5c-512mb`, 0.5 CPU, 512MB) — **$7 לחודש**, אושר בלוח
+Render ב־2026-09-29 והשירות Live.
+
+עד אז הייתה התוכנית Free, והשירות נרדם אחרי ~15 דקות ללא תעבורה: הבקשה הראשונה
+אחר כך המתינה עשרות שניות ל־cold start. זה מקובל ל־smoke ולא לשימוש יומיומי —
+מסך שנפתח בחנות והמתנה של חצי דקה הם ההבדל בין להשתמש במוצר לבין לוותר עליו.
+
+**השדרוג נעשה בלוח, לא בקובץ.** ההוצאה היא החלטת הבעלים (`ADR-0033`), והיא
+מתקבלת במקום שבו המחיר מוצג לפני האישור. מה שהקובץ עושה הוא **לעקוב**: `plan`
+ב־`render.yaml` מציין עכשיו `0.5c-512mb` כדי ש־blueprint sync לא יחזיר את
+השירות ל־Free. כל עוד השירות היה חינמי, `plan: free` בקובץ מנע חיוב בשוגג; מרגע
+שהוא אינו חינמי, אותה שורה הפכה למלכודת. הקובץ אינו הדרך לשנות תוכנית.
 
 ### ב. Supabase Auth מול ה־origin החדש (Authentication → URL Configuration)
 
@@ -125,7 +136,7 @@
 | הזנת שלושת הערכים | **פעולת בעלים** | ערכים אינם נכנסים למאגר, גם לא הציבוריים |
 | Site URL, Redirect URLs, תבניות אימייל | **פעולת בעלים** | שינוי הגדרות Supabase לא בוצע ללא הוראה |
 | דומיין ו־DNS | **פעולת בעלים, אופציונלי** | שלב ב׳, אחרי smoke על onrender.com |
-| Free מול Starter | **החלטת בעלים** | `plan: free` בקובץ כדי שלא תיווצר הוצאה בשוגג |
+| Free מול Starter | **הוכרע: Starter** (2026-09-29) | החלטת הבעלים, בוצעה בלוח Render שבו המחיר מוצג לפני האישור — $7/חודש. הקובץ עודכן **אחרי** השינוי ומציין `0.5c-512mb`, כדי ש־sync לא יחזיר ל־Free |
 | CSP / HSTS headers | נדחה | דורש בדיקה מול המוצר הרץ ב־https; milestone הקשחה |
 | Passkeys בייצור | נדחה (`ADR-0032`) | זהות = Supabase Auth |
 | בדיקות אינטגרציה ב־CI | נדחה | דורש סוד DB ב־GitHub — החלטה נפרדת |
