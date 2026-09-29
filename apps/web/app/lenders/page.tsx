@@ -14,6 +14,7 @@ import {
 } from '../../components/ui';
 import { addDebtAction, recordRolloverAction } from '../../lib/actions/entries';
 import { copy } from '../../lib/copy/copy';
+import { repayment } from '../../lib/copy/repayment';
 import { screens } from '../../lib/copy/screens';
 import { loadDashboardView } from '../../lib/dashboard/load';
 import { todayInJerusalem } from '../../lib/forms';
@@ -265,6 +266,30 @@ export default async function LendersPage() {
                     { value: 'demanded', label: copy.debts.urgency['demanded'] ?? '' },
                     { value: 'legal', label: copy.debts.urgency['legal'] ?? '' },
                   ]}
+                />
+              </div>
+              {/*
+                When the loan is expected to be repaid — and, as an equal answer
+                rather than a blank, that no date was agreed. The default is
+                "not recorded", because a form that opened on a date would
+                invite a guess, and a guessed deadline is worse than none.
+              */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectField
+                  name="expectation"
+                  label={repayment.expectation.choiceLabel}
+                  defaultValue="unrecorded"
+                  options={[
+                    { value: 'unrecorded', label: repayment.expectation.unrecorded },
+                    { value: 'dated', label: repayment.expectation.choiceDated },
+                    { value: 'none', label: repayment.expectation.choiceNone },
+                  ]}
+                />
+                <TextField
+                  name="expectedRepaymentOn"
+                  label={repayment.expectation.dateLabel}
+                  type="date"
+                  required={false}
                 />
               </div>
             </>

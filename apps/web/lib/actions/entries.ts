@@ -1,5 +1,6 @@
 'use server';
 
+import type { RepaymentExpectation } from '@family-finance/contracts';
 import {
   acceptReconciliationGap,
   addDebt,
@@ -20,6 +21,7 @@ import {
 } from '@family-finance/local-store';
 import { revalidatePath } from 'next/cache';
 
+import { repayment } from '../copy/repayment';
 import { FieldReader, failed, succeeded, type FormState, submissionKey } from '../forms';
 import { householdStore } from '../store/server';
 import { ALREADY_RECORDED, describe, repeatWatch, refreshMoneyScreens } from './errors';
@@ -535,6 +537,35 @@ export async function addDebtAction(_previous: FormState, data: FormData): Promi
   const expectedCallDate = reader.optionalDate('expectedCallDate', 'מתי עלולים לבקש בחזרה');
   const notes = reader.optionalText('notes', 'הערות', 1000);
 
+  /*
+   * When the whole loan is expected to be repaid, in three answers.
+   *
+   * The default is `unrecorded` so a form submitted without touching this says
+   * nothing rather than asserting something — which is what every caller that
+   * predates the field also means. `none` is a real answer, not an empty one: a
+   * loan from a relative with no agreed deadline is an ordinary loan, and the
+   * product must be able to hold that without asking the family to fix it.
+   */
+  const expectationChoice = reader.choice(
+    'expectation',
+    repayment.expectation.choiceLabel,
+    ['dated', 'none', 'unrecorded'] as const,
+    'unrecorded',
+  );
+  const expectedRepaymentOn = reader.optionalDate(
+    'expectedRepaymentOn',
+    repayment.expectation.dateLabel,
+  );
+  if (expectationChoice === 'dated' && expectedRepaymentOn === null) {
+    reader.problem('expectedRepaymentOn', repayment.expectation.dateNeeded);
+  }
+  const repaymentExpectation: RepaymentExpectation | undefined =
+    expectationChoice === 'unrecorded'
+      ? undefined
+      : expectationChoice === 'none'
+        ? { kind: 'none' }
+        : { kind: 'dated', on: expectedRepaymentOn ?? '' };
+
   const isPrivate = kind === 'private_person';
   const relationshipSensitivity = isPrivate
     ? (reader.optionalChoice('relationshipSensitivity', ['low', 'medium', 'high'] as const) ??
@@ -567,6 +598,7 @@ export async function addDebtAction(_previous: FormState, data: FormData): Promi
             relationshipSensitivity,
             partialPaymentAllowed,
             expectedCallDate,
+            ...(repaymentExpectation === undefined ? {} : { repaymentExpectation }),
             notes,
           },
           context,

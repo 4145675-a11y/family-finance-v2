@@ -76,6 +76,39 @@ export type DebtUrgency = z.infer<typeof debtUrgencySchema>;
 export const relationshipSensitivitySchema = z.enum(['low', 'medium', 'high']);
 export type RelationshipSensitivity = z.infer<typeof relationshipSensitivitySchema>;
 
+/**
+ * What the family expects about when this loan will be repaid.
+ *
+ * Three states, and the third is the point. A loan can have a date; a loan can
+ * have been agreed with **no** repayment date at all — which is the ordinary
+ * shape of a loan from a relative, and a real fact about it; and a loan can
+ * simply never have been asked about. Those are not the same, and a single
+ * nullable date cannot tell the second from the third: it would turn "we agreed
+ * there is no deadline" into "nobody has filled this in", which is the answer a
+ * family would then be nagged about for ever.
+ *
+ * So the field is optional and, when present, says which of the two things was
+ * decided. Absent means unrecorded, and every loan entered before this existed
+ * is absent — correctly, because nothing was ever said about it.
+ *
+ * It is deliberately not `dueDate`. That is when a *payment* falls due, it
+ * recurs, and it carries a Hebrew reading; this is when the *whole* loan is
+ * expected to be finished. Nor is it `expectedCallDate`, which is the day the
+ * lender might ask for the money back early — a risk, not a plan.
+ */
+export const repaymentExpectationSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('dated'),
+    /** The day the loan is expected to be repaid by. */
+    on: businessDateSchema,
+  }),
+  z.object({
+    /** Agreed with no repayment date: `ללא צפי לפירעון`. */
+    kind: z.literal('none'),
+  }),
+]);
+export type RepaymentExpectation = z.infer<typeof repaymentExpectationSchema>;
+
 export const debtSchema = z
   .object({
     id: uuidSchema,
@@ -111,6 +144,14 @@ export const debtSchema = z
      * exactly what those records mean.
      */
     dueDate: dueDateSchema.optional(),
+    /**
+     * When the whole loan is expected to be repaid, or that no date was agreed.
+     *
+     * Optional for the same reason `dueDate` is: absent means nothing was ever
+     * recorded, which is exactly what every loan entered before this field
+     * existed means.
+     */
+    repaymentExpectation: repaymentExpectationSchema.optional(),
     notes: z.string().trim().max(1000).nullable(),
     openedOn: businessDateSchema,
     closedAt: timestampSchema.nullable(),
@@ -215,6 +256,53 @@ export const debtEventSchema = z
 export type DebtEvent = z.infer<typeof debtEventSchema>;
 
 /**
+ * A time the lender asked to be repaid.
+ *
+ * Its own record, not a field on the debt, for the reason the checks
+ * collection gives: a demand has a date and a history. A lender who asked in
+ * Elul, again in Tishrei, and again with a deadline is telling a story that a
+ * single `last_demand_at` column erases every time it is overwritten — and that
+ * story is the whole reason the family needs this screen.
+ *
+ * **It moves no money and changes no term.** A demand is not a payment, not a
+ * charge, and not a change to the loan: recording one leaves the balance, the
+ * events, the status and the closed date exactly as they were. That is what
+ * makes it safe on a loan that is already repaid — and a lender who comes back
+ * after a settled loan is precisely the case a family cannot afford to have no
+ * way to write down.
+ */
+export const debtRepaymentDemandSchema = z
+  .object({
+    id: uuidSchema,
+    householdId: uuidSchema,
+    debtId: uuidSchema,
+    /** The day the demand was made. Defaults to today in the form, never guessed here. */
+    demandedOn: businessDateSchema,
+    /** By when the lender asked to be paid. Null when they named no date. */
+    requestedDeadline: businessDateSchema.nullable(),
+    /**
+     * How much was asked for, when a figure was named.
+     *
+     * Null is not zero: a lender who said "I need it back" without a number has
+     * demanded something, and recording 0 would be inventing a figure. Nothing
+     * derives a balance from this — the events remain the only truth about that.
+     */
+    amountMinor: amountMinorSchema.nullable(),
+    note: z.string().trim().max(500).nullable(),
+    createdBy: uuidSchema,
+    createdAt: timestampSchema,
+  })
+  .refine(
+    (demand) =>
+      demand.requestedDeadline === null || demand.requestedDeadline >= demand.demandedOn,
+    {
+      message: 'a deadline cannot fall before the day it was asked for',
+      path: ['requestedDeadline'],
+    },
+  );
+export type DebtRepaymentDemand = z.infer<typeof debtRepaymentDemandSchema>;
+
+/**
  * How a rollover link came to exist.
  *
  * A link inferred from amount and timing is a suggestion until a person confirms
@@ -289,9 +377,32 @@ export const createDebtInputSchema = z.object({
   partialPaymentAllowed: z.boolean().nullable(),
   expectedCallDate: businessDateSchema.nullable(),
   dueDate: dueDateSchema.optional(),
+  repaymentExpectation: repaymentExpectationSchema.optional(),
   notes: z.string().trim().max(1000).nullable(),
 });
 export type CreateDebtInput = z.infer<typeof createDebtInputSchema>;
+
+/**
+ * Setting, changing or clearing what is expected about repayment.
+ *
+ * `expectation` absent means "back to nothing recorded", which is a legitimate
+ * correction: a person who set a date they were not sure about must be able to
+ * withdraw it rather than be forced to leave a guess on the record.
+ */
+export const setRepaymentExpectationInputSchema = z.object({
+  debtId: uuidSchema,
+  expectation: repaymentExpectationSchema.optional(),
+});
+export type SetRepaymentExpectationInput = z.infer<typeof setRepaymentExpectationInputSchema>;
+
+export const recordRepaymentDemandInputSchema = z.object({
+  debtId: uuidSchema,
+  demandedOn: businessDateSchema,
+  requestedDeadline: businessDateSchema.nullable(),
+  amountMinor: amountMinorSchema.nullable(),
+  note: z.string().trim().max(500).nullable(),
+});
+export type RecordRepaymentDemandInput = z.infer<typeof recordRepaymentDemandInputSchema>;
 
 export const recordDebtEventInputSchema = z.object({
   debtId: uuidSchema,

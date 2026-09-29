@@ -72,26 +72,28 @@ function transportOver(outcomes: Record<string, { data?: unknown; error?: unknow
 
 const RECORD_CHANGES: HouseholdChanges = { debtEvents: { upsert: [{ id: 'e1' }] } };
 
-describe('a database that has the newer function', () => {
-  test('the write goes through it, and the older one is not called', async () => {
+describe('a database that has the newest function', () => {
+  test('the write goes through it, and no older one is called', async () => {
     const { transport, calls } = transportOver({
-      apply_household_document: { data: { version: 7 } },
+      save_household_document: { data: { version: 7 } },
     });
 
     await expect(transport.apply(HOUSEHOLD, 6, RECORD_CHANGES)).resolves.toBe(7);
-    expect(calls.map((call) => call.fn)).toEqual(['apply_household_document']);
+    expect(calls.map((call) => call.fn)).toEqual(['save_household_document']);
   });
 });
 
 describe('a database that does not have it yet', () => {
   test('financial records still save, through the older function', async () => {
     const { transport, calls } = transportOver({
+      save_household_document: { error: MISSING_FUNCTION },
       apply_household_document: { error: MISSING_FUNCTION },
       apply_household_changes: { data: { version: 7 } },
     });
 
     await expect(transport.apply(HOUSEHOLD, 6, RECORD_CHANGES)).resolves.toBe(7);
     expect(calls.map((call) => call.fn)).toEqual([
+      'save_household_document',
       'apply_household_document',
       'apply_household_changes',
     ]);
@@ -99,12 +101,13 @@ describe('a database that does not have it yet', () => {
 
   test('the fallback sends the same change set, unaltered', async () => {
     const { transport, calls } = transportOver({
+      save_household_document: { error: MISSING_FUNCTION },
       apply_household_document: { error: MISSING_FUNCTION },
       apply_household_changes: { data: { version: 7 } },
     });
 
     await transport.apply(HOUSEHOLD, 6, RECORD_CHANGES);
-    expect(calls[1]?.args).toEqual({
+    expect(calls[2]?.args).toEqual({
       p_household_id: HOUSEHOLD,
       p_expected_version: 6,
       p_changes: RECORD_CHANGES,
@@ -118,6 +121,7 @@ describe('a database that does not have it yet', () => {
      * forgotten — a false success, which is worse than a refusal.
      */
     const { transport, calls } = transportOver({
+      save_household_document: { error: MISSING_FUNCTION },
       apply_household_document: { error: MISSING_FUNCTION },
       apply_household_changes: { data: { version: 7 } },
     });
@@ -127,25 +131,76 @@ describe('a database that does not have it yet', () => {
     ).rejects.toMatchObject({ failure: 'schema_outdated' });
 
     // And nothing was written at all.
-    expect(calls.map((call) => call.fn)).toEqual(['apply_household_document']);
+    expect(calls.map((call) => call.fn)).toEqual([
+      'save_household_document',
+      'apply_household_document',
+    ]);
+  });
+
+  test('a repayment demand is refused precisely, not dropped', async () => {
+    /*
+     * The one that matters most of the three. A lender asked for their money,
+     * the family wrote it down, and a silent drop would tell them it was kept.
+     * There is no recovering that: nobody re-reads a screen that said "נרשם".
+     */
+    const { transport, calls } = transportOver({
+      save_household_document: { error: MISSING_FUNCTION },
+      apply_household_document: { data: { version: 7 } },
+      apply_household_changes: { data: { version: 7 } },
+    });
+
+    await expect(
+      transport.apply(HOUSEHOLD, 6, { repaymentDemands: { upsert: [{ id: 'd1' }] } }),
+    ).rejects.toMatchObject({ failure: 'schema_outdated' });
+
+    expect(calls.map((call) => call.fn)).toEqual(['save_household_document']);
+  });
+
+  test('an expected repayment date is refused the same way', async () => {
+    const { transport, calls } = transportOver({
+      save_household_document: { error: MISSING_FUNCTION },
+      apply_household_document: { data: { version: 7 } },
+      apply_household_changes: { data: { version: 7 } },
+    });
+
+    await expect(
+      transport.apply(HOUSEHOLD, 6, {
+        debtRepaymentExpectations: { upsert: [{ id: 'debt-1' }] },
+      }),
+    ).rejects.toMatchObject({ failure: 'schema_outdated' });
+
+    expect(calls.map((call) => call.fn)).toEqual(['save_household_document']);
+  });
+
+  test('records without either still fall back and save', async () => {
+    // The refusals are precise: they name what cannot be carried and let
+    // everything else through, rather than stopping every write.
+    const { transport } = transportOver({
+      save_household_document: { error: MISSING_FUNCTION },
+      apply_household_document: { data: { version: 7 } },
+    });
+
+    await expect(transport.apply(HOUSEHOLD, 6, RECORD_CHANGES)).resolves.toBe(7);
   });
 });
 
 describe('a write that genuinely fails', () => {
   test('a real error from the newer function is reported, never retried as legacy', async () => {
     const { transport, calls } = transportOver({
-      apply_household_document: { error: { code: '42501', message: 'permission denied' } },
+      save_household_document: { error: { code: '42501', message: 'permission denied' } },
+      apply_household_document: { data: { version: 99 } },
       apply_household_changes: { data: { version: 99 } },
     });
 
     await expect(transport.apply(HOUSEHOLD, 6, RECORD_CHANGES)).rejects.toMatchObject({
       failure: 'permission_denied',
     });
-    expect(calls.map((call) => call.fn)).toEqual(['apply_household_document']);
+    expect(calls.map((call) => call.fn)).toEqual(['save_household_document']);
   });
 
   test('a failure in the fallback is reported too', async () => {
     const { transport } = transportOver({
+      save_household_document: { error: MISSING_FUNCTION },
       apply_household_document: { error: MISSING_FUNCTION },
       apply_household_changes: { error: { code: '40001', message: 'conflict' } },
     });

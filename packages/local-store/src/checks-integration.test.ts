@@ -580,6 +580,33 @@ describe('the migration itself', () => {
     expect(migrated['learnedRules']).toEqual([]);
   });
 
+  test('a document written before repayment demands existed is backfilled', () => {
+    /*
+     * The same failure as the learned rules above, and it happened again: the
+     * collection was added to the schema without a line here, and a real
+     * document written by the previous build stopped loading with
+     * `expected array, received undefined` on every page. Caught by the build
+     * gate reading an actual file, not by reading the schema.
+     */
+    const migrated = migrateDocument({
+      formatVersion: 2,
+      checks: [],
+      repaymentPlans: [],
+    }) as Record<string, unknown>;
+
+    expect(migrated['repaymentDemands']).toEqual([]);
+  });
+
+  test('a document that already has repayment demands keeps them', () => {
+    const migrated = migrateDocument({
+      formatVersion: 2,
+      checks: [],
+      repaymentPlans: [],
+      repaymentDemands: [{ id: 'asked-once' }],
+    }) as Record<string, unknown>;
+    expect(migrated['repaymentDemands']).toEqual([{ id: 'asked-once' }]);
+  });
+
   test('a document that already has learned rules keeps them', () => {
     const migrated = migrateDocument({
       formatVersion: 2,

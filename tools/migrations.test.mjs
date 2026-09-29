@@ -345,27 +345,84 @@ describe('load_household_document never loses a key', () => {
     return keys;
   }
 
-  /** Every definition of the function, in the order the migrations apply. */
-  function definitions() {
+  /** Every definition of a named function, in the order the migrations apply. */
+  function definitionsOfFunction(signature) {
     const found = [];
     for (const { name, sql } of migrations()) {
-      let at = sql.indexOf('create or replace function public.load_household_document');
+      let at = sql.indexOf(signature);
       while (at >= 0) {
         const end = sql.indexOf('$$;', at);
         found.push({ name, definition: sql.slice(at, end) });
-        at = sql.indexOf('create or replace function public.load_household_document', end);
+        at = sql.indexOf(signature, end);
       }
     }
     return found;
+  }
+
+  /** Every definition of the public entry point, in the order the migrations apply. */
+  function definitions() {
+    return definitionsOfFunction('create or replace function public.load_household_document');
+  }
+
+  /**
+   * The body the entry point delegates to, when it delegates.
+   *
+   * The function grew past the point where adding one key meant retyping sixty
+   * exercised lines, so the body moved to `app.load_household_core` and the
+   * public function became a composition: the core document, plus the keys added
+   * since. That is safer than another restatement, and it must not become a way
+   * to hide a dropped key — so the rule below reads through the delegation
+   * rather than around it, and only when the delegation is actually there.
+   */
+  const CORE = 'app.load_household_core';
+
+  function coreDefinitions() {
+    return definitionsOfFunction(`create or replace function ${CORE}`);
+  }
+
+  /** What the last definition of the entry point effectively returns. */
+  function finalKeys() {
+    const all = definitions();
+    const last = all[all.length - 1];
+    const keys = keysOf(last.definition);
+    if (!last.definition.includes(CORE)) return keys;
+
+    const cores = coreDefinitions();
+    expect(cores.length, `${CORE} is composed but never defined`).toBeGreaterThan(0);
+    for (const [key, shape] of keysOf(cores[cores.length - 1].definition)) {
+      if (!keys.has(key)) keys.set(key, shape);
+    }
+    return keys;
   }
 
   test('there is at least one definition to check', () => {
     expect(definitions().length).toBeGreaterThan(0);
   });
 
+  test('a delegating entry point really reaches the body it delegates to', () => {
+    /*
+     * The composition is only safe while it is a composition. If the entry point
+     * ever stops naming the core — a restatement that inlined part of it, a
+     * rename that missed this file — the keys it no longer carries would vanish
+     * from the document, and the rule above would be reading a body nothing
+     * calls. So: either the entry point carries the whole document itself, or it
+     * names the core and the core defines it.
+     */
+    const all = definitions();
+    const last = all[all.length - 1];
+    if (!last.definition.includes(CORE)) {
+      expect(keysOf(last.definition).has('household')).toBe(true);
+      return;
+    }
+
+    const cores = coreDefinitions();
+    expect(cores.length, `${CORE} is composed but never defined`).toBeGreaterThan(0);
+    expect(keysOf(cores[cores.length - 1].definition).has('household')).toBe(true);
+  });
+
   test('the final definition carries every key an earlier one did', () => {
     const all = definitions();
-    const final = keysOf(all[all.length - 1].definition);
+    const final = finalKeys();
 
     const lost = [];
     for (const { name, definition } of all.slice(0, -1)) {
@@ -379,7 +436,7 @@ describe('load_household_document never loses a key', () => {
 
   test('a key that once read a table is not later an empty literal', () => {
     const all = definitions();
-    const final = keysOf(all[all.length - 1].definition);
+    const final = finalKeys();
 
     const emptied = [];
     for (const { name, definition } of all.slice(0, -1)) {

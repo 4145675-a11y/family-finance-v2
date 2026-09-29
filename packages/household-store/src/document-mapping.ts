@@ -40,6 +40,13 @@ export interface LoadedHousehold {
   readonly debts: JsonRow[];
   readonly debtEvents: JsonRow[];
   readonly rollovers: JsonRow[];
+  /**
+   * Optional because a database that has not had the migration applied returns
+   * no such key, and an empty list of demands is the truthful reading of that:
+   * none has been recorded there. Writing one, by contrast, is refused out loud
+   * in the transport rather than dropped.
+   */
+  readonly repaymentDemands?: JsonRow[];
   readonly checks: JsonRow[];
   readonly repaymentPlans: JsonRow[];
   readonly budgets: JsonRow[];
@@ -129,6 +136,7 @@ export function documentFromLoaded(loaded: LoadedHousehold): StoreDocument {
     debts: loaded.debts.map((r) => debtFromRow(r)),
     debtEvents: loaded.debtEvents.map((r) => rowToCamel(r)),
     rollovers: loaded.rollovers.map((r) => rowToCamel(r)),
+    repaymentDemands: (loaded.repaymentDemands ?? []).map((r) => rowToCamel(r)),
     checks: loaded.checks.map((r) => rowToCamel(r)),
     repaymentPlans: loaded.repaymentPlans.map((r) => rowToCamel(r)),
     budgets: loaded.budgets.map((r) => rowToCamel(r)),
@@ -326,6 +334,7 @@ const PLAIN_COLLECTIONS = [
   'debts',
   'debtEvents',
   'rollovers',
+  'repaymentDemands',
   'checks',
   'repaymentPlans',
   'budgets',
@@ -419,6 +428,38 @@ export function changesBetween(
     };
     if (gone.length > 0 && mark !== undefined) entry[mark] = gone;
     changes[collection] = entry;
+  }
+
+  /*
+   * What changed about when a loan is expected to be repaid, as its own key.
+   *
+   * Only the debts whose expectation actually moved, so a save that touched a
+   * debt for some other reason does not rewrite a date nobody edited. A cleared
+   * expectation appears here as two nulls rather than as an absence: withdrawing
+   * a date has to reach the database, and a key that disappeared when emptied
+   * would leave yesterday's date in the row while the screen showed none.
+   */
+  const expectationsBefore = new Map(
+    before.debts.map((debt) => [debt.id, stableStringify(debt.repaymentExpectation ?? null)]),
+  );
+  const expectations = after.debts
+    .filter((debt) =>
+      expectationsBefore.has(debt.id)
+        ? expectationsBefore.get(debt.id) !== stableStringify(debt.repaymentExpectation ?? null)
+        : // A loan recorded with an expectation in the same breath. Its row is
+          // created by the debts upsert above, which does not carry these two
+          // columns, so without this the date entered on the form would be
+          // dropped on the way in — the exact failure ADR-0038 was written for.
+          debt.repaymentExpectation !== undefined,
+    )
+    .map((debt) => ({
+      id: debt.id,
+      repayment_expectation: debt.repaymentExpectation?.kind ?? null,
+      expected_repayment_on:
+        debt.repaymentExpectation?.kind === 'dated' ? debt.repaymentExpectation.on : null,
+    }));
+  if (expectations.length > 0) {
+    changes['debtRepaymentExpectations'] = { upsert: expectations };
   }
 
   const batches = diffRows(before.importBatches, after.importBatches);
@@ -586,10 +627,39 @@ const DUE_DATE_COLUMNS = [
   'due_date_missing_day_choice',
 ] as const;
 
+/**
+ * The two columns that carry what is expected about repayment.
+ *
+ * Two, not one, because the fact has three states and a date alone has two.
+ * `repayment_expectation` null means nothing was ever recorded; `'none'` means a
+ * loan agreed with no repayment date; `'dated'` means the date beside it.
+ */
+const REPAYMENT_EXPECTATION_COLUMNS = [
+  'repayment_expectation',
+  'expected_repayment_on',
+] as const;
+
 function debtFromRow(row: JsonRow): JsonRow {
   const flat = { ...row };
   for (const column of DUE_DATE_COLUMNS) delete flat[column];
+  for (const column of REPAYMENT_EXPECTATION_COLUMNS) delete flat[column];
   const debt = rowToCamel(flat);
+
+  /*
+   * A database that has not had the migration applied returns neither column,
+   * which reads here exactly as "nothing recorded" — the same answer as a row
+   * that has them and has not been asked. So the screen works either way, and
+   * the write path is where being behind is refused out loud.
+   */
+  const expectation = row['repayment_expectation'];
+  if (expectation === 'none') {
+    debt['repaymentExpectation'] = { kind: 'none' };
+  } else if (expectation === 'dated' && row['expected_repayment_on'] != null) {
+    debt['repaymentExpectation'] = {
+      kind: 'dated',
+      on: String(row['expected_repayment_on']).slice(0, 10),
+    };
+  }
 
   const gregorian = row['due_date'];
   const sourceText = row['due_date_source_text'];
@@ -625,7 +695,16 @@ function debtFromRow(row: JsonRow): JsonRow {
 
 /** The reverse: one `DueDate` object spread back across its columns. */
 function debtToRow(debt: JsonRow): JsonRow {
+  /*
+   * The expectation is dropped here on purpose. It travels as its own change
+   * key, written by its own function, for the reason ADR-0037 gives: the debt
+   * upsert in `apply_household_changes` lists its columns by hand, so widening
+   * the row it receives would either be ignored in silence or require restating
+   * five hundred exercised lines. Its own key is also what makes a database
+   * that lacks the column detectable rather than quietly lossy.
+   */
   const { dueDate, ...rest } = debt;
+  delete rest['repaymentExpectation'];
   const row = rowToSnake(rest);
   if (dueDate === undefined || dueDate === null) return row;
 

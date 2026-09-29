@@ -1,6 +1,11 @@
 import 'server-only';
 
-import type { Debt, DebtEventKind, DueDate } from '@family-finance/contracts';
+import type {
+  Debt,
+  DebtEventKind,
+  DebtRepaymentDemand,
+  DueDate,
+} from '@family-finance/contracts';
 import { normaliseLenderName } from '@family-finance/contracts';
 import { finalBalanceOf, replayDebtLedger } from '@family-finance/finance-engine';
 import type { StoreDocument } from '@family-finance/local-store';
@@ -60,6 +65,15 @@ export interface LenderCard {
   readonly nextDue: DueDate | null;
   /** Due dates that need a person to resolve them. */
   readonly dueDatesNeedingReview: readonly { debtId: string; due: DueDate }[];
+  /**
+   * Every time this lender asked to be repaid, newest first.
+   *
+   * Kept apart from `ledger` deliberately. A demand moved no money, so putting
+   * it in a column whose last row has to equal the balance above it would either
+   * corrupt that sum or add a row that means nothing in it. The screen shows the
+   * two side by side and says which is which.
+   */
+  readonly demands: readonly DebtRepaymentDemand[];
   readonly ledger: readonly LedgerLine[];
 }
 
@@ -73,6 +87,29 @@ export interface LenderCard {
 function chronologically(a: LedgerLine, b: LedgerLine): number {
   if (a.occurredOn !== b.occurredOn) return a.occurredOn < b.occurredOn ? -1 : 1;
   return a.eventId < b.eventId ? -1 : 1;
+}
+
+/**
+ * This lender's repayment demands, newest first.
+ *
+ * Ordered by the day the lender asked, then by when it was written down, so two
+ * demands recorded on the same day keep the order they were entered in. A
+ * closed debt's demands are included: a lender who came back after the loan was
+ * settled is the case this record exists for, and dropping those rows would
+ * quietly delete the only trace of it.
+ */
+function demandsFor(
+  document: StoreDocument,
+  debts: readonly Debt[],
+): readonly DebtRepaymentDemand[] {
+  const ids = new Set(debts.map((debt) => debt.id));
+  return document.repaymentDemands
+    .filter((demand) => ids.has(demand.debtId))
+    .sort((a, b) => {
+      if (a.demandedOn !== b.demandedOn) return a.demandedOn < b.demandedOn ? 1 : -1;
+      if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
+      return a.id < b.id ? 1 : -1;
+    });
 }
 
 export function lenderCards(document: StoreDocument, today: string): readonly LenderCard[] {
@@ -161,6 +198,7 @@ export function lenderCards(document: StoreDocument, today: string): readonly Le
       dueDatesNeedingReview: withDates.filter((entry) => entry.due.reviewReason !== null),
       // Newest first: what happened last is what a person is looking for.
       ledger: [...ledger].reverse(),
+      demands: demandsFor(document, ordered),
     });
   }
 

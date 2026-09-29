@@ -7,6 +7,11 @@ import { notFound } from 'next/navigation';
 import { AppShell } from '../../../components/app-shell';
 import { DueDateLines } from '../../../components/due-date';
 import {
+  RepaymentDemands,
+  RepaymentExpectationForm,
+  RepaymentExpectationLine,
+} from '../../../components/repayment';
+import {
   ActionForm,
   HiddenValue,
   MoneyField,
@@ -186,7 +191,30 @@ export default async function LenderCardPage({
               <DueDateLines due={debt.dueDate} />
             </div>
           )}
+          {/*
+            When the whole loan is expected to be repaid — a different question
+            from the instalment date above it, and shown as its own line so the
+            two are never read as one.
+          */}
+          <RepaymentExpectationLine debt={debt} />
+          <RepaymentExpectationForm debt={debt} />
           {debt.notes === null ? null : <StatRow label="הערה" value={debt.notes} />}
+          {/*
+            What happened after the agreement: every time the lender asked. Kept
+            under the loan it concerns, including a loan already repaid.
+
+            `submissionId` is its own identifier rather than a variant of the
+            ledger form's. Each is rendered once per page and each becomes the
+            primary key of the row it writes, so they have to be distinct — and
+            they have to be real identifiers, which a concatenation of two is
+            not.
+          */}
+          <RepaymentDemands
+            debt={debt}
+            demands={card.demands.filter((demand) => demand.debtId === debt.id)}
+            today={today}
+            submissionId={randomUUID()}
+          />
         </Card>
       ))}
 

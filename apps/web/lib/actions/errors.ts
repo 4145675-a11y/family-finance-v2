@@ -43,6 +43,8 @@ const MESSAGES: Readonly<Record<string, string>> = {
   needs_account: 'צריך לבחור לאיזה חשבון השורה שייכת.',
   needs_debt: 'צריך לבחור לאיזה חוב התשלום שייך.',
   correction_changes_kind: 'אפשר לתקן שורה, אבל לא לשנות את סוג הרשומה.',
+  debt_is_closed: 'החוב הזה נסגר, ואין בו עוד פירעון צפוי. דרישת פירעון אפשר לרשום גם עליו.',
+  deadline_before_demand: 'התאריך שביקשו קודם ליום שבו נתבקש. אפשר לבדוק את שני התאריכים.',
 };
 
 /** Turns a thrown command error into a sentence a family can act on. */

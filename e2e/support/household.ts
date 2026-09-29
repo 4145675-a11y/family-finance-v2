@@ -94,6 +94,18 @@ export const LENDER_TOPUP = 'E2E גמח חמישי';
  * the pair is written this way round rather than as two unrelated names: an
  * overlap has to actually overlap.
  */
+/**
+ * The repayment spec's own two lenders.
+ *
+ * Two, because that spec needs a loan it keeps open — to set, change and
+ * withdraw an expected repayment date on — and a separate one it repays in full
+ * so a demand can be recorded against a loan that is already closed. Repaying a
+ * lender another file asserts on is exactly what makes two spec files depend on
+ * the order they run in, which is the thing this fixture is arranged to avoid.
+ */
+export const LENDER_EXPECTATION = 'E2E גמח שישי';
+export const LENDER_CLOSED = 'E2E גמח שביעי';
+
 export const LENDER_OVERLAP_A = 'E2E גמח אור';
 export const LENDER_OVERLAP_B = 'E2E גמח אור החיים';
 
@@ -103,6 +115,9 @@ export const LENDER_CARD_OPENING_MINOR = 100_000;
 export const LENDER_OVERPAY_OPENING_MINOR = 50_000;
 export const LENDER_AI_OPENING_MINOR = 500_000;
 export const LENDER_TOPUP_OPENING_MINOR = 200_000;
+export const LENDER_EXPECTATION_OPENING_MINOR = 300_000;
+/** Small and round, so the spec can clear it in one repayment. */
+export const LENDER_CLOSED_OPENING_MINOR = 40_000;
 export const LENDER_OVERLAP_A_OPENING_MINOR = 50_000;
 export const LENDER_OVERLAP_B_OPENING_MINOR = 70_000;
 
@@ -120,6 +135,8 @@ export interface SeededHousehold {
   readonly lenderOverpayId: string;
   readonly lenderAiId: string;
   readonly lenderTopupId: string;
+  readonly lenderExpectationId: string;
+  readonly lenderClosedId: string;
   readonly lenderOverlapAId: string;
   readonly lenderOverlapBId: string;
 }
@@ -237,6 +254,8 @@ export async function seedHousehold(): Promise<SeededHousehold> {
   const lenderOverpayId = await lend(LENDER_OVERPAY, LENDER_OVERPAY_OPENING_MINOR);
   const lenderAiId = await lend(LENDER_AI, LENDER_AI_OPENING_MINOR);
   const lenderTopupId = await lend(LENDER_TOPUP, LENDER_TOPUP_OPENING_MINOR);
+  const lenderExpectationId = await lend(LENDER_EXPECTATION, LENDER_EXPECTATION_OPENING_MINOR);
+  const lenderClosedId = await lend(LENDER_CLOSED, LENDER_CLOSED_OPENING_MINOR);
   const lenderOverlapAId = await lend(LENDER_OVERLAP_A, LENDER_OVERLAP_A_OPENING_MINOR);
   const lenderOverlapBId = await lend(LENDER_OVERLAP_B, LENDER_OVERLAP_B_OPENING_MINOR);
 
@@ -249,6 +268,8 @@ export async function seedHousehold(): Promise<SeededHousehold> {
     lenderOverpayId,
     lenderAiId,
     lenderTopupId,
+    lenderExpectationId,
+    lenderClosedId,
     lenderOverlapAId,
     lenderOverlapBId,
   };

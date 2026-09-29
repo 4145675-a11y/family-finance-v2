@@ -56,9 +56,16 @@ async function recordOnCard(
 ): Promise<void> {
   // The form is behind a disclosure: opening it is part of the journey.
   await page.getByText('לרשום תשלום, הלוואה נוספת, תיקון או הערה').click();
-  const form = page
-    .locator('form')
-    .filter({ has: page.locator('input[name="idempotencyKey"]') });
+  /*
+   * Identified by the date field only the ledger form has.
+   *
+   * It used to be identified by `idempotencyKey`, which stopped being unique
+   * once the demand form appeared on this card — both carry one, correctly, so
+   * that pressing either button twice records one thing. `occurredOn` is the
+   * ledger's own field; the demand form asks `demandedOn`, which is a different
+   * question about a different fact.
+   */
+  const form = page.locator('form').filter({ has: page.locator('input[name="occurredOn"]') });
   await form.locator('select[name="kind"]').selectOption({ label: options.kind });
   await form.locator('input[name="amountMinor"]').fill(options.amount);
   await form.locator('input[name="occurredOn"]').fill(options.date);

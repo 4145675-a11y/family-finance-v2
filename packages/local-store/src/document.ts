@@ -7,6 +7,7 @@ import {
   cashflowItemSchema,
   categorySchema,
   debtEventSchema,
+  debtRepaymentDemandSchema,
   debtRolloverSchema,
   debtSchema,
   familyTaskSchema,
@@ -102,6 +103,17 @@ export const storeDocumentSchema = z.object({
   debts: z.array(debtSchema).max(500),
   debtEvents: z.array(storedDebtEventSchema).max(50_000),
   rollovers: z.array(debtRolloverSchema).max(5_000),
+  /**
+   * Every time a lender asked to be repaid.
+   *
+   * A collection rather than a column on the debt, for the same reason as the
+   * checks below: each demand is a fact with a date, and a lender who asked
+   * three times is saying something that overwriting one field cannot hold.
+   * Nothing here touches a balance — the debt events remain the only truth
+   * about how much is owed — which is what lets a demand be recorded against a
+   * loan that has already been repaid.
+   */
+  repaymentDemands: z.array(debtRepaymentDemandSchema).max(20_000),
   /**
    * Post-dated checks, and the agreements they repay.
    *
@@ -227,6 +239,7 @@ export function emptyDocument(input: EmptyDocumentInput): StoreDocument {
     debts: [],
     debtEvents: [],
     rollovers: [],
+    repaymentDemands: [],
     checks: [],
     repaymentPlans: [],
     budgets: [],
@@ -296,6 +309,17 @@ export function migrateDocument(value: unknown): unknown {
    * taken this month unreadable by a build from last month, for no gain.
    */
   if (!Array.isArray(document['learnedRules'])) document['learnedRules'] = [];
+
+  /*
+   * And the repayment demands, backfilled for the same reason.
+   *
+   * A document without the key means "no lender has ever asked this household
+   * to repay", which is the empty array exactly. Without this line every
+   * household that used the previous build meets an unreadable file on the
+   * first page load — which is what happened, and was caught by the build gate
+   * loading a real document rather than by reading the schema.
+   */
+  if (!Array.isArray(document['repaymentDemands'])) document['repaymentDemands'] = [];
 
   return document;
 }

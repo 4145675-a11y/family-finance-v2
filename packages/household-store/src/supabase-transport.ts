@@ -68,6 +68,45 @@ export class SupabaseHouseholdTransport implements HouseholdTransport {
      * thing the old function cannot do is carry classification rules, and that is
      * refused loudly below rather than dropped.
      */
+    /*
+     * `save_household_document` is the same composition with two more steps:
+     * when a loan is expected to be repaid, and the times a lender asked for it
+     * back. It gets its own name for the same reason `apply_household_document`
+     * did — a function that is simply replaced in place cannot be told apart
+     * from the older one, so a database that is behind would accept the call and
+     * drop the new facts without a word. A distinct name turns that into
+     * PGRST202, which is a refusal we can act on.
+     */
+    const saved = await this.client.rpc('save_household_document', {
+      p_household_id: householdId,
+      p_expected_version: expectedVersion,
+      p_changes: changes,
+    });
+
+    if (!isMissingFunction(saved.error)) {
+      if (saved.error) throw this.translate(saved.error, 'saving the change');
+      return this.versionOf(saved.data);
+    }
+
+    /*
+     * The schema is behind the code. A repayment date or a demand cannot be
+     * carried by the older functions, and either one silently failing would be
+     * a false success: the family would be told the lender's demand was written
+     * down and find it gone.
+     */
+    if (changes['repaymentDemands'] !== undefined) {
+      throw new TransportError(
+        'schema_outdated',
+        'recording a repayment demand needs a database migration that has not been applied',
+      );
+    }
+    if (changes['debtRepaymentExpectations'] !== undefined) {
+      throw new TransportError(
+        'schema_outdated',
+        'saving an expected repayment date needs a database migration that has not been applied',
+      );
+    }
+
     const composed = await this.client.rpc('apply_household_document', {
       p_household_id: householdId,
       p_expected_version: expectedVersion,

@@ -6,7 +6,13 @@ import {
   replayDebtBalances,
   replayDebtLedger,
 } from '@family-finance/finance-engine';
-import { addDebt, recordDebtEvent, type StoreDocument } from '@family-finance/local-store';
+import {
+  addDebt,
+  recordDebtEvent,
+  recordRepaymentDemand,
+  setRepaymentExpectation,
+  type StoreDocument,
+} from '@family-finance/local-store';
 import {
   contextFor,
   seededHousehold,
@@ -218,5 +224,152 @@ describe('there is no second debt-balance calculation in the lender UI', () => {
     expect(pageCode).not.toContain('Math.max(0');
     expect(pageCode).not.toMatch(/amountMinor\s*[*+]/);
     expect(pageCode).not.toMatch(/function\s+directionOf/);
+  });
+});
+
+describe('demands sit beside the ledger, never inside it', () => {
+  /**
+   * A loan with three demands against it, one of them after it was repaid.
+   *
+   * Built through the commands rather than assembled by hand so the shape under
+   * test is the shape the product actually writes.
+   */
+  function withDemands() {
+    const seeded = seededHousehold();
+    let document = seeded.document;
+    const debtId = seeded.privateDebtId;
+
+    for (const demand of [
+      { demandedOn: '2026-07-01', requestedDeadline: null, amountMinor: null, note: 'ראשונה' },
+      {
+        demandedOn: '2026-08-01',
+        requestedDeadline: '2026-08-20',
+        amountMinor: 100_000,
+        note: 'שנייה',
+      },
+      {
+        demandedOn: '2026-09-01',
+        requestedDeadline: null,
+        amountMinor: null,
+        note: 'שלישית',
+      },
+    ]) {
+      document = recordRepaymentDemand(
+        document,
+        { debtId, ...demand },
+        contextFor(document),
+      ).document;
+    }
+
+    return { document, debtId };
+  }
+
+  test('the card carries every demand, newest first', () => {
+    const { document, debtId } = withDemands();
+    const card = lenderCards(document, TODAY).find((candidate) =>
+      candidate.debts.some((debt) => debt.id === debtId),
+    );
+
+    expect(card?.demands.map((demand) => demand.note)).toEqual(['שלישית', 'שנייה', 'ראשונה']);
+  });
+
+  test('and not one of them appears as a ledger line', () => {
+    /*
+     * The running column has to add up to the balance printed above it. A
+     * demand moved no money, so a row for it would either break that sum or sit
+     * in it meaning nothing.
+     */
+    const { document, debtId } = withDemands();
+    const card = lenderCards(document, TODAY).find((candidate) =>
+      candidate.debts.some((debt) => debt.id === debtId),
+    );
+
+    for (const note of ['ראשונה', 'שנייה', 'שלישית']) {
+      expect(card?.ledger.map((line) => line.note)).not.toContain(note);
+    }
+  });
+
+  test('recording them leaves the lender balance and ledger exactly where they were', () => {
+    /*
+     * One household, before and after, because the identifiers are generated
+     * per household — comparing two freshly seeded ones would compare two
+     * different sets of events and prove nothing about this change.
+     */
+    const seeded = seededHousehold();
+    const debtId = seeded.privateDebtId;
+    const cardOf = (document: StoreDocument) =>
+      lenderCards(document, TODAY).find((candidate) =>
+        candidate.debts.some((debt) => debt.id === debtId),
+      );
+
+    const before = cardOf(seeded.document);
+    const demanded = recordRepaymentDemand(
+      seeded.document,
+      {
+        debtId,
+        demandedOn: '2026-09-01',
+        requestedDeadline: '2026-09-30',
+        amountMinor: 500_000,
+        note: 'ביקש בחזרה',
+      },
+      contextFor(seeded.document),
+    ).document;
+    const after = cardOf(demanded);
+
+    expect(after?.currentBalanceMinor).toBe(before?.currentBalanceMinor);
+    expect(after?.ledger).toEqual(before?.ledger);
+    expect(after?.demands).toHaveLength(1);
+  });
+
+  test('a demand belonging to another lender does not appear on this card', () => {
+    const { document, debtId } = withDemands();
+    const other = document.debts.find((debt) => debt.id !== debtId);
+    const extended = recordRepaymentDemand(
+      document,
+      {
+        debtId: other?.id ?? '',
+        demandedOn: '2026-09-05',
+        requestedDeadline: null,
+        amountMinor: null,
+        note: 'של מלווה אחר',
+      },
+      contextFor(document),
+    ).document;
+
+    const card = lenderCards(extended, TODAY).find((candidate) =>
+      candidate.debts.some((debt) => debt.id === debtId),
+    );
+    expect(card?.demands.map((demand) => demand.note)).not.toContain('של מלווה אחר');
+  });
+
+  test('a lender with none has an empty list rather than nothing at all', () => {
+    const seeded = seededHousehold();
+    for (const card of lenderCards(seeded.document, TODAY)) {
+      expect(Array.isArray(card.demands)).toBe(true);
+      expect(card.demands).toHaveLength(0);
+    }
+  });
+
+  test('the card reports what is expected about repayment without interpreting it', () => {
+    const seeded = seededHousehold();
+    const set = setRepaymentExpectation(
+      seeded.document,
+      { debtId: seeded.privateDebtId, expectation: { kind: 'none' } },
+      contextFor(seeded.document),
+    ).document;
+
+    const card = lenderCard(
+      set,
+      TODAY,
+      lenderCards(set, TODAY).find((candidate) =>
+        candidate.debts.some((debt) => debt.id === seeded.privateDebtId),
+      )?.key ?? '',
+    );
+    const debt = card?.debts.find((candidate) => candidate.id === seeded.privateDebtId);
+
+    // Carried through as the fact it is; the screen decides the words.
+    expect(debt?.repaymentExpectation).toEqual({ kind: 'none' });
+    // And it is not folded into the payment due date, which is a different thing.
+    expect(card?.nextDue).toBeNull();
   });
 });

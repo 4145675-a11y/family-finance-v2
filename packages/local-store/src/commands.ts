@@ -4,6 +4,7 @@ import {
   type AccountKind,
   type BudgetCategoryKey,
   type Certainty,
+  type Debt,
   type DebtEventKind,
   type DebtKind,
   type DebtUrgency,
@@ -11,6 +12,7 @@ import {
   type DueDate,
   type RecordScope,
   type RelationshipSensitivity,
+  type RepaymentExpectation,
   type TransactionKind,
   type TransactionStatus,
 } from '@family-finance/contracts';
@@ -876,6 +878,8 @@ export interface AddDebtInput extends Idempotent {
   readonly notes: string | null;
   /** When the payment falls due, in whichever calendar the family wrote it. */
   readonly dueDate?: DueDate;
+  /** When the whole loan is expected to be repaid, or that no date was agreed. */
+  readonly repaymentExpectation?: RepaymentExpectation | undefined;
   /**
    * The import this debt came from, recorded on its opening balance.
    *
@@ -918,6 +922,9 @@ export function addDebt(
     lastConversationAt: null,
     expectedCallDate: input.expectedCallDate,
     ...(input.dueDate === undefined ? {} : { dueDate: input.dueDate }),
+    ...(input.repaymentExpectation === undefined
+      ? {}
+      : { repaymentExpectation: input.repaymentExpectation }),
     notes: input.notes,
     openedOn: input.openedOn,
     closedAt: null,
@@ -1055,6 +1062,160 @@ export function recordDebtEvent(
       }),
     ]),
     value: event.id,
+  };
+}
+
+export interface SetRepaymentExpectationInput {
+  readonly debtId: string;
+  /**
+   * What is now expected, or `undefined` to return the loan to "nothing
+   * recorded".
+   *
+   * Clearing is a real correction, not a curiosity: somebody who typed a date
+   * they were not sure of has to be able to take it back, and the alternative —
+   * leaving a guess on the record because the form cannot express its absence —
+   * is how invented facts get into a ledger.
+   */
+  readonly expectation?: RepaymentExpectation | undefined;
+}
+
+/**
+ * Setting, changing or withdrawing when a loan is expected to be repaid.
+ *
+ * Refused once the loan is closed. A settled or written-off loan has no
+ * repayment still to expect, and its terms are finished: letting a date be
+ * written onto it would put a future on a record that has none, and the screen
+ * would then show a loan that is both repaid and due. Demands are the other way
+ * round — those *must* work on a closed loan, because a lender coming back after
+ * the fact is exactly the thing a family needs to be able to write down.
+ */
+export function setRepaymentExpectation(
+  document: StoreDocument,
+  input: SetRepaymentExpectationInput,
+  context: CommandContext,
+): CommandResult<string> {
+  const debt = requireDebt(document, input.debtId);
+
+  if (debt.status !== 'active') {
+    throw new CommandError(
+      'debt_is_closed',
+      'a closed debt has no repayment still expected; record a demand instead',
+    );
+  }
+
+  const before = debt.repaymentExpectation;
+  const after = input.expectation;
+
+  // Nothing to say. Writing the row anyway would bump the version and the
+  // timestamp, and a save that changed nothing would show up as a change.
+  if (JSON.stringify(before ?? null) === JSON.stringify(after ?? null)) {
+    return { document, value: debt.id, alreadyRecorded: true };
+  }
+
+  const updated: Debt = {
+    ...debt,
+    ...(after === undefined ? {} : { repaymentExpectation: after }),
+    updatedAt: context.now,
+    version: debt.version + 1,
+  };
+  // Spread cannot remove a key, and an absent expectation has to be absent
+  // rather than present-and-undefined: the schema would reject the latter.
+  if (after === undefined)
+    delete (updated as { repaymentExpectation?: unknown }).repaymentExpectation;
+
+  return {
+    document: withAudit(
+      {
+        ...document,
+        debts: document.debts.map((candidate) =>
+          candidate.id === debt.id ? updated : candidate,
+        ),
+      },
+      [
+        auditEvent({
+          householdId: document.household.id,
+          actorProfileId: context.actorProfileId,
+          action: 'debt.repayment_expectation_set',
+          entityType: 'debt',
+          entityId: debt.id,
+          before: { repaymentExpectation: before ?? null },
+          after: { repaymentExpectation: after ?? null },
+          occurredAt: context.now,
+        }),
+      ],
+    ),
+    value: debt.id,
+  };
+}
+
+export interface RecordRepaymentDemandInput extends Idempotent {
+  readonly debtId: string;
+  readonly demandedOn: string;
+  readonly requestedDeadline: string | null;
+  readonly amountMinor: number | null;
+  readonly note: string | null;
+}
+
+/**
+ * Writing down that the lender asked to be repaid.
+ *
+ * This command is defined by what it does **not** touch. It appends one row and
+ * returns every other collection unchanged: no debt event, so no balance moves;
+ * no transaction, so no account moves; and not a single field of the debt
+ * itself, so the terms, the status and the closed date are the same afterwards
+ * as before. `lastDemandAt` is deliberately left alone for that reason — writing
+ * it would modify a repaid loan's record to store something this collection
+ * already says better, and the two could then disagree.
+ *
+ * Allowed on a closed debt, which is the whole point.
+ */
+export function recordRepaymentDemand(
+  document: StoreDocument,
+  input: RecordRepaymentDemandInput,
+  context: CommandContext,
+): CommandResult<string> {
+  requireDebt(document, input.debtId);
+
+  if (input.requestedDeadline !== null && input.requestedDeadline < input.demandedOn) {
+    throw new CommandError(
+      'deadline_before_demand',
+      'a deadline cannot fall before the day it was asked for',
+    );
+  }
+
+  const claim = claimId(document.repaymentDemands, input.idempotencyKey);
+  if (claim.already !== undefined) {
+    return { document, value: claim.already.id, alreadyRecorded: true };
+  }
+
+  const demand = {
+    id: claim.id,
+    householdId: document.household.id,
+    debtId: input.debtId,
+    demandedOn: input.demandedOn,
+    requestedDeadline: input.requestedDeadline,
+    amountMinor: input.amountMinor,
+    note: input.note,
+    createdBy: context.actorProfileId,
+    createdAt: context.now,
+  };
+
+  return {
+    document: withAudit(
+      { ...document, repaymentDemands: [...document.repaymentDemands, demand] },
+      [
+        auditEvent({
+          householdId: document.household.id,
+          actorProfileId: context.actorProfileId,
+          action: 'debt.repayment_demanded',
+          entityType: 'debt_repayment_demand',
+          entityId: demand.id,
+          after: demand,
+          occurredAt: context.now,
+        }),
+      ],
+    ),
+    value: demand.id,
   };
 }
 

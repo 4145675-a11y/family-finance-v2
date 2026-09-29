@@ -420,3 +420,92 @@ describe('the shell', () => {
     expect((home.match(/<h1/g) ?? []).length).toBe(0);
   });
 });
+
+describe('repayment expectation and demands are two things on the screen', () => {
+  const component = readFileSync(join(APP_ROOT, '..', 'components', 'repayment.tsx'), 'utf8');
+  const lenderPage = read('lenders/[lender]/page.tsx');
+
+  test('the lender card shows both, from the component that owns each', () => {
+    expect(lenderPage).toContain('RepaymentExpectationLine');
+    expect(lenderPage).toContain('RepaymentDemands');
+  });
+
+  test('the expectation is not folded into the payment due date', () => {
+    /*
+     * `dueDate` is when an instalment falls due and it recurs; the expectation
+     * is when the whole loan is expected to be finished. A screen that showed
+     * the soonest of the two would answer neither question.
+     */
+    const expectationBlock = lenderPage.slice(
+      lenderPage.indexOf('<RepaymentExpectationLine'),
+      lenderPage.indexOf('<RepaymentDemands'),
+    );
+    expect(expectationBlock).not.toContain('DueDateLines');
+    expect(lenderPage).toContain('<DueDateLines due={debt.dueDate} />');
+  });
+
+  test('all three states of the expectation are rendered, each its own way', () => {
+    const line = component.slice(
+      component.indexOf('export function RepaymentExpectationLine'),
+      component.indexOf('export function RepaymentExpectationForm'),
+    );
+    // Nothing recorded, and an agreed absence, each get a sentence of their own.
+    expect(line).toContain('repayment.expectation.unrecorded');
+    expect(line).toContain('repayment.expectation.none');
+    // The dated state shows the date, formatted, rather than a word.
+    expect(line).toContain('formatDueDate(expectation.on)');
+    // And the three are distinguished by the fact, not by a truthiness test
+    // that would read an agreed absence as nothing recorded.
+    expect(line).toContain('expectation === undefined');
+    expect(line).toContain("expectation.kind === 'none'");
+  });
+
+  test('the demand list says plainly that recording one changes nothing', () => {
+    // The fear that writing a demand down reopens a settled debt is what stops
+    // people writing it down, so the screen answers it before it is asked.
+    expect(component).toContain('repayment.demand.harmless');
+  });
+
+  test('a closed loan still gets the demand form, and not the expectation form', () => {
+    const expectationForm = component.slice(
+      component.indexOf('export function RepaymentExpectationForm'),
+      component.indexOf('export function RepaymentDemands'),
+    );
+    const demandForm = component.slice(component.indexOf('export function RepaymentDemands'));
+
+    // The expectation form removes itself once the loan is closed.
+    expect(expectationForm).toContain("debt.status !== 'active'");
+    expect(expectationForm).toContain('return null');
+    // The demand form has no such gate: it is the thing that must keep working.
+    expect(demandForm).not.toContain('return null');
+    expect(demandForm).toContain('repayment.demand.onClosedDebt');
+  });
+
+  test('neither form computes a balance or an amount of its own', () => {
+    expect(component).not.toMatch(/amountMinor\s*[*+-]/);
+    expect(component).not.toContain('replayDebt');
+    expect(component).not.toContain('finalBalanceOf');
+  });
+
+  test('the demand form defaults its date to today and nothing else', () => {
+    /*
+     * A deadline or a figure filled in by the product would be a fact nobody
+     * stated. The day it was asked is the one thing the form may assume, and a
+     * person can change it.
+     */
+    expect(component).toContain('defaultValue={today}');
+    const deadline = component.slice(
+      component.indexOf('name="requestedDeadline"'),
+      component.indexOf('name="note"'),
+    );
+    expect(deadline).not.toContain('defaultValue={today}');
+  });
+
+  test('every target on it is a real one, so it works on a phone', () => {
+    // The shared field components carry the 44px minimum; this screen must not
+    // hand-roll an input that skips them.
+    expect(component).not.toContain('<input');
+    expect(component).not.toContain('<select');
+    expect(component).not.toContain('<button');
+  });
+});
