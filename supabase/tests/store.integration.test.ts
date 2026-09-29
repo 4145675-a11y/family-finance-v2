@@ -49,7 +49,7 @@ import {
   type StoreDocument,
 } from '@family-finance/local-store';
 import type { Client } from 'pg';
-import { describe, expect, test } from 'vitest';
+import { beforeAll, describe, expect, test } from 'vitest';
 
 import { asUser, ownerClient, useHouseholdFixture, type Person } from './harness';
 import { PgHouseholdTransport } from './pg-transport';
@@ -101,6 +101,23 @@ const account = {
 };
 
 describe('A. identity and household context', () => {
+  /*
+   * Creating a household is the platform owner's act.
+   *
+   * The store's `create` still does what it always did — bootstrap the
+   * household, its settings, its setup row, the creator's membership and the
+   * audit entry — but the person calling it has to be allowed to. Mallory is
+   * appointed for the length of this transaction so the bootstrap can still be
+   * checked here; that only the platform owner may do it is checked in
+   * `rls-platform-owner`.
+   */
+  beforeAll(async () => {
+    await ownerClient().query(
+      'insert into public.platform_admins (profile_id) values ($1) on conflict do nothing',
+      [mallory.id],
+    );
+  });
+
   test('a person with no household has no store to read; creating one bootstraps everything', async () => {
     await withStore(mallory, null, async (store) => {
       expect(await store.exists()).toBe(false);

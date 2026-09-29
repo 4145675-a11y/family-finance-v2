@@ -11,6 +11,9 @@ import {
 import { AppShell } from '../../components/app-shell';
 import { ActionForm, MoneyField, TextField } from '../../components/form';
 import { Card, LinkButton, Meter, Notice, StatRow } from '../../components/ui';
+import { accountScreen } from '../../lib/copy/security';
+import { activeBackend } from '../../lib/auth/backend';
+import { platform } from '../../lib/copy/platform';
 import { screens } from '../../lib/copy/screens';
 import { requireUnlocked } from '../../lib/auth/guard';
 import { householdStore } from '../../lib/store/server';
@@ -37,6 +40,32 @@ export default async function SetupPage() {
   const document = await store.readDocumentOrNull();
 
   if (document === null) {
+    /*
+     * No household, and on the hosted service no way to make one from here.
+     *
+     * Creating a household is the platform owner's act: the person in front of
+     * this screen either has an invitation or needs one, so this points at the
+     * door rather than offering a form the database would refuse. On the local
+     * backend — one family, one machine, no platform owner — the form is still
+     * the right thing and is still here.
+     */
+    if (activeBackend() === 'supabase') {
+      return (
+        <AppShell active="/more" title={platform.doorTitle}>
+          <Card>
+            <p className="text-text-secondary">{platform.doorClosed}</p>
+            <p className="mt-4">
+              <LinkButton href="/join">{accountScreen.joinTitle}</LinkButton>
+            </p>
+          </Card>
+
+          <Card title={screens.setup.privacyTitle}>
+            <p className="text-text-secondary">{screens.setup.privacyBody}</p>
+          </Card>
+        </AppShell>
+      );
+    }
+
     return (
       <AppShell active="/more" title={screens.setup.title} subtitle={screens.setup.intro}>
         <Card>

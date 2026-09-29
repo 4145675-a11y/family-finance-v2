@@ -490,6 +490,23 @@ describe('anon reaches nothing', () => {
 });
 
 describe('create_household — the creator becomes the first member (ADR-0032)', () => {
+  /*
+   * Creating a household became an administrative act.
+   *
+   * It used to be self-service: any authenticated person could call this
+   * function and become the owner of a new household. One person now decides
+   * which families exist, so the tests below make Mallory a platform owner for
+   * the length of the transaction. What they check is unchanged — that creation
+   * bootstraps the profile, the settings, the setup row, the membership and the
+   * audit trail in one go — and `rls-platform-owner` covers the refusals.
+   */
+  beforeAll(async () => {
+    await ownerClient().query(
+      'insert into public.platform_admins (profile_id) values ($1) on conflict do nothing',
+      [mallory.id],
+    );
+  });
+
   test('a person with a profile creates a household and can read it, its settings and its setup', async () => {
     const created = await asUser(mallory, async (client) => {
       const { rows } = await client.query<{ id: string }>(
@@ -530,21 +547,36 @@ describe('create_household — the creator becomes the first member (ADR-0032)',
     expect(created.audit).toHaveLength(1);
   });
 
-  test('a person without a profile must name themselves; then the profile is created too', async () => {
+  test('a brand-new person gets a profile the first time they ask for a household', async () => {
+    /*
+     * This used to check the same bootstrap inside `create_household`, where a
+     * person with no profile named themselves and got one. That path is no
+     * longer reachable: creating a household is now the platform owner's, and a
+     * platform owner necessarily has a profile — `platform_admins.profile_id`
+     * references it.
+     *
+     * The bootstrap itself still matters, and has simply moved to the two doors
+     * a person without a profile can now arrive at: asking for a household, and
+     * redeeming an invitation. This covers the first; the invitation path is
+     * covered where invitations are.
+     */
     const fresh = randomUUID();
     await ownerClient().query(
       `insert into auth.users (id, email, aud, role) values ($1, $2, 'authenticated', 'authenticated')`,
       [fresh, `fresh-${fresh}@example.test`],
     );
-    const nameless = await expectRejection(
-      { id: fresh, email: '' },
-      `select public.create_household('בית')`,
+    await ownerClient().query(
+      'update public.platform_settings set household_requests_enabled = true',
     );
-    expect(nameless?.message).toMatch(/display name is required/);
+
+    const before = await ownerClient().query('select 1 from public.profiles where id = $1', [
+      fresh,
+    ]);
+    expect(before.rows, 'signing in alone creates no profile').toHaveLength(0);
 
     // Two statements: the function's writes are visible only to a later one.
     const profile = await asUser({ id: fresh, email: '' }, async (client) => {
-      await client.query(`select public.create_household('בית', 'דנה')`);
+      await client.query(`select public.request_household('בית של דנה')`);
       return (
         await client.query<{ display_name: string }>(
           'select display_name from public.profiles where id = $1',
@@ -552,7 +584,7 @@ describe('create_household — the creator becomes the first member (ADR-0032)',
         )
       ).rows;
     });
-    expect(profile).toEqual([{ display_name: 'דנה' }]);
+    expect(profile, 'asking gives them an identity, and nothing else').toHaveLength(1);
   });
 
   test('an unauthenticated caller cannot create a household', async () => {

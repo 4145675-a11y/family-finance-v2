@@ -75,6 +75,31 @@ test.describe('@smoke a signed-out visitor sees the sign-in screen', () => {
   });
 });
 
+/*
+ * ⚠ STALE SINCE THE PLATFORM OWNER ARRIVED — read before running.
+ *
+ * The three journeys below have each synthetic person create their own
+ * household through the setup screen. That flow no longer exists on the hosted
+ * backend: `public.create_household` now refuses anybody who is not the
+ * platform owner, and the setup screen points a person with no household at the
+ * invitation door instead.
+ *
+ * They were deliberately **not rewritten**, because this file cannot be run
+ * without creating synthetic users in the production database — and a rewritten
+ * isolation test nobody has executed is worse than a failing one: it looks like
+ * proof and is not.
+ *
+ * What the rewrite needs, when somebody runs this next:
+ *
+ *   1. `e2e/support/live-setup.ts` appoints a synthetic platform owner
+ *      (`app.appoint_platform_admin`) and calls
+ *      `public.admin_create_household_with_owner` twice, keeping both tokens;
+ *   2. each person signs in and redeems their own token at `/join`;
+ *   3. the isolation assertions below are unchanged — they are still the point.
+ *
+ * The same guarantees are proved today, without a browser and without creating
+ * anything that survives, in `supabase/tests/rls-platform-owner.integration.test.ts`.
+ */
 test.describe('the first synthetic person', () => {
   test('signs in through the real form and is offered setup', async ({ page }) => {
     const first = people()[0];
