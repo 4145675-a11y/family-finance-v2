@@ -65,7 +65,7 @@ export default async function SecurityPage() {
         </Notice>
       ) : null}
 
-      <Card title={authScreen.setupTitle}>
+      <Card fb="auth-screen-setup" title={authScreen.setupTitle}>
         {passkeys.length === 0 ? (
           <p className="mb-4 text-text-secondary">{authScreen.setupIntro}</p>
         ) : null}
@@ -94,7 +94,7 @@ export default async function SecurityPage() {
       </Card>
 
       {passkeys.length === 0 ? null : (
-        <Card title={authScreen.passkeysTitle}>
+        <Card fb="auth-screen-passkeys" title={authScreen.passkeysTitle}>
           <DataTable
             caption={authScreen.passkeysTitle}
             columns={['שם', authScreen.passkeyAdded, authScreen.passkeyLastUsed, 'איפה נשמר']}
@@ -138,7 +138,7 @@ export default async function SecurityPage() {
       )}
 
       {passkeys.length === 0 ? null : (
-        <Card title={authScreen.settingsTitle}>
+        <Card fb="auth-screen-settings" title={authScreen.settingsTitle}>
           {managing ? (
             <ActionForm action={updateLockSettingsAction} submitLabel={screens.entry.save}>
               <TextField
@@ -155,7 +155,7 @@ export default async function SecurityPage() {
         </Card>
       )}
 
-      <Card title={authScreen.recoveryTitle}>
+      <Card fb="auth-screen-recovery" title={authScreen.recoveryTitle}>
         <ul className="flex list-disc flex-col gap-2 pe-5 text-text-secondary">
           {authScreen.recovery.map((line) => (
             <li key={line}>{line}</li>
@@ -164,7 +164,7 @@ export default async function SecurityPage() {
         <p className="mt-4">{authScreen.recoveryHonest}</p>
       </Card>
 
-      <Card title={authScreen.protectsTitle}>
+      <Card fb="auth-screen-protects" title={authScreen.protectsTitle}>
         <ul className="flex list-disc flex-col gap-2 pe-5 text-text-secondary">
           {authScreen.protects.map((line) => (
             <li key={line}>{line}</li>
@@ -191,7 +191,7 @@ export default async function SecurityPage() {
       </Card>
 
       {passkeys.length === 0 ? null : (
-        <Card title={authScreen.lockOffTitle} tone="attention">
+        <Card fb="auth-screen-lock-off" title={authScreen.lockOffTitle} tone="attention">
           <p className="text-text-secondary">{authScreen.lockOffExplain}</p>
           {managing ? (
             <div className="mt-4">
@@ -207,7 +207,7 @@ export default async function SecurityPage() {
         </Card>
       )}
 
-      <Card title={authScreen.logTitle}>
+      <Card fb="auth-screen-log" title={authScreen.logTitle}>
         {recentLog.length === 0 ? (
           <p className="text-text-secondary">{authScreen.logEmpty}</p>
         ) : (

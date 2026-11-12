@@ -357,7 +357,7 @@ export default async function GemachLoanPage({ params }: { params: Promise<{ id:
         </div>
       </Card>
 
-      <Card title={gemach.loanAmount}>
+      <Card fb="gemach-loan-amount" title={gemach.loanAmount}>
         <StatRow
           label={gemach.loanAmount}
           value={<Money amountMinor={loan.principalMinor} currency={currency} />}
@@ -398,7 +398,11 @@ export default async function GemachLoanPage({ params }: { params: Promise<{ id:
       {/* Delivering everything at once: the common case, and the one that must
           visibly change no figure. */}
       {loan.deliverable.length === 0 ? null : (
-        <Card title={gemach.checksDelivered} subtitle={gemach.deliverAllNote}>
+        <Card
+          fb="gemach-checks-delivered"
+          title={gemach.checksDelivered}
+          subtitle={gemach.deliverAllNote}
+        >
           <ActionForm action={deliverChecksAction} submitLabel={gemach.markDeliveredAll}>
             <>
               {loan.deliverable.map((view) => (
@@ -494,7 +498,7 @@ export default async function GemachLoanPage({ params }: { params: Promise<{ id:
 
       <SectionTitle>{gemach.planTitle}</SectionTitle>
 
-      <Card title={gemach.planTitle} subtitle={gemach.planNote}>
+      <Card fb="gemach-plan" title={gemach.planTitle} subtitle={gemach.planNote}>
         {loan.plan === null ? (
           <p className="text-text-secondary">{gemach.planNone}</p>
         ) : (
@@ -560,7 +564,7 @@ export default async function GemachLoanPage({ params }: { params: Promise<{ id:
 
       <SectionTitle>{gemach.addSeries}</SectionTitle>
 
-      <Card title={gemach.addSeries} subtitle={gemach.intendedTotalHint}>
+      <Card fb="gemach-add-series" title={gemach.addSeries} subtitle={gemach.intendedTotalHint}>
         <ActionForm action={addCheckSeriesAction} submitLabel={gemach.addSeries}>
           <>
             <HiddenValue name="debtId" value={loan.debtId} />
@@ -609,7 +613,7 @@ export default async function GemachLoanPage({ params }: { params: Promise<{ id:
         </ActionForm>
       </Card>
 
-      <Card title={gemach.addOne}>
+      <Card fb="gemach-add-one" title={gemach.addOne}>
         <ActionForm action={addCheckAction} submitLabel={gemach.addOne} resetOnSuccess>
           <>
             <HiddenValue name="debtId" value={loan.debtId} />
@@ -645,7 +649,7 @@ export default async function GemachLoanPage({ params }: { params: Promise<{ id:
 
       <SectionTitle>{gemach.closeTitle}</SectionTitle>
 
-      <Card title={gemach.closeTitle}>
+      <Card fb="gemach-close" title={gemach.closeTitle}>
         {loan.status === 'settled' ? (
           <p className="text-text-secondary">{gemach.closed}</p>
         ) : loan.canClose ? (
@@ -672,7 +676,7 @@ export default async function GemachLoanPage({ params }: { params: Promise<{ id:
         )}
       </Card>
 
-      <Card title={gemach.historyTitle}>
+      <Card fb="gemach-history" title={gemach.historyTitle}>
         {history.length === 0 ? (
           <p className="text-text-secondary">{gemach.historyEmpty}</p>
         ) : (

@@ -61,7 +61,7 @@ export default async function BusinessPage() {
   if (profit === null) {
     return (
       <AppShell source={descriptor} active="/more" title={copy.business.title}>
-        <Card title={copy.business.title}>
+        <Card fb="business-title" title={copy.business.title}>
           <p className="text-text-secondary">{copy.business.none}</p>
         </Card>
       </AppShell>
@@ -71,7 +71,7 @@ export default async function BusinessPage() {
   return (
     <AppShell source={descriptor} active="/more" title={copy.business.title}>
       {/* The breakdown comes first. The transfer figure is the conclusion, not the headline. */}
-      <Card title={copy.business.reallyLeft}>
+      <Card fb="business-really-left" title={copy.business.reallyLeft}>
         <StatRow
           label={copy.business.accountingProfit}
           value={
@@ -119,7 +119,7 @@ export default async function BusinessPage() {
         tone={transfer.resultMinor > 0 ? 'primary' : 'attention'}
       />
 
-      <Card title={copy.business.limitedBy}>
+      <Card fb="business-limited-by" title={copy.business.limitedBy}>
         <BreakdownList
           lines={transfer.breakdown}
           currency={snapshot.currency}
@@ -147,7 +147,11 @@ export default async function BusinessPage() {
         view nets to zero (02-FINANCIAL-RULES.md § Scopes ותנועות).
       */}
       {businessAccounts.length === 0 || householdAccounts.length === 0 ? null : (
-        <Card title={copy.business.safeToMove} subtitle={copy.business.proposalNote}>
+        <Card
+          fb="business-safe-to-move"
+          title={copy.business.safeToMove}
+          subtitle={copy.business.proposalNote}
+        >
           <ActionForm action={transferToHouseholdAction} submitLabel={copy.business.safeToMove}>
             <>
               <div className="grid gap-4 sm:grid-cols-2">

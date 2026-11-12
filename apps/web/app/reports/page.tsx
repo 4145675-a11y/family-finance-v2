@@ -83,7 +83,7 @@ export default async function ReportsPage() {
         <p className="mt-1">{screens.reports.pendingCount(reports[0]?.pendingCount ?? 0)}</p>
       </Notice>
 
-      <Card title={screens.reports.exportTitle}>
+      <Card fb="reports-export" title={screens.reports.exportTitle}>
         {/* Printing renders a screen this person is already looking at, so it is
             outside the gate. The two file exports carry every figure out of the
             application, so they are inside it. */}

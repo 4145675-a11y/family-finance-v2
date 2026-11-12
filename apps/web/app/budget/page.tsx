@@ -76,7 +76,7 @@ export default async function BudgetPage() {
         title={copy.budget.title}
         subtitle={copy.budget.subtitle}
       >
-        <Card title={copy.budget.empty}>
+        <Card fb="budget-empty" title={copy.budget.empty}>
           <p className="text-text-secondary">{copy.budget.emptyAction}</p>
           <div className="mt-4">
             <ActionForm action={startBudgetAction} submitLabel={copy.budget.emptyAction}>
@@ -103,7 +103,7 @@ export default async function BudgetPage() {
       <p className="-mt-2 px-1 text-text-secondary">{copy.budget.subtitle}</p>
 
       {budgetId !== null ? (
-        <Card title={copy.budget.planned} subtitle={copy.budget.draftNote}>
+        <Card fb="budget-planned" title={copy.budget.planned} subtitle={copy.budget.draftNote}>
           <ActionForm action={setBudgetLineAction} submitLabel={copy.budget.planned}>
             <>
               <HiddenValue name="budgetId" value={budgetId} />
@@ -124,13 +124,13 @@ export default async function BudgetPage() {
       ) : null}
 
       {budget.lines.length === 0 ? (
-        <Card title={copy.budget.empty}>
+        <Card fb="budget-empty" title={copy.budget.empty}>
           <p className="text-text-secondary">{copy.budget.emptyAction}</p>
         </Card>
       ) : (
         <>
           {/* The month in one card, before any category detail. */}
-          <Card title={copy.budget.monthTotal}>
+          <Card fb="budget-month-total" title={copy.budget.monthTotal}>
             <div className="flex flex-col gap-3">
               <ProgressBar
                 value={totals.approvedMinor + totals.pendingMinor + totals.committedMinor}
@@ -244,7 +244,7 @@ export default async function BudgetPage() {
           ) : null}
 
           {/* Categories. */}
-          <Card title={copy.budget.title}>
+          <Card fb="budget-title" title={copy.budget.title}>
             <div className="flex flex-col gap-5">
               {budget.lines.map((line) => {
                 const usedMinor = line.approvedMinor + line.pendingMinor + line.committedMinor;
@@ -338,7 +338,7 @@ export default async function BudgetPage() {
           </Card>
 
           {/* Moving money between categories is a proposal, and the screen says so. */}
-          <Card title={copy.budget.transferTitle}>
+          <Card fb="budget-transfer" title={copy.budget.transferTitle}>
             <p>{copy.budget.transferExplain(30_000, copy.budget.categories.food ?? 'מזון')}</p>
             <p className="mt-2 text-text-secondary">{copy.budget.transferKeepsTotal}</p>
             <p className="mt-2 text-text-secondary">{copy.budget.transferNeedsApproval}</p>
@@ -346,7 +346,11 @@ export default async function BudgetPage() {
           </Card>
 
           {budget.warnings.length > 0 || budget.missingData.length > 0 ? (
-            <Card title={copy.sections.needsAttention} tone="attention">
+            <Card
+              fb="sections-needs-attention"
+              title={copy.sections.needsAttention}
+              tone="attention"
+            >
               <ul className="flex list-inside list-disc flex-col gap-1.5">
                 {[...budget.warnings, ...budget.missingData].map((item) => (
                   <li key={item.code}>{sayNotice(item)}</li>

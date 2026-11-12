@@ -2,7 +2,7 @@
 
 מצב הפרויקט מול `09-MILESTONES.md`. מתעדכן בסוף כל milestone, לפני העצירה לאישור.
 
-- **תאריך עדכון אחרון**: 2026-09-23
+- **תאריך עדכון אחרון**: 2026-11-12
 - **Milestone פעיל**: **Transaction Intelligence** (ADR-0036) — סיווג דטרמיניסטי לכל שורת בנק, שלוש רמות ביטחון, קישור הלוואה שאינו ניחוש, וכללים של משק בית. לפניו: **Debt Import & Dual Calendar** (ADR-0035) על `feature/debt-import-hebrew-calendar` — **המסלול שלם מקצה לקצה**: העלאה → זיהוי לפי ערכים → הצעות → סקירה → אישור → מלווה, חוב ואירוע פתיחה → כרטיס מלווה עם היסטוריה, ושני לוחות שנה בכל מקום שיש בו מועד. ה־hotfix של Render (ADR-0034) מוזג ל־`main` ב־`a42ca8c`; **הייצור חי** — `/api/health` מחזיר `200 ok`, `readiness: ready` (2026-09-22, אחרי שחזור פרויקט Supabase).
 - **סטטוס**: **מוצר מקומי שלם ושמיש, עם נעילה אמיתית.** משפחה יכולה להקים משק בית, להזין
   הכול ידנית, להעלות קובץ בנק, לעבור עליו ולאשר, לראות תמונה יומית, לנהל תקציב וחובות,
@@ -53,6 +53,7 @@
 | — | **UX Simplification** | **Complete — evidenced** | [UX-SIMPLIFICATION-AUDIT](docs/UX-SIMPLIFICATION-AUDIT.md) | **ניווט 15 → 5**, זהה בטלפון ובמחשב · בית מקיר של 9 מקטעים ו־10 פעולות למרכז שליטה של 5 מקטעים ו־6 (2.7 → 1.7 מסכי טלפון, 824 → 571 תווים), והעדכון המהיר כפעולה הראשית היחידה · `/debts` ו־`/lenders` מוזגו למסך אחד ו־`/debts` מפנה מאחורי המנעול · פעולה ראשית אחת בכל מסך רגיל · **מדידה בדפדפן לפני ואחרי, 8 מסעות, בשני רוחבים** |
 | — | **One Flow & One Card** | **Complete — evidenced** | ADR-0042 | **זרימה אחת במסך העדכון המהיר**: כפתור אחד (`הצע עדכון`) שהקורא שלו נבחר בשרת, נפילה שקטה לטבלת הכללים כחוסן, מתאם מלווים משותף, חוזה שבו מודל אינו יכול לבטא מזהה מלווה (`lenderText`), `new_debt` מול כרטיס קיים שמועלה ל־`new_principal`, `dueDate` נפרד שנרשם ולא רק מוצג, וכרטיס בן חמש שורות ששאלתו כפתורים. **124 בדיקות דפדפן** + המסע נצפה בצילום מסך ב־1280×900 וב־390×844 |
 | — | **Hosting & Production-Origin** | **Complete — evidenced, merged; first deploy failed at build → hotfix on branch** | [hosting-production-origin](docs/checkpoints/hosting-production-origin.md) · [hotfix-render-build](docs/checkpoints/hotfix-render-build.md) | **`render.yaml` + בדיקה; origin חובה ומוכח; cookies Secure/HttpOnly/Lax; `/auth/callback` + קביעת סיסמה; ריצה חיה 18/18. יצירת השירות, Supabase Auth ודומיין — פעולות בעלים** |
+| — | **Feedback In Product** | **In progress** | [feedback-in-product](docs/checkpoints/feedback-in-product.md) | ADR-0047 · כפתור משוב לכל חבר, בייצור ובמקומי · unit 47 + E2E 10 עברו · בדיקות RLS 27/27 מול Supabase · migration `20261112090000` לא הוחל · לא נעשה commit |
 
 ## שערי איכות — מצב נוכחי
 

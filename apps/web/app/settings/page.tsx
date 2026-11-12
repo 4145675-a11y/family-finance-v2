@@ -112,7 +112,7 @@ export default async function SettingsPage() {
         </ActionForm>
       </Card>
 
-      <Card title={screens.settings.dataTitle}>
+      <Card fb="settings-data" title={screens.settings.dataTitle}>
         <p className="text-text-secondary">{screens.settings.dataLocationHint}</p>
         <p className="mt-2 rounded-control bg-surface-muted p-3 text-small">
           <bdi dir="ltr">{dataDirectory() ?? accountScreen.storedInDatabase}</bdi>

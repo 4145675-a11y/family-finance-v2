@@ -97,7 +97,7 @@ export default async function UploadPage() {
         <UploadForm accounts={accounts} hasBusiness={document.businesses.length > 0} />
       </Card>
 
-      <Card title={screens.upload.accepts}>
+      <Card fb="upload-accepts" title={screens.upload.accepts}>
         <ul className="flex list-inside list-disc flex-col gap-1.5 text-text-secondary">
           <li>{screens.upload.limits}</li>
           <li>{screens.upload.xlsNote}</li>
@@ -105,7 +105,7 @@ export default async function UploadPage() {
         </ul>
       </Card>
 
-      <Card title={screens.upload.history}>
+      <Card fb="upload-history" title={screens.upload.history}>
         {history.length === 0 ? (
           <p className="text-text-secondary">{screens.upload.noHistory}</p>
         ) : (

@@ -54,7 +54,7 @@ export default async function BackupPage() {
 
   return (
     <AppShell active="/more" title={screens.backup.title} subtitle={screens.backup.subtitle}>
-      <Card title={screens.backup.whatTitle}>
+      <Card fb="backup-what" title={screens.backup.whatTitle}>
         <p className="text-text-secondary">{screens.backup.whatBody}</p>
         <div className="mt-4">
           {counts.map(([key, value]) => (
@@ -67,7 +67,7 @@ export default async function BackupPage() {
         </div>
       </Card>
 
-      <Card title={screens.backup.whereTitle}>
+      <Card fb="backup-where" title={screens.backup.whereTitle}>
         <p className="text-text-secondary">{screens.backup.whereBody}</p>
         <p className="mt-2 text-small text-text-secondary">
           <bdi dir="ltr">{dataDirectory() ?? accountScreen.storedInDatabase}</bdi>

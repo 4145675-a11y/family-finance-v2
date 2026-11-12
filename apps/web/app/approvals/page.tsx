@@ -139,7 +139,7 @@ export default async function ApprovalsPage() {
         </>
       )}
 
-      <Card title={screens.review.pending}>
+      <Card fb="review-pending" title={screens.review.pending}>
         <StatRow
           label={screens.reports.pendingCount(snapshot.quality.components.length)}
           value={<Figure>{snapshot.quality.score}</Figure>}

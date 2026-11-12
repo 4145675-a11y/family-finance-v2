@@ -148,7 +148,7 @@ export default async function TasksPage() {
       </Card>
 
       {finished.length === 0 ? null : (
-        <Card title={screens.tasks.done}>
+        <Card fb="tasks-done" title={screens.tasks.done}>
           {finished.map((task) => (
             <StatRow
               key={task.id}

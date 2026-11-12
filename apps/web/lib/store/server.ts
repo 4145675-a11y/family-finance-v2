@@ -5,7 +5,11 @@ import {
   SupabaseHouseholdTransport,
   type HouseholdStorePort,
 } from '@family-finance/household-store';
-import { HouseholdStore, resolveStorePaths } from '@family-finance/local-store';
+import {
+  HouseholdStore,
+  LocalFeedbackStore,
+  resolveStorePaths,
+} from '@family-finance/local-store';
 import { cache } from 'react';
 
 import { activeBackend } from '../auth/backend';
@@ -85,3 +89,23 @@ export function dataDirectory(): string | null {
 }
 
 export { findProjectRoot };
+
+let feedbackFiles: LocalFeedbackStore | null = null;
+
+/**
+ * Feedback notes on the file backend (ADR-0047 § 6): beside the household
+ * document in the same data directory, never inside it, behind the same lock.
+ * Constructed here because this is the one module that opens the data directory.
+ */
+export function localFeedbackStore(): LocalFeedbackStore {
+  if (activeBackend() === 'supabase') {
+    throw new Error('feedback files exist only with the file backend');
+  }
+  if (feedbackFiles === null) {
+    feedbackFiles = new LocalFeedbackStore({
+      root: resolveStorePaths(findProjectRoot()).root,
+      guard: assertUnlocked,
+    });
+  }
+  return feedbackFiles;
+}

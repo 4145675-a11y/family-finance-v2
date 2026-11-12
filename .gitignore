@@ -34,6 +34,9 @@ service-role*.json
 # ADR-0024 puts the store here; the directory is created on first run.
 .data/
 
+# Feedback notes pulled for review (ADR-0047). Never committed.
+.feedback/
+
 # local temp / uploads (import pipeline scratch space)
 tmp/
 .tmp/

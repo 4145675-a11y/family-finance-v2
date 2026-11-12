@@ -113,15 +113,19 @@ export function Card({
   children,
   tone = 'neutral',
   className = '',
+  fb,
 }: {
   title?: string;
   subtitle?: string;
   children: ReactNode;
   tone?: Tone;
   className?: string;
+  /** A stable name for the feedback button (ADR-0047): lowercase, hyphens. */
+  fb?: string;
 }) {
   return (
     <section
+      data-fb={fb}
       className={`rounded-card border ${TONE_BORDER[tone]} bg-surface p-4 shadow-card sm:p-5 ${className}`}
     >
       {title ? (
@@ -176,7 +180,7 @@ export function Hero({
   const Label = asHeading ? 'h1' : 'p';
 
   return (
-    <section className={`flex flex-col rounded-hero p-5 sm:p-6 ${surface}`}>
+    <section data-fb="hero" className={`flex flex-col rounded-hero p-5 sm:p-6 ${surface}`}>
       <Label className={`text-small font-medium ${secondaryText}`}>{label}</Label>
 
       {amountMinor === null ? (

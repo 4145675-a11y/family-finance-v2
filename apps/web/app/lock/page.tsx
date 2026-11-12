@@ -73,7 +73,7 @@ export default async function LockPage() {
         </Card>
       )}
 
-      <Card title={authScreen.recoveryTitle}>
+      <Card fb="auth-screen-recovery" title={authScreen.recoveryTitle}>
         <ul className="flex list-disc flex-col gap-2 pe-5 text-text-secondary">
           {authScreen.recovery.map((line) => (
             <li key={line}>{line}</li>

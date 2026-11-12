@@ -326,7 +326,7 @@ export default async function HomePage() {
         habit the product lives or dies by. It used to be one of four buttons in
         the ninth section.
       */}
-      <Card title={copy.home.recordTitle} tone="primary">
+      <Card fb="home-record" title={copy.home.recordTitle} tone="primary">
         <p className="text-text-secondary">{copy.home.recordIntro}</p>
         <div className="mt-4">
           <LinkButton href="/quick">{copy.actions.quickUpdate}</LinkButton>
@@ -335,7 +335,7 @@ export default async function HomePage() {
 
       {/* 3. What needs attention — one card, or nothing at all. */}
       {attention.length === 0 ? null : (
-        <Card title={copy.home.attentionTitle} tone="attention">
+        <Card fb="home-attention" title={copy.home.attentionTitle} tone="attention">
           <ul className="flex flex-col gap-3">
             {attention.map((item) => (
               <li key={item.key} className="flex flex-col gap-1">
@@ -362,7 +362,7 @@ export default async function HomePage() {
         reads at breakfast; a card with a progress bar, a meaning, a footer and a
         trend is what they scroll past.
       */}
-      <Card title={copy.home.pictureTitle}>
+      <Card fb="home-picture" title={copy.home.pictureTitle}>
         <StatRow
           label={copy.home.debtTotalNow}
           value={

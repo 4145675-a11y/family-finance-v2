@@ -139,7 +139,7 @@ export default async function GemachPage() {
 
       <SectionTitle>{gemach.newLoanTitle}</SectionTitle>
 
-      <Card title={gemach.newLoanTitle} subtitle={gemach.interestNote}>
+      <Card fb="gemach-new-loan" title={gemach.newLoanTitle} subtitle={gemach.interestNote}>
         <ActionForm action={addGemachLoanAction} submitLabel={gemach.addLoan} resetOnSuccess>
           <>
             <TextField name="creditorName" label={gemach.lenderName} maxLength={160} />

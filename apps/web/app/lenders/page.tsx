@@ -128,7 +128,7 @@ export default async function LendersPage() {
             person meeting them in two separate places treats the second as noise.
           */}
           {needingReview.length === 0 && (risk?.within30DaysMinor ?? 0) === 0 ? null : (
-            <Card title={copy.debts.urgentTitle} tone="attention">
+            <Card fb="debts-urgent" title={copy.debts.urgentTitle} tone="attention">
               {(risk?.within30DaysMinor ?? 0) > 0 ? (
                 <p>{copy.debts.callableSoon(risk?.within30DaysMinor ?? 0)}</p>
               ) : null}

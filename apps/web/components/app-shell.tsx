@@ -5,6 +5,7 @@ import { copy } from '../lib/copy/copy';
 import { platform } from '../lib/copy/platform';
 import { isPlatformOwner } from '../lib/auth/platform';
 import type { DataSourceDescriptor } from '../lib/dashboard/source';
+import { FeedbackWidget } from './feedback-widget';
 import { Mark, SourceBanner } from './ui';
 
 /**
@@ -144,7 +145,10 @@ export async function AppShell({
         {copy.nav.skipToContent}
       </a>
 
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <header
+        data-fb="shell-header"
+        className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+      >
         <Link
           href="/"
           className="flex min-h-11 items-center gap-2 rounded-control text-primary transition-colors hover:text-primary-hover"
@@ -164,6 +168,7 @@ export async function AppShell({
           each, which is more structure than the thing it structures.
         */}
         <nav
+          data-fb="shell-nav"
           aria-label={copy.nav.ariaMain}
           className="hidden shrink-0 flex-col gap-0.5 rounded-card border border-border bg-surface p-2 shadow-card sm:flex sm:w-44"
         >
@@ -176,7 +181,7 @@ export async function AppShell({
           </ul>
         </nav>
 
-        <main id="main" className="flex min-w-0 flex-1 flex-col gap-4">
+        <main id="main" data-fb="screen" className="flex min-w-0 flex-1 flex-col gap-4">
           {source !== undefined && !source.isRealData && source.kind !== 'none' ? (
             <SourceBanner />
           ) : null}
@@ -206,6 +211,7 @@ export async function AppShell({
         a column: the honest fix then is fewer destinations, not smaller text.
       */}
       <nav
+        data-fb="shell-bottom-nav"
         aria-label={copy.nav.ariaBottom}
         className="fixed inset-x-0 bottom-0 border-t border-border bg-surface sm:hidden"
       >
@@ -217,6 +223,9 @@ export async function AppShell({
           ))}
         </ul>
       </nav>
+
+      {/* Feedback from inside the product (ADR-0047): every screen a member reaches. */}
+      <FeedbackWidget />
     </div>
   );
 }

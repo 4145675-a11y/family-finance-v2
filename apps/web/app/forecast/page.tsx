@@ -60,7 +60,7 @@ export default async function ForecastPage() {
 
   return (
     <AppShell source={descriptor} active="/more" title={copy.forecast.title}>
-      <Card title={copy.forecast.endQuestion}>
+      <Card fb="forecast-end-question" title={copy.forecast.endQuestion}>
         <p className="text-display font-bold text-primary">
           <Money amountMinor={conservative.endOfPeriodMinor} currency={snapshot.currency} />
         </p>
@@ -75,7 +75,7 @@ export default async function ForecastPage() {
         that is wrong by four thousand shekels.
       */}
       {snapshot.checkExposure.outstandingCount === 0 ? null : (
-        <Card title={gemach.checksOutstanding}>
+        <Card fb="gemach-checks-outstanding" title={gemach.checksOutstanding}>
           <p className="text-text-secondary">
             {gemach.outstandingCount(
               snapshot.checkExposure.outstandingCount,
@@ -120,7 +120,7 @@ export default async function ForecastPage() {
       </Card>
 
       {/* The four kinds of money, in order of how much you can rely on them. */}
-      <Card title={copy.forecast.certainQuestion}>
+      <Card fb="forecast-certain-question" title={copy.forecast.certainQuestion}>
         <StatRow
           label={copy.forecast.alreadyHave}
           value={<Money amountMinor={conservative.openingMinor} currency={snapshot.currency} />}
@@ -132,7 +132,7 @@ export default async function ForecastPage() {
         <p className="mt-3 text-small text-text-secondary">{copy.forecast.onlyFirstTwoCount}</p>
       </Card>
 
-      <Card title={copy.forecast.maybeQuestion}>
+      <Card fb="forecast-maybe-question" title={copy.forecast.maybeQuestion}>
         <StatRow
           label={copy.forecast.probablyEnter}
           value={<Money amountMinor={incomeBy('probable')} currency={snapshot.currency} />}
@@ -147,7 +147,7 @@ export default async function ForecastPage() {
         />
       </Card>
 
-      <Card title={copy.forecast.dayTable}>
+      <Card fb="forecast-day-table" title={copy.forecast.dayTable}>
         {movingDays.length === 0 ? (
           <p className="text-text-secondary">אין תנועות צפויות עד סוף החודש.</p>
         ) : (
@@ -193,7 +193,11 @@ export default async function ForecastPage() {
         )}
       </Card>
 
-      <Card title={copy.forecast.whatIfTitle} subtitle={copy.forecast.whatIfNote}>
+      <Card
+        fb="forecast-what-if"
+        title={copy.forecast.whatIfTitle}
+        subtitle={copy.forecast.whatIfNote}
+      >
         <div className="flex flex-col gap-3">
           {snapshot.stressTests.map((result) => (
             <div key={result.key} className="border-b border-border pb-3 last:border-b-0">

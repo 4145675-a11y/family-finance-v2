@@ -288,7 +288,7 @@ export default async function AccountsPage() {
       </Card>
 
       {closed.length === 0 ? null : (
-        <Card title={screens.accounts.closed}>
+        <Card fb="accounts-closed" title={screens.accounts.closed}>
           {closed.map((account) => (
             <StatRow
               key={account.id}

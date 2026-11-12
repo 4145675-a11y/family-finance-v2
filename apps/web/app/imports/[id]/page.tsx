@@ -206,7 +206,7 @@ export default async function ImportReviewPage({
             <p className="mt-2">{screens.upload.scanNote}</p>
           ) : null}
         </Notice>
-        <Card title={screens.entry.title}>
+        <Card fb="entry-title" title={screens.entry.title}>
           <p className="text-text-secondary">{screens.entry.subtitle}</p>
           <div className="mt-3">
             <a
@@ -255,7 +255,7 @@ export default async function ImportReviewPage({
         </Notice>
       )}
 
-      <Card title={screens.review.summaryTitle}>
+      <Card fb="review-summary" title={screens.review.summaryTitle}>
         <StatRow label={screens.review.file} value={batch.file.displayName} />
         <StatRow
           label={screens.review.documentType}
@@ -326,7 +326,7 @@ export default async function ImportReviewPage({
       </Card>
 
       {decided ? null : (
-        <Card title={screens.review.rowsTitle}>
+        <Card fb="review-rows" title={screens.review.rowsTitle}>
           {confidentCount === 0 ? null : (
             <div className="mb-3">
               <p className="mb-2 text-text-secondary">
@@ -853,7 +853,7 @@ export default async function ImportReviewPage({
       )}
 
       {batch.status !== 'approved' ? null : (
-        <Card title={screens.review.resultTitle} tone="success">
+        <Card fb="review-result" title={screens.review.resultTitle} tone="success">
           <p className="text-text-secondary">
             {screens.review.resultCreated(
               document.transactions.filter(

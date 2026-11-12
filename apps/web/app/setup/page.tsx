@@ -59,7 +59,7 @@ export default async function SetupPage() {
             </p>
           </Card>
 
-          <Card title={screens.setup.privacyTitle}>
+          <Card fb="setup-privacy" title={screens.setup.privacyTitle}>
             <p className="text-text-secondary">{screens.setup.privacyBody}</p>
           </Card>
         </AppShell>
@@ -82,7 +82,7 @@ export default async function SetupPage() {
           </ActionForm>
         </Card>
 
-        <Card title={screens.setup.privacyTitle}>
+        <Card fb="setup-privacy" title={screens.setup.privacyTitle}>
           <p className="text-text-secondary">{screens.setup.privacyBody}</p>
         </Card>
       </AppShell>
@@ -118,7 +118,7 @@ export default async function SetupPage() {
         </ul>
       </Card>
 
-      <Card title={screens.setup.householdName}>
+      <Card fb="setup-household-name" title={screens.setup.householdName}>
         <ActionForm action={renameHouseholdAction} submitLabel={screens.common.confirm}>
           <TextField
             name="name"
@@ -129,7 +129,11 @@ export default async function SetupPage() {
         </ActionForm>
       </Card>
 
-      <Card title={screens.setup.members} subtitle={screens.setup.membersHint}>
+      <Card
+        fb="setup-members"
+        title={screens.setup.members}
+        subtitle={screens.setup.membersHint}
+      >
         {members.map((profile) => (
           <StatRow key={profile.id} label={profile.displayName} value="" />
         ))}
@@ -151,7 +155,11 @@ export default async function SetupPage() {
         </div>
       </Card>
 
-      <Card title={screens.accounts.title} subtitle={screens.accounts.emptyHint}>
+      <Card
+        fb="accounts-title"
+        title={screens.accounts.title}
+        subtitle={screens.accounts.emptyHint}
+      >
         {document.accounts.length === 0 ? (
           <p className="text-text-secondary">{screens.accounts.empty}</p>
         ) : (
@@ -170,7 +178,11 @@ export default async function SetupPage() {
         </div>
       </Card>
 
-      <Card title={screens.setup.businessTitle} subtitle={screens.setup.businessHint}>
+      <Card
+        fb="setup-business"
+        title={screens.setup.businessTitle}
+        subtitle={screens.setup.businessHint}
+      >
         {business !== undefined ? (
           <>
             <StatRow label={business.name} value={screens.accounts.scopes['business'] ?? ''} />
@@ -206,7 +218,7 @@ export default async function SetupPage() {
         )}
       </Card>
 
-      <Card title={screens.setup.privacyTitle}>
+      <Card fb="setup-privacy" title={screens.setup.privacyTitle}>
         <p className="text-text-secondary">{screens.setup.privacyBody}</p>
         {document.setup.privacyExplained ? null : (
           <div className="mt-4">

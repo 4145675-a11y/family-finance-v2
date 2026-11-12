@@ -110,7 +110,7 @@ export default async function EntryPage() {
       subtitle={screens.entry.subtitle}
       status={<StatusChips snapshot={snapshot} />}
     >
-      <Card title={screens.entry.expenseTitle}>
+      <Card fb="entry-expense" title={screens.entry.expenseTitle}>
         <ActionForm
           action={recordExpenseAction}
           submitLabel={screens.entry.save}

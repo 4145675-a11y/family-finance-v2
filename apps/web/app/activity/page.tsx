@@ -78,7 +78,11 @@ export default async function ActivityPage() {
        * here has just pressed save somewhere and wants to see the thing, not the
        * name of the action that made it.
        */}
-      <Card title={screens.activity.recordsTitle} subtitle={screens.activity.recordsSubtitle}>
+      <Card
+        fb="activity-records"
+        title={screens.activity.recordsTitle}
+        subtitle={screens.activity.recordsSubtitle}
+      >
         {records.length === 0 ? (
           <p className="text-text-secondary">{screens.activity.recordsEmpty}</p>
         ) : (

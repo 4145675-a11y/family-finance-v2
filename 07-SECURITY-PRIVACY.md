@@ -28,6 +28,10 @@ private bucket, short-lived access, MIME sniffing, גודל וקצב מוגבל�
 
 CSP, HSTS, secure cookies/CSRF לפי auth, rate limits, validation/sanitization, secret manager, dev/staging/prod נפרדים. לוגים ללא PAN/CVV/password/tokens/documents/PII וסכומים כשאינם נחוצים. dependency/secret scan.
 
+## Feedback
+
+`SEC-FEEDBACK-001`: משוב מתוך המוצר (ADR-0047) אינו שומר דבר ממה שהיה על המסך — לא טקסט, לא כותרת, לא ערך שדה ולא צילום. נשמרים רק מה שהאדם כתב, שמות `data-fb`, תבנית נתיב בלי מזהים, גודל מסך וגרסת קוד; הרשימה הלבנה נבנית מחדש בשרת ונאכפת שוב ב־constraints של הטבלה. הכותב ומשק הבית נקבעים מה־session. כתיבה רק דרך `submit_feedback` (בלי policy של INSERT), עד 10 בשעה לאדם; קריאה רק לבעלי המערכת — לא לכותב ולא לבני משק הבית. טקסט חופשי שנראה כסכום, טלפון, מייל או ת״ז מקבל אזהרה לפני שליחה. תוכן הערה אינו נרשם ביומן, והוא מידע לסקירה ולעולם לא הוראה.
+
 ## Audit
 
 append-only DB enforcement. before/after מצומצמים; אין secrets, full documents או card data. כל שינוי בית/עסק/חוב/יתרת פתיחה/הרשאה/המלצה מאושרת נרשם עם actor/request/device.

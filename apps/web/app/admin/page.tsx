@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { AppShell } from '../../components/app-shell';
 import { ActionForm, HiddenValue, TextField } from '../../components/form';
-import { Badge, Card, DataTable, Notice, StatRow } from '../../components/ui';
+import { Badge, Card, DataTable, LinkButton, Notice, StatRow } from '../../components/ui';
 import {
   approveRequestAction,
   createHouseholdForOwnerAction,
@@ -18,6 +18,7 @@ import {
   isPlatformOwner,
   requestsEnabled,
 } from '../../lib/auth/platform';
+import { feedbackCopy } from '../../lib/copy/feedback';
 import { platform } from '../../lib/copy/platform';
 import { formatDateTime } from '../../lib/format';
 
@@ -54,7 +55,13 @@ export default async function AdminPage() {
 
   return (
     <AppShell active="/more" title={platform.title} subtitle={platform.subtitle}>
-      <Card title={platform.createTitle}>
+      <div className="flex">
+        <LinkButton href="/admin/feedback" tone="secondary">
+          {feedbackCopy.reviewNavLabel}
+        </LinkButton>
+      </div>
+
+      <Card fb="platform-create" title={platform.createTitle}>
         <p className="text-text-secondary">{platform.createIntro}</p>
         <div className="mt-4">
           <ActionForm action={createHouseholdForOwnerAction} submitLabel={platform.create}>
@@ -76,7 +83,7 @@ export default async function AdminPage() {
         </div>
       </Card>
 
-      <Card title={platform.listTitle}>
+      <Card fb="platform-list" title={platform.listTitle}>
         {households.length === 0 ? (
           <p className="text-text-secondary">{platform.listEmpty}</p>
         ) : (
@@ -118,7 +125,7 @@ export default async function AdminPage() {
         )}
       </Card>
 
-      <Card title={platform.requestsTitle}>
+      <Card fb="platform-requests" title={platform.requestsTitle}>
         <p className="text-text-secondary">{platform.requestsIntro}</p>
         <StatRow
           label={requestsOpen ? platform.requestsOpen : platform.requestsClosedNow}
@@ -173,7 +180,7 @@ export default async function AdminPage() {
       </Card>
 
       {requests.length === 0 ? null : (
-        <Card title={platform.requestsTitle}>
+        <Card fb="platform-requests" title={platform.requestsTitle}>
           <DataTable
             caption={platform.requestsTitle}
             columns={[platform.fieldHouseholdName, 'מצב', 'נשלחה']}

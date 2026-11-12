@@ -83,15 +83,15 @@ export default async function MorePage() {
 
   return (
     <AppShell active="/more" title={copy.nav.more}>
-      <Card title={copy.nav.groupPicture}>
+      <Card fb="nav-group-picture" title={copy.nav.groupPicture}>
         <LinkList items={picture} />
       </Card>
 
-      <Card title={copy.nav.groupKeeping}>
+      <Card fb="nav-group-keeping" title={copy.nav.groupKeeping}>
         <LinkList items={keeping} />
       </Card>
 
-      <Card title={copy.app.household}>
+      <Card fb="app-household" title={copy.app.household}>
         <LinkList items={household} />
         {exists ? null : (
           <p className="mt-3 text-small text-text-secondary">{screens.setup.intro}</p>
@@ -100,7 +100,7 @@ export default async function MorePage() {
 
       {/* Real evidence, and not something a family reads at breakfast. It moved
           off the home screen for that reason, and it did not disappear. */}
-      <Card title={copy.sections.technical}>
+      <Card fb="sections-technical" title={copy.sections.technical}>
         <StatRow label="גרסת חישוב" value={<Figure>{CALCULATION_VERSION}</Figure>} />
         <StatRow label="גרסת כללים" value={<Figure>{POLICY_VERSION}</Figure>} />
       </Card>

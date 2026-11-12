@@ -184,3 +184,10 @@ export {
 } from './projection';
 
 export { HouseholdStore, viewOf, type CreateHouseholdInput, type HouseholdView } from './store';
+
+export {
+  FEEDBACK_DIRECTORY,
+  FeedbackLimitError,
+  LocalFeedbackStore,
+  type LocalFeedbackStoreOptions,
+} from './feedback-store';

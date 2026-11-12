@@ -75,7 +75,7 @@ export default async function AccountPage() {
 
   return (
     <AppShell active="/more" title={accountScreen.membersTitle}>
-      <Card title={accountScreen.signInTitle}>
+      <Card fb="account-screen-sign-in" title={accountScreen.signInTitle}>
         {user.email !== null ? (
           <p className="text-text-secondary">{accountScreen.signedInAs(user.email)}</p>
         ) : null}
@@ -90,7 +90,7 @@ export default async function AccountPage() {
         </Notice>
       ) : (
         <>
-          <Card title={accountScreen.membersTitle}>
+          <Card fb="account-screen-members" title={accountScreen.membersTitle}>
             {members.map((member) => (
               <StatRow
                 key={member.profileId}
@@ -106,7 +106,7 @@ export default async function AccountPage() {
             ))}
           </Card>
 
-          <Card title={accountScreen.inviteTitle}>
+          <Card fb="account-screen-invite" title={accountScreen.inviteTitle}>
             {isOwner ? (
               <InviteForm />
             ) : (
@@ -115,7 +115,10 @@ export default async function AccountPage() {
           </Card>
 
           {invitations.length === 0 ? null : (
-            <Card title={accountScreen.pendingInvitations}>
+            <Card
+              fb="account-screen-pending-invitations"
+              title={accountScreen.pendingInvitations}
+            >
               <DataTable
                 caption={accountScreen.pendingInvitations}
                 columns={[accountScreen.inviteEmail, 'מצב', 'תוקף']}

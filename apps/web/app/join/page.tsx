@@ -64,7 +64,7 @@ export default async function JoinPage({
       </Card>
 
       {!(await requestsEnabled()) ? null : (
-        <Card title={platform.requestTitle}>
+        <Card fb="platform-request" title={platform.requestTitle}>
           <p className="text-text-secondary">{platform.doorRequest}</p>
           <div className="mt-4">
             <ActionForm action={requestHouseholdAction} submitLabel={platform.request}>
