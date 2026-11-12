@@ -95,7 +95,7 @@ test.describe('the top-up journey works with no reader at all', () => {
    * A lender of its own, and one this project's specs do not otherwise move, so
    * the figures stay independent of the run order.
    */
-  const SENTENCE = `קיבלתי עוד 3,000 ₪ מ${LENDER_PLAIN}, לפירעון ב־10/10/2026`;
+  const SENTENCE = `קיבלתי עוד 3,000 ₪ מ${LENDER_PLAIN}, לפירעון ב־10/10/2030`;
 
   test('the existing card is found, the day is read, and one question is asked', async ({
     page,
@@ -108,7 +108,7 @@ test.describe('the top-up journey works with no reader at all', () => {
     expect(await actionOf(card)).toBe('new_principal');
     await expect(card.getByTestId('quick-lender')).toContainText(LENDER_PLAIN);
     await expect(card.getByTestId('quick-lender')).toContainText('כרטיס קיים');
-    await expect(card.getByTestId('quick-due')).toContainText('10.10.2026');
+    await expect(card.getByTestId('quick-due')).toContainText('10.10.2030');
     await expect(accountQuestion(card)).toContainText('לאיזה חשבון נכנסו 3,000 ₪?');
 
     expect(JSON.stringify(storedDocument())).toBe(before);
@@ -134,7 +134,7 @@ test.describe('the top-up journey works with no reader at all', () => {
     expect(storedDocument().debts).toHaveLength(cardsBefore);
     expect(eventsFor(debtId)).toHaveLength(eventsBefore + 1);
     expect(eventsFor(debtId).at(-1)?.kind).toBe('new_principal');
-    expect(eventsFor(debtId).at(-1)?.note).toContain('10.10.2026');
+    expect(eventsFor(debtId).at(-1)?.note).toContain('10.10.2030');
     expect(balanceOf(debtId)).toBe(balanceBefore + 300_000);
   });
 });
