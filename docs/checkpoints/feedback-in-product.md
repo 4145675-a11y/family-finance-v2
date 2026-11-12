@@ -1,6 +1,6 @@
 # CHECKPOINT — FEEDBACK: משוב מתוך המוצר
 
-- **Result**: PARTIAL — הקוד, בדיקות היחידה, בדיקות הדפדפן ובדיקות הבידוד מול Supabase עוברים (27/27, 2026-11-12); הקוד ב־`main` (`8a5d527`) ופרוס ב־Render; ה־migration **לא הוחל** על המסד.
+- **Result**: PASS — קוד, unit, E2E ו־RLS מול Supabase עוברים; פרוס מ־`main`; ה־migration הוחל (2026-11-12).
 - **Branch**: `feature/in-product-feedback` (מ־`main` ב־`a409669`)
 - **Environment**: Windows 11, Node 24.19.0, backend `local_json` לבדיקות הדפדפן
 - **Date**: 2026-11-12
@@ -17,9 +17,8 @@
   - מקומי: קובץ אחד לכל הערה ב־`.data/feedback/`, נכתב עם `wx` ולא נדרס, ובאותה מגבלת קצב.
   - דף `/admin/feedback` לבעלי המערכת: סינון לפי סטטוס, שינוי סטטוס, מחיקה והורדת JSON מ־`/admin/feedback/export`.
   - שמות `data-fb` על המעטפת, על ה־hero ועל 72 כרטיסים בעלי כותרת.
-- **לא הושלם**:
-  - החלת ה־migration על המסד. פעולת בעלים. עד שהיא נעשית, שליחת משוב בייצור תחזיר "ההערה לא נשלחה".
-- **מחוץ ל־scope ולא שונה**: מנוע הכסף, החשבונות, החובות, שכבת ה־AI, והבדיקה הנכשלת ב־`ai-unconfigured.plain.spec.ts` (ראו למטה).
+- **לא הושלם**: אין.
+- **מחוץ ל־scope ולא שונה**: מנוע הכסף, החשבונות, החובות ושכבת ה־AI. הבדיקה ב־`ai-unconfigured.plain.spec.ts` תוקנה בנפרד (`8a5d527`), כי התאריך שבה פג. הפרטים למטה.
 
 ## Changes
 
@@ -88,12 +87,6 @@
 
 אין.
 
-## Stop
-
-עצירה לאישור. הצעדים הבאים, כל אחד דורש הוראה מפורשת:
-
-1. החלת ה־migration על המסד (פעולת בעלים): `npm run db:apply -- supabase/migrations/20261112090000_in_product_feedback.sql`. הניסיון להריץ אותה מכאן נחסם על ידי בודק ההרשאות של הסביבה.
-
 ## Deployment (2026-11-12)
 
 - `main` קודם ל־`8a5d527` בלי merge commit (fast-forward), ונדחף.
@@ -101,4 +94,12 @@
 - `/api/health` מחזיר `readiness: ready` ו־`schema: compatible`.
 - `npm run smoke:production`: 20/20.
 - `/admin/feedback/export` עונה לאנונימי `404 Not found` עם `Cache-Control: no-store`, כלומר ה־handler החדש הוא שעונה.
-- `db:cleanliness`: 38 טבלאות. `feedback` עוד לא קיימת, ולכן שליחת משוב בייצור עונה "ההערה לא נשלחה" עד להחלת ה־migration.
+- **Migration הוחל**: `npm run db:apply -- supabase/migrations/20261112090000_in_product_feedback.sql`, sha256 `7bef2ca5…cfb84d`, `applied`. עד להחלה הקוד רץ בייצור, ושליחת משוב ענתה "ההערה לא נשלחה".
+- אחרי ההחלה:
+  - `db:cleanliness`: 39 טבלאות ציבוריות, 39/39 RLS enabled+forced, 0 משתמשי בדיקה. ה־FAIL היחיד הוא משק הבית האמיתי.
+  - `rls-feedback` 27/27 ו־`rls-platform-owner` 32/32 מול המסד.
+  - `/api/health` עדיין `ready`.
+
+## Stop
+
+הושלם. אין צעד פתוח ב־milestone הזה.

@@ -86,4 +86,4 @@
 | IMP-CLASSIFY-001 | Architecture | packages/transaction-intelligence | unit | TXN-INT | **Verified in TXN-INT** — 81 בדיקות; טבלה דטרמיניסטית, שום נתון אינו יוצא מהתהליך |
 | IMP-LOANLINK-001 | Financial | packages/local-store/src/imports.ts + apps/web/app/imports/[id] | unit + store integration | TXN-INT | **Verified in TXN-INT** — `needs_debt` חוסם; יתרות אינן זזות בשורה עמומה |
 | IMP-RULES-001 | Security | packages/local-store/src/learned-rules.ts + apps/web/app/rules + learned_rules | unit + mapping round-trip | TXN-INT | **Verified in TXN-INT** — מוצע ולא נלקח; בידוד מבני ו־RLS; round-trip מוכח |
-| SEC-FEEDBACK-001 | Security | contracts/feedback + feedback table + submit_feedback + feedback widget | unit + negative integration + E2E | FEEDBACK | **Implemented (2026-11-12)** — unit 47, E2E 10 ו־RLS 27/27 מול Supabase עברו; ה־migration טרם הוחל |
+| SEC-FEEDBACK-001 | Security | contracts/feedback + feedback table + submit_feedback + feedback widget | unit + negative integration + E2E | FEEDBACK | **Implemented (2026-11-12)** — unit 47, E2E 10 ו־RLS 27/27 מול Supabase עברו; ה־migration הוחל ופרוס |
