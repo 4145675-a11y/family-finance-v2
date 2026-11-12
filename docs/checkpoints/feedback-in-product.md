@@ -1,6 +1,6 @@
 # CHECKPOINT — FEEDBACK: משוב מתוך המוצר
 
-- **Result**: PARTIAL — הקוד, בדיקות היחידה, בדיקות הדפדפן ובדיקות הבידוד מול Supabase עוברים (27/27, 2026-11-12); ה־migration **לא הוחל** על המסד; לא נעשה commit.
+- **Result**: PARTIAL — הקוד, בדיקות היחידה, בדיקות הדפדפן ובדיקות הבידוד מול Supabase עוברים (27/27, 2026-11-12); הקוד ב־`main` (`8a5d527`) ופרוס ב־Render; ה־migration **לא הוחל** על המסד.
 - **Branch**: `feature/in-product-feedback` (מ־`main` ב־`a409669`)
 - **Environment**: Windows 11, Node 24.19.0, backend `local_json` לבדיקות הדפדפן
 - **Date**: 2026-11-12
@@ -58,7 +58,7 @@
 | Integration/RLS | `npx vitest run --config vitest.integration.config.ts supabase/tests/rls-feedback.integration.test.ts` | PASS (0) | 27/27 מול Supabase, 43.7 שניות. ה־migration הוחל בתוך טרנזקציית הבדיקה ובוטל איתה |
 | DB cleanliness | `npm run db:cleanliness` | FAIL (1), צפוי | 38 טבלאות ציבוריות (בלי `feedback`, כלומר ה־migration בוטל), 0 משתמשי בדיקה, 38/38 RLS enabled+forced. ה־FAIL היחיד הוא "database holds no household": במסד יש משק בית אמיתי אחד, כי הייצור בשימוש |
 | E2E (feedback) | `npm run e2e -- e2e/specs/feedback*.ts` | PASS (0) | 10/10: 8 במחשב ו־2 בטלפון |
-| E2E (הכול) | `npm run e2e` | FAIL (1) | 167 עברו, 1 נכשלה, 6 לא רצו אחריה |
+| E2E (הכול) | `npm run e2e` | PASS (0) | 174/174, אחרי תיקון התאריך שפג ב־`ai-unconfigured.plain.spec.ts` (`8a5d527`) |
 | Build | `npm run build`, `check:build`, `check:shell` | PASS (0) | |
 | Fail-closed / secrets / env | `check:fail-closed`, `check:client-secrets`, `check:no-env-files` | PASS (0) | |
 | Forbidden scan | `npm run scan:forbidden` | PASS (0) | 0 errors, 0 warnings |
@@ -92,5 +92,13 @@
 
 עצירה לאישור. הצעדים הבאים, כל אחד דורש הוראה מפורשת:
 
-1. החלת ה־migration על המסד (פעולת בעלים).
-2. commit.
+1. החלת ה־migration על המסד (פעולת בעלים): `npm run db:apply -- supabase/migrations/20261112090000_in_product_feedback.sql`. הניסיון להריץ אותה מכאן נחסם על ידי בודק ההרשאות של הסביבה.
+
+## Deployment (2026-11-12)
+
+- `main` קודם ל־`8a5d527` בלי merge commit (fast-forward), ונדחף.
+- GitHub: "Quality gates" success, "Deployed service (read-only)" success.
+- `/api/health` מחזיר `readiness: ready` ו־`schema: compatible`.
+- `npm run smoke:production`: 20/20.
+- `/admin/feedback/export` עונה לאנונימי `404 Not found` עם `Cache-Control: no-store`, כלומר ה־handler החדש הוא שעונה.
+- `db:cleanliness`: 38 טבלאות. `feedback` עוד לא קיימת, ולכן שליחת משוב בייצור עונה "ההערה לא נשלחה" עד להחלת ה־migration.
